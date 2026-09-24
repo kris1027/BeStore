@@ -29,14 +29,15 @@ Single brand online store: storefront (guest or account checkout, card payment) 
 ## Commands
 
 ```bash
-pnpm install                 # also runs prisma generate
+pnpm install                 # also runs prisma generate and installs the pre commit hook
 pnpm db:start                # local Supabase stack (needs Docker); db:stop to stop
 pnpm db:migrate              # prisma migrate dev
 pnpm dev                     # dev server
 pnpm build
 pnpm lint && pnpm typecheck
-pnpm exec vitest run         # unit + integration (*.test.ts beside the source)
-pnpm exec playwright test    # e2e (tests/e2e/*.spec.ts)
+pnpm format                  # Prettier; format:check in CI
+pnpm test                    # Vitest unit + integration (*.test.ts beside the source)
+pnpm test:e2e                # Playwright e2e (tests/e2e/*.spec.ts)
 ```
 
 ## Specs
@@ -61,10 +62,10 @@ Stored in `docs/specs/`. Format: `docs/specs/NNNN-title/index.md`. Scope lives i
 
 ## Tooling
 
-Chosen here, installed by `/develop tooling`:
-- ESLint (Next.js config, `@typescript-eslint/no-explicit-any: error`) + Prettier with `prettier-plugin-tailwindcss`; scripts `format`, `format:check`, `test`.
-- Pre commit (simple-git-hooks + lint-staged): lint and format staged files, then `pnpm typecheck`.
-- CI: GitHub Actions on push and PR: install, lint, format check, typecheck, Vitest (Playwright once flows exist).
+Installed:
+- ESLint (Next.js config, `@typescript-eslint/no-explicit-any: error`) + Prettier with `prettier-plugin-tailwindcss`; scripts `format`, `format:check`, `test`, `test:e2e`. Prettier skips `*.md` on purpose (skills and `next dev` own those files).
+- Pre commit (simple-git-hooks + lint-staged): lint and format staged files, then `pnpm typecheck`. `SKIP_SIMPLE_GIT_HOOKS=1` bypasses it in an emergency.
+- CI: [.github/workflows/ci.yml](.github/workflows/ci.yml), on pushes to `main` and on every PR: install, lint, format check, typecheck, Vitest (Playwright once flows exist).
 
 ## Git
 
