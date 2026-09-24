@@ -1,0 +1,9 @@
+{
+  "tool": "vitest",
+  "gate": null,
+  "additionalTools": [],
+  "e2eTool": "playwright",
+  "testDir": "beside the source (unit); tests/e2e (Playwright)",
+  "filePattern": "*.test.ts (unit); *.spec.ts (e2e)",
+  "packageManager": "pnpm"
+}
