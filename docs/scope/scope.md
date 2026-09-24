@@ -13,7 +13,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 |---|---------|-------|--------|
 | 1 | Stack & architecture | Foundation | done |
 | 2 | Coding standards & tooling | Foundation | done |
-| 3 | Data model | Foundation | planned |
+| 3 | Data model | Foundation | in-progress |
 | 4 | Design system & UI foundation | Foundation | planned |
 | 5 | Admin sign in | Slice 1 | planned |
 | 6 | Core buy loop | Slice 1 | planned |
@@ -52,10 +52,18 @@ code in [package.json](../../package.json), [.github/workflows/](../../.github/w
   - [x] Pre commit hook (lint, format, typecheck)
   - [x] CI on GitHub Actions
 
-### 3. Data model · needs a decision
+### 3. Data model · in-progress
 Core entities every feature builds on: products, variants (size, color) with their own price and stock, categories, images, carts, orders and order lines, customers, admins, discounts, shipping settings.
 **Done when:** the schema supports every planned slice (variants, guest and account orders, refunds, promo codes) without a breaking migration, and order lines keep the price paid even if the product changes later.
-- [ ] Design it (spec): `/architect data model`
+spec [0002](../specs/0002-data-model/index.md)
+- [x] Design it (spec): `/architect data model`
+- [ ] Build it: `/develop data model`
+  - [ ] Thin thread: products, variants and settings migrated, db test suite and CI Postgres running (AC-1, AC-2, AC-4, AC-9, AC-14)
+  - [ ] Full catalog, people and cart tables with their constraints and tests (AC-5, AC-7, AC-10)
+  - [ ] Orders, money and operations tables, no drift, constraint and race tests (AC-3, AC-6, AC-8, AC-11, AC-12, AC-15)
+  - [ ] Demo seed with the local host guard (AC-13)
+- [ ] Verify it: `/check verify data model`
+- [ ] Test it: `/test data model`
 
 ### 4. Design system & UI foundation · needs a decision
 Visual language, layout, and base components shared by the storefront and the admin panel, built to WCAG AA from the start.
