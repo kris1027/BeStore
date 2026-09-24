@@ -7,7 +7,9 @@ React Email templates for the customer emails (order confirmation, shipped, refu
 ## Conventions
 
 - Templates are React components with named exports, rendered and sent only on the server.
-- Sending happens after the work it reports is committed, and must be safe to retry: an email for one event goes out once (use a Resend idempotency key tied to the order or event).
+- Sending happens after the work it reports is committed, and must be safe to retry: an email for one event goes out once.
+  - Build the Resend idempotency key from the email type plus the order or event id (e.g. `order-confirmation/<orderId>`), so different emails for one order never share a key.
+  - Resend keeps idempotency keys for only 24 hours. Retries later than that must also check a durable record of sent emails in our DB.
 - `RESEND_API_KEY` and `EMAIL_FROM` join the Zod schema in `src/lib/env.ts` when this area is built.
 
 ## Agent skills
