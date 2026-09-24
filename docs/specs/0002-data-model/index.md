@@ -1,7 +1,7 @@
 # 0002. Data model for BeStore
 
 **Date**: 2026-09-24
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 
@@ -228,9 +228,9 @@ All in `*.db.test.ts`, run by `pnpm test:db`.
 Tracer Bullet within a foundation: prove the thread (schema → migration → generated client → a real DB test in CI) on a thin slice of tables first, then widen the same thread to the full model. Everything ships in one migration before the feature is marked done; the first milestone iterates on an uncommitted migration.
 
 **Milestone 1: thin thread through every layer**
-1. Add `products`, `product_variants` and `store_settings` to `prisma/schema.prisma` with the conventions above; `prisma migrate dev --create-only`; append RLS, the stock and price CHECKs, and the settings row; apply, satisfies **AC-1**, **AC-2**, **AC-4**, **AC-9**
-2. Add the db test setup: split `vitest.config.ts` into Vitest `projects`, `unit` (today's config, excluding `**/*.db.test.ts`) and `db` (`**/*.db.test.ts`, `fileParallelism: false`); `pnpm test` runs `unit`, `pnpm test:db` runs `prisma migrate deploy` against `TEST_DATABASE_URL` then the `db` project; a helper builds its own `PrismaClient` from `TEST_DATABASE_URL` (not `src/lib/db.ts`, which needs the full env) and refuses if it equals `DATABASE_URL` or `DIRECT_URL`; `beforeEach` runs `TRUNCATE ... RESTART IDENTITY CASCADE` on every table except `_prisma_migrations` and `store_settings`; add `TEST_DATABASE_URL` to `src/lib/env.ts` (optional) and `.env.example`, satisfies **AC-14**
-3. Add a Postgres 17 service container to `.github/workflows/ci.yml` with `DIRECT_URL` and `TEST_DATABASE_URL` both pointing at it, then `pnpm test:db`; first tests: RLS check and the stock CHECK, satisfies **AC-2**, **AC-4**, **AC-14**
+1. [x] Add `products`, `product_variants` and `store_settings` to `prisma/schema.prisma` with the conventions above; `prisma migrate dev --create-only`; append RLS, the stock and price CHECKs, and the settings row; apply, satisfies **AC-1**, **AC-2**, **AC-4**, **AC-9**
+2. [x] Add the db test setup: split `vitest.config.ts` into Vitest `projects`, `unit` (today's config, excluding `**/*.db.test.ts`) and `db` (`**/*.db.test.ts`, `fileParallelism: false`); `pnpm test` runs `unit`, `pnpm test:db` runs `prisma migrate deploy` against `TEST_DATABASE_URL` then the `db` project; a helper builds its own `PrismaClient` from `TEST_DATABASE_URL` (not `src/lib/db.ts`, which needs the full env) and refuses if it equals `DATABASE_URL` or `DIRECT_URL`; `beforeEach` runs `TRUNCATE ... RESTART IDENTITY CASCADE` on every table except `_prisma_migrations` and `store_settings`; add `TEST_DATABASE_URL` to `src/lib/env.ts` (optional) and `.env.example`, satisfies **AC-14**
+3. [x] Add a Postgres 17 service container to `.github/workflows/ci.yml` with `DIRECT_URL` and `TEST_DATABASE_URL` both pointing at it, then `pnpm test:db`; first tests: RLS check and the stock CHECK, satisfies **AC-2**, **AC-4**, **AC-14**
 
 **Milestone 2: full catalog, people and cart**
 4. Reset the uncommitted migration and add option types, option values, `variant_option_values`, categories, `product_categories`, images, `admin_users`, `customers`, `customer_addresses`, `carts`, `cart_items`, with their indexes, CHECKs, the default address partial unique index and RLS, satisfies **AC-1**, **AC-2**, **AC-5**, **AC-10**
