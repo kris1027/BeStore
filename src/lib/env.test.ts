@@ -47,6 +47,12 @@ describe("env", () => {
     },
   );
 
+  it.each(["DATABASE_URL", "DIRECT_URL"] as const)("rejects %s when it is not a PostgreSQL URL", async (key) => {
+    stubEnv({ [key]: "https://supabase.com/dashboard/project/abc" });
+
+    await expect(loadEnv()).rejects.toThrow("PostgreSQL connection string");
+  });
+
   it.each(["NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"] as const)(
     "rejects an empty %s, as left by a copied .env.example",
     async (key) => {
@@ -95,13 +101,22 @@ describe("env", () => {
   });
 
   describe("STORE_TIMEZONE", () => {
-    it.each(["Europe/Warsaw", "America/New_York", "UTC"])("accepts the IANA zone %s", async (zone) => {
+    it.each(["Europe/Warsaw", "America/New_York", "America/Argentina/Buenos_Aires", "UTC"])("accepts the IANA zone %s", async (zone) => {
       stubEnv({ STORE_TIMEZONE: zone });
 
       await expect(loadEnv()).resolves.toMatchObject({ STORE_TIMEZONE: zone });
     });
 
-    it.each(["Mars/Olympus_Mons", "Warsaw", "not a zone"])("rejects %j with the IANA hint", async (zone) => {
+    it.each([
+      "Mars/Olympus_Mons",
+      "Warsaw",
+      "not a zone",
+      "+02:00",
+      "EST",
+      "CET",
+      "europe/warsaw",
+      "Etc/GMT-2",
+    ])("rejects %j with the IANA hint", async (zone) => {
       stubEnv({ STORE_TIMEZONE: zone });
 
       await expect(loadEnv()).rejects.toThrow("IANA timezone, e.g. Europe/Warsaw");
