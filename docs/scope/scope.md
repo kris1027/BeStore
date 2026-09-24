@@ -62,7 +62,7 @@ spec [0002](../specs/0002-data-model/index.md) · code in [prisma/](../../prisma
   - [x] Full catalog, people and cart tables with their constraints and tests (AC-5, AC-7, AC-10)
   - [x] Orders, money and operations tables, no drift, constraint and race tests (AC-3, AC-6, AC-8, AC-11, AC-12, AC-15)
   - [x] Demo seed with the local host guard (AC-13)
-- [ ] Verify it: `/check verify data model`
+- [x] Verify it: `/check verify data model`
 - [ ] Test it: `/test data model`
 
 ### 4. Design system & UI foundation · needs a decision

@@ -14,7 +14,7 @@ _Steps derived from spec 0002 acceptance criteria. `/check verify` runs these; `
 - [x] `DIRECT_URL=postgresql://u:p@db.example.com:5432/postgres pnpm db:seed` → refuses, exit 1, names the host; with `-- --yes` it passes the guard (then fails to connect) → AC-13
 - [x] `pnpm test:db` → migrates `bestore_test` and all db suites pass; `pnpm test` passes with no database running → AC-14
 - [x] Unset `TEST_DATABASE_URL`, or set it to the `DIRECT_URL` value, then `pnpm test:db` → refuses before running any migration → AC-14
-- [ ] Push the branch → the CI `check` job starts a Postgres 17 service and `pnpm test:db` passes there → AC-14
+- [x] Push the branch → the CI `check` job starts a Postgres 17 service and `pnpm test:db` passes there → AC-14
 
 ## Constraint behavior (covered by `pnpm test:db`, spot check by hand if wanted)
 - [x] Rename the product, reprice and archive the variant → the order line keeps name, label, SKU, image path and unit price; hard delete the product in SQL → line survives with `variant_id` and `product_id` null → AC-3
