@@ -16,6 +16,9 @@ export const validEnv = {
 export type EnvKey = keyof typeof validEnv;
 
 export function stubEnv(overrides: Partial<Record<EnvKey, string | undefined>> = {}) {
+  // Clear optional variables too, so one set in the shell (CI sets TEST_DATABASE_URL job
+  // wide) cannot leak into the parsed env.
+  vi.stubEnv("TEST_DATABASE_URL", undefined);
   const values = { ...validEnv, ...overrides };
   for (const key of Object.keys(values) as EnvKey[]) {
     vi.stubEnv(key, values[key]);

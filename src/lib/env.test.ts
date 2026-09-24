@@ -19,6 +19,13 @@ describe("env", () => {
     await expect(loadEnv()).resolves.toEqual(validEnv);
   });
 
+  it("stays hermetic when the shell sets TEST_DATABASE_URL, as CI does", async () => {
+    vi.stubEnv("TEST_DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/bestore_test");
+    stubEnv();
+
+    await expect(loadEnv()).resolves.toEqual(validEnv);
+  });
+
   it("does not expose variables outside the schema", async () => {
     stubEnv();
     vi.stubEnv("UNRELATED_SECRET", "should-not-leak");
