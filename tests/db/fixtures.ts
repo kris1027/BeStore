@@ -37,3 +37,82 @@ export async function createSimpleProduct(suffix = "1", stockQuantity = 5) {
   const variant = await createVariant(product.id, { sku: `SKU-${suffix}`, stockQuantity });
   return { product, variant };
 }
+
+// A product with Size (S, M) and Color (Red, Blue) and one variant per combination,
+// with option_key and variant_option_values kept in step as the catalog action will.
+export async function createProductWithOptions(suffix = "opt") {
+  const product = await createProduct(suffix);
+  const size = await testDb.productOptionType.create({
+    data: {
+      productId: product.id,
+      name: "Size",
+      position: 0,
+      values: {
+        create: [
+          { value: "S", position: 0 },
+          { value: "M", position: 1 },
+        ],
+      },
+    },
+    include: { values: true },
+  });
+  const color = await testDb.productOptionType.create({
+    data: {
+      productId: product.id,
+      name: "Color",
+      position: 1,
+      values: {
+        create: [
+          { value: "Red", position: 0 },
+          { value: "Blue", position: 1 },
+        ],
+      },
+    },
+    include: { values: true },
+  });
+  const variants = [];
+  for (const s of size.values) {
+    for (const c of color.values) {
+      const ids = [s.id, c.id].toSorted();
+      variants.push(
+        await testDb.productVariant.create({
+          data: {
+            productId: product.id,
+            sku: `SKU-${suffix}-${s.value}-${c.value}`,
+            priceCents: 3000,
+            stockQuantity: 3,
+            position: variants.length,
+            optionKey: ids.join(","),
+            optionValues: { create: ids.map((optionValueId) => ({ optionValueId })) },
+          },
+        }),
+      );
+    }
+  }
+  return { product, size, color, variants };
+}
+
+let customerCount = 0;
+
+export async function createCustomer(email?: string) {
+  customerCount += 1;
+  return testDb.customer.create({
+    data: { id: crypto.randomUUID(), email: email ?? `customer${customerCount}@example.com` },
+  });
+}
+
+export function address(customerId: string, isDefault = false) {
+  return {
+    customerId,
+    fullName: "Ada Lovelace",
+    line1: "1 Main St",
+    city: "Warsaw",
+    postalCode: "00-001",
+    countryCode: "PL",
+    isDefault,
+  };
+}
+
+export function inThirtyDays() {
+  return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+}

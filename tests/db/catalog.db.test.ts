@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { expectViolation, SQLSTATE, testDb, resetDatabaseBeforeEach } from "./client";
-import { createProduct, createSimpleProduct, createVariant } from "./fixtures";
+import {
+  createProduct,
+  createProductWithOptions,
+  createSimpleProduct,
+  createVariant,
+} from "./fixtures";
 
 resetDatabaseBeforeEach();
 
@@ -89,6 +94,164 @@ describe("variant prices", () => {
       testDb.product.create({ data: { name: "Mug", slug: "mug", weightGrams: 0 } }),
       SQLSTATE.check,
       "products_weight_grams_check",
+    );
+  });
+});
+
+describe("catalog uniqueness (AC-5)", () => {
+  it("rejects a second variant with the same option combination", async () => {
+    const { product, variants } = await createProductWithOptions();
+    const first = variants[0]!;
+
+    await expectViolation(
+      createVariant(product.id, { sku: "SKU-DUP", optionKey: first.optionKey }),
+      SQLSTATE.unique,
+      "product_variants_product_id_option_key_key",
+    );
+  });
+
+  it("rejects a second default variant on the same product", async () => {
+    const { product } = await createSimpleProduct();
+
+    await expectViolation(
+      createVariant(product.id, { sku: "SKU-OTHER" }),
+      SQLSTATE.unique,
+      "product_variants_product_id_option_key_key",
+    );
+  });
+
+  it("allows the same option combination on different products", async () => {
+    const a = await createProduct("a");
+    const b = await createProduct("b");
+    await createVariant(a.id, { sku: "SKU-A" });
+
+    await expect(createVariant(b.id, { sku: "SKU-B" })).resolves.toBeDefined();
+  });
+
+  it("rejects a duplicate SKU", async () => {
+    const { variant } = await createSimpleProduct("a");
+    const other = await createProduct("b");
+
+    await expectViolation(
+      createVariant(other.id, { sku: variant.sku }),
+      SQLSTATE.unique,
+      "product_variants_sku_key",
+    );
+  });
+
+  it("rejects a duplicate product slug", async () => {
+    await createProduct("same");
+
+    await expectViolation(createProduct("same"), SQLSTATE.unique, "products_slug_key");
+  });
+
+  it("rejects a duplicate category slug", async () => {
+    const category = { name: "Tops", slug: "tops", position: 0 };
+    await testDb.category.create({ data: category });
+
+    await expectViolation(
+      testDb.category.create({ data: category }),
+      SQLSTATE.unique,
+      "categories_slug_key",
+    );
+  });
+
+  it("rejects a duplicate option name on a product and a duplicate value on an option", async () => {
+    const { product, size } = await createProductWithOptions();
+
+    await expectViolation(
+      testDb.productOptionType.create({
+        data: { productId: product.id, name: "Size", position: 2 },
+      }),
+      SQLSTATE.unique,
+      "product_option_types_product_id_name_key",
+    );
+    await expectViolation(
+      testDb.productOptionValue.create({
+        data: { optionTypeId: size.id, value: "S", position: 2 },
+      }),
+      SQLSTATE.unique,
+      "product_option_values_option_type_id_value_key",
+    );
+  });
+});
+
+describe("catalog relations", () => {
+  it("refuses to delete an option value a variant still uses", async () => {
+    const { size } = await createProductWithOptions();
+
+    await expectViolation(
+      testDb.productOptionValue.delete({ where: { id: size.values[0]!.id } }),
+      SQLSTATE.foreignKey,
+    );
+  });
+
+  it("deletes options, variants, images and category links with the product", async () => {
+    const { product, size } = await createProductWithOptions();
+    const category = await testDb.category.create({
+      data: { name: "Tops", slug: "tops", position: 0 },
+    });
+    await testDb.productCategory.create({
+      data: { productId: product.id, categoryId: category.id, position: 0 },
+    });
+    await testDb.productImage.create({
+      data: {
+        productId: product.id,
+        storagePath: "products/tee/1.jpg",
+        position: 0,
+        optionValueId: size.values[0]!.id,
+      },
+    });
+
+    await testDb.product.delete({ where: { id: product.id } });
+
+    const counts = await Promise.all([
+      testDb.productOptionType.count(),
+      testDb.productOptionValue.count(),
+      testDb.productVariant.count(),
+      testDb.variantOptionValue.count(),
+      testDb.productImage.count(),
+      testDb.productCategory.count(),
+      testDb.category.count(),
+    ]);
+    expect(counts).toEqual([0, 0, 0, 0, 0, 0, 1]);
+  });
+
+  it("keeps an image when its option value goes away, unlinked", async () => {
+    const product = await createProduct();
+    const size = await testDb.productOptionType.create({
+      data: {
+        productId: product.id,
+        name: "Size",
+        position: 0,
+        values: { create: [{ value: "S", position: 0 }] },
+      },
+      include: { values: true },
+    });
+    const image = await testDb.productImage.create({
+      data: {
+        productId: product.id,
+        storagePath: "products/tee/s.jpg",
+        position: 0,
+        optionValueId: size.values[0]!.id,
+      },
+    });
+
+    await testDb.productOptionType.delete({ where: { id: size.id } });
+
+    const after = await testDb.productImage.findUniqueOrThrow({ where: { id: image.id } });
+    expect(after.optionValueId).toBeNull();
+  });
+
+  it("rejects a duplicate image storage path", async () => {
+    const product = await createProduct();
+    const image = { productId: product.id, storagePath: "products/tee/1.jpg", position: 0 };
+    await testDb.productImage.create({ data: image });
+
+    await expectViolation(
+      testDb.productImage.create({ data: { ...image, position: 1 } }),
+      SQLSTATE.unique,
+      "product_images_storage_path_key",
     );
   });
 });

@@ -233,8 +233,8 @@ Tracer Bullet within a foundation: prove the thread (schema → migration → ge
 3. [x] Add a Postgres 17 service container to `.github/workflows/ci.yml` with `DIRECT_URL` and `TEST_DATABASE_URL` both pointing at it, then `pnpm test:db`; first tests: RLS check and the stock CHECK, satisfies **AC-2**, **AC-4**, **AC-14**
 
 **Milestone 2: full catalog, people and cart**
-4. Reset the uncommitted migration and add option types, option values, `variant_option_values`, categories, `product_categories`, images, `admin_users`, `customers`, `customer_addresses`, `carts`, `cart_items`, with their indexes, CHECKs, the default address partial unique index and RLS, satisfies **AC-1**, **AC-2**, **AC-5**, **AC-10**
-5. Tests for variant combination and slug/SKU uniqueness, default address, cart line rules, customer deletion cascade, satisfies **AC-5**, **AC-7**, **AC-10**
+4. [x] Reset the uncommitted migration and add option types, option values, `variant_option_values`, categories, `product_categories`, images, `admin_users`, `customers`, `customer_addresses`, `carts`, `cart_items`, with their indexes, CHECKs, the default address partial unique index and RLS, satisfies **AC-1**, **AC-2**, **AC-5**, **AC-10**
+5. [x] Tests for variant combination and slug/SKU uniqueness, default address, cart line rules, customer deletion cascade, satisfies **AC-5**, **AC-7**, **AC-10**
 
 **Milestone 3: orders, money and operations**
 6. Add `orders`, `order_lines`, `order_events`, `refunds`, `refund_lines`, `discount_codes`, `discount_redemptions`, `stripe_events`, `email_sends` with all enums, CHECKs, indexes, RLS, and `ALTER SEQUENCE orders_number_seq START WITH 1001 RESTART WITH 1001` so order numbers start at 1001 (setting START keeps `TRUNCATE ... RESTART IDENTITY` in tests at 1001), satisfies **AC-1**, **AC-2**, **AC-6**, **AC-8**, **AC-11**, **AC-12**
