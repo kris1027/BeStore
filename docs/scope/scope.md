@@ -12,7 +12,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | # | Feature | Phase | Status |
 |---|---------|-------|--------|
 | 1 | Stack & architecture | Foundation | done |
-| 2 | Coding standards & tooling | Foundation | planned |
+| 2 | Coding standards & tooling | Foundation | done |
 | 3 | Data model | Foundation | planned |
 | 4 | Design system & UI foundation | Foundation | planned |
 | 5 | Admin sign in | Slice 1 | planned |
@@ -41,10 +41,16 @@ spec [0001](../specs/0001-stack-architecture/index.md) · code in [app/](../../a
 - [x] Verify it: `/check verify stack & architecture`
 - [x] Test it: `/test stack & architecture`
 
-### 2. Coding standards & tooling
+### 2. Coding standards & tooling · done
 Capture conventions from the real scaffolded project, then install lint, format, type checks, pre commit hooks, and CI.
 **Done when:** root `AGENTS.md` reflects the real stack, and lint, format, and pre commit run clean.
-- [ ] Capture conventions + tooling choices: `/audit`
+code in [package.json](../../package.json), [.github/workflows/](../../.github/workflows/)
+- [x] Capture conventions + tooling choices: `/audit`
+- [x] Build it: `/develop tooling`
+  - [x] Stricter types (`noUncheckedIndexedAccess`, no `any`)
+  - [x] Prettier with Tailwind class sorting
+  - [x] Pre commit hook (lint, format, typecheck)
+  - [x] CI on GitHub Actions
 
 ### 3. Data model · needs a decision
 Core entities every feature builds on: products, variants (size, color) with their own price and stock, categories, images, carts, orders and order lines, customers, admins, discounts, shipping settings.
