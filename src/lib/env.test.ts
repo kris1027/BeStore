@@ -28,30 +28,40 @@ describe("env", () => {
     expect(env).not.toHaveProperty("UNRELATED_SECRET");
   });
 
-  it.each(Object.keys(validEnv) as EnvKey[])("fails and names %s when it is missing", async (key) => {
-    stubEnv({ [key]: undefined });
-
-    await expect(loadEnv()).rejects.toThrow(
-      expect.objectContaining({
-        message: expect.stringMatching(new RegExp(`Invalid environment variables[\\s\\S]*${key}`)),
-      }),
-    );
-  });
-
-  it.each(["DATABASE_URL", "DIRECT_URL", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SITE_URL"] as const)(
-    "rejects %s when it is not a URL",
+  it.each(Object.keys(validEnv) as EnvKey[])(
+    "fails and names %s when it is missing",
     async (key) => {
-      stubEnv({ [key]: "localhost-without-scheme" });
+      stubEnv({ [key]: undefined });
 
-      await expect(loadEnv()).rejects.toThrow(key);
+      await expect(loadEnv()).rejects.toThrow(
+        expect.objectContaining({
+          message: expect.stringMatching(
+            new RegExp(`Invalid environment variables[\\s\\S]*${key}`),
+          ),
+        }),
+      );
     },
   );
 
-  it.each(["DATABASE_URL", "DIRECT_URL"] as const)("rejects %s when it is not a PostgreSQL URL", async (key) => {
-    stubEnv({ [key]: "https://supabase.com/dashboard/project/abc" });
+  it.each([
+    "DATABASE_URL",
+    "DIRECT_URL",
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SITE_URL",
+  ] as const)("rejects %s when it is not a URL", async (key) => {
+    stubEnv({ [key]: "localhost-without-scheme" });
 
-    await expect(loadEnv()).rejects.toThrow("PostgreSQL connection string");
+    await expect(loadEnv()).rejects.toThrow(key);
   });
+
+  it.each(["DATABASE_URL", "DIRECT_URL"] as const)(
+    "rejects %s when it is not a PostgreSQL URL",
+    async (key) => {
+      stubEnv({ [key]: "https://supabase.com/dashboard/project/abc" });
+
+      await expect(loadEnv()).rejects.toThrow("PostgreSQL connection string");
+    },
+  );
 
   it.each(["NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"] as const)(
     "rejects an empty %s, as left by a copied .env.example",
@@ -93,19 +103,25 @@ describe("env", () => {
       await expect(loadEnv()).resolves.toMatchObject({ STORE_CURRENCY: code });
     });
 
-    it.each(["euro", "eur", "EURO", "EU", "E1R", " EUR"])("rejects %j with the ISO 4217 hint", async (code) => {
-      stubEnv({ STORE_CURRENCY: code });
+    it.each(["euro", "eur", "EURO", "EU", "E1R", " EUR"])(
+      "rejects %j with the ISO 4217 hint",
+      async (code) => {
+        stubEnv({ STORE_CURRENCY: code });
 
-      await expect(loadEnv()).rejects.toThrow("ISO 4217 code, e.g. EUR");
-    });
+        await expect(loadEnv()).rejects.toThrow("ISO 4217 code, e.g. EUR");
+      },
+    );
   });
 
   describe("STORE_TIMEZONE", () => {
-    it.each(["Europe/Warsaw", "America/New_York", "America/Argentina/Buenos_Aires", "UTC"])("accepts the IANA zone %s", async (zone) => {
-      stubEnv({ STORE_TIMEZONE: zone });
+    it.each(["Europe/Warsaw", "America/New_York", "America/Argentina/Buenos_Aires", "UTC"])(
+      "accepts the IANA zone %s",
+      async (zone) => {
+        stubEnv({ STORE_TIMEZONE: zone });
 
-      await expect(loadEnv()).resolves.toMatchObject({ STORE_TIMEZONE: zone });
-    });
+        await expect(loadEnv()).resolves.toMatchObject({ STORE_TIMEZONE: zone });
+      },
+    );
 
     it.each([
       "Mars/Olympus_Mons",

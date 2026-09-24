@@ -16,7 +16,10 @@ const envSchema = z.object({
 });
 
 function postgresUrl() {
-  return z.url({ protocol: /^postgres(ql)?$/, error: "PostgreSQL connection string (postgresql://...)" });
+  return z.url({
+    protocol: /^postgres(ql)?$/,
+    error: "PostgreSQL connection string (postgresql://...)",
+  });
 }
 
 // Intl also accepts fixed offsets ("+02:00"), legacy abbreviations ("EST") and any casing,
@@ -24,7 +27,8 @@ function postgresUrl() {
 // Only the Area/Location form (not the fixed-offset Etc/ zones) or UTC is allowed.
 function isIanaTimezone(value: string) {
   if (value === "UTC") return true;
-  if (!/^[A-Z][A-Za-z]*(\/[A-Z][A-Za-z0-9_+-]*)+$/.test(value) || value.startsWith("Etc/")) return false;
+  if (!/^[A-Z][A-Za-z]*(\/[A-Z][A-Za-z0-9_+-]*)+$/.test(value) || value.startsWith("Etc/"))
+    return false;
   try {
     new Intl.DateTimeFormat("en", { timeZone: value });
     return true;
