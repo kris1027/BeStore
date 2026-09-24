@@ -116,3 +116,37 @@ export function address(customerId: string, isDefault = false) {
 export function inThirtyDays() {
   return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 }
+
+type OrderInput = Partial<{
+  customerId: string;
+  cartId: string;
+  email: string;
+  status: "pending_payment" | "paid" | "shipped" | "delivered" | "cancelled" | "expired";
+  subtotalCents: number;
+  discountCents: number;
+  shippingCents: number;
+}>;
+
+// A pending guest order whose totals add up (total = subtotal - discount + shipping).
+export async function createOrder(input: OrderInput = {}) {
+  const subtotalCents = input.subtotalCents ?? 5000;
+  const discountCents = input.discountCents ?? 0;
+  const shippingCents = input.shippingCents ?? 0;
+  return testDb.order.create({
+    data: {
+      customerId: input.customerId,
+      cartId: input.cartId,
+      status: input.status,
+      email: input.email ?? "guest@example.com",
+      currency: "EUR",
+      subtotalCents,
+      discountCents,
+      shippingCents,
+      totalCents: subtotalCents - discountCents + shippingCents,
+    },
+  });
+}
+
+export async function createAdmin(email = "admin@example.com") {
+  return testDb.adminUser.create({ data: { id: crypto.randomUUID(), email, name: "Admin" } });
+}

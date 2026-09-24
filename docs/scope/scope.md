@@ -60,7 +60,7 @@ spec [0002](../specs/0002-data-model/index.md) · code in [prisma/](../../prisma
 - [ ] Build it: `/develop data model`
   - [x] Thin thread: products, variants and settings migrated, db test suite and CI Postgres running (AC-1, AC-2, AC-4, AC-9, AC-14)
   - [x] Full catalog, people and cart tables with their constraints and tests (AC-5, AC-7, AC-10)
-  - [ ] Orders, money and operations tables, no drift, constraint and race tests (AC-3, AC-6, AC-8, AC-11, AC-12, AC-15)
+  - [x] Orders, money and operations tables, no drift, constraint and race tests (AC-3, AC-6, AC-8, AC-11, AC-12, AC-15)
   - [ ] Demo seed with the local host guard (AC-13)
 - [ ] Verify it: `/check verify data model`
 - [ ] Test it: `/test data model`
