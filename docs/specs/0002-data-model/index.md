@@ -242,8 +242,8 @@ Tracer Bullet within a foundation: prove the thread (schema → migration → ge
 8. [x] Confirm `prisma migrate dev` reports no drift (CHECKs are invisible to drift; the partial index is declared in Prisma) and run the Supabase security advisor on the local stack, satisfies **AC-1**, **AC-2**
 
 **Milestone 4: seed**
-9. Add `tsx` as a dev dependency; write `prisma/seed.ts` and register it as `migrations.seed: "tsx prisma/seed.ts"` in `prisma.config.ts`, script `db:seed` = `prisma db seed`: upserts by slug and SKU, two categories, one simple product, one with Size, one with Size and Color; no images (the storefront shows its empty image state); refuses a `DIRECT_URL` host other than `localhost`/`127.0.0.1` unless `--yes`, satisfies **AC-13**
-10. Test that the seed runs twice cleanly and that the host guard refuses, satisfies **AC-13**
+9. [x] Add `tsx` as a dev dependency; write `prisma/seed.ts` and register it as `migrations.seed: "tsx prisma/seed.ts"` in `prisma.config.ts`, script `db:seed` = `prisma db seed`: upserts by slug and SKU, two categories, one simple product, one with Size, one with Size and Color; no images (the storefront shows its empty image state); refuses a `DIRECT_URL` host other than `localhost`/`127.0.0.1` unless `--yes`, satisfies **AC-13**
+10. [x] Test that the seed runs twice cleanly and that the host guard refuses, satisfies **AC-13**
 
 ## Consequences
 
