@@ -92,13 +92,9 @@ export async function createProductWithOptions(suffix = "opt") {
   return { product, size, color, variants };
 }
 
-let customerCount = 0;
-
 export async function createCustomer(email?: string) {
-  customerCount += 1;
-  return testDb.customer.create({
-    data: { id: crypto.randomUUID(), email: email ?? `customer${customerCount}@example.com` },
-  });
+  const id = crypto.randomUUID();
+  return testDb.customer.create({ data: { id, email: email ?? `customer-${id}@example.com` } });
 }
 
 export function address(customerId: string, isDefault = false) {

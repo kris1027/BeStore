@@ -283,6 +283,98 @@ describe("money (AC-6)", () => {
       "refunds_succeeded_at_check",
     );
   });
+
+  // Each row breaks exactly one rule, so the named constraint is the one that must fire.
+  it.each([
+    {
+      field: "discountCents",
+      data: { discountCents: -100, totalCents: 5100 },
+      constraint: "orders_discount_cents_check",
+    },
+    { field: "taxCents", data: { taxCents: -1 }, constraint: "orders_tax_cents_check" },
+    {
+      field: "refundedCents",
+      data: { refundedCents: -1 },
+      constraint: "orders_refunded_cents_check",
+    },
+    {
+      field: "discountValue",
+      data: { discountValue: 0 },
+      constraint: "orders_discount_value_check",
+    },
+  ])("rejects an order with a negative or zero $field", async ({ data, constraint }) => {
+    await expectViolation(
+      testDb.order.create({
+        data: {
+          email: "a@example.com",
+          currency: "EUR",
+          subtotalCents: 5000,
+          totalCents: 5000,
+          ...data,
+        },
+      }),
+      SQLSTATE.check,
+      constraint,
+    );
+  });
+
+  it.each([
+    {
+      field: "discountCents",
+      data: { discountCents: -100, lineTotalCents: 1100 },
+      constraint: "order_lines_discount_cents_check",
+    },
+    { field: "taxCents", data: { taxCents: -1 }, constraint: "order_lines_tax_cents_check" },
+    { field: "taxRateBps", data: { taxRateBps: -1 }, constraint: "order_lines_tax_rate_bps_check" },
+  ])("rejects an order line with a negative $field", async ({ data, constraint }) => {
+    const order = await createOrder();
+
+    await expectViolation(
+      testDb.orderLine.create({
+        data: {
+          orderId: order.id,
+          productName: "Tee",
+          sku: "SKU",
+          unitPriceCents: 1000,
+          quantity: 1,
+          lineTotalCents: 1000,
+          ...data,
+        },
+      }),
+      SQLSTATE.check,
+      constraint,
+    );
+  });
+
+  it("rejects a refund line with a quantity of 0", async () => {
+    const order = await createOrder();
+    const line = await testDb.orderLine.create({
+      data: {
+        orderId: order.id,
+        productName: "Tee",
+        sku: "SKU",
+        unitPriceCents: 1000,
+        quantity: 1,
+        lineTotalCents: 1000,
+      },
+    });
+    const refund = await testDb.refund.create({
+      data: { orderId: order.id, amountCents: 1000, actorType: "system" },
+    });
+
+    await expectViolation(
+      testDb.refundLine.create({
+        data: { refundId: refund.id, orderLineId: line.id, quantity: 0 },
+      }),
+      SQLSTATE.check,
+      "refund_lines_quantity_check",
+    );
+    await expect(
+      testDb.refundLine.create({
+        data: { refundId: refund.id, orderLineId: line.id, quantity: 1 },
+      }),
+    ).resolves.toBeDefined();
+  });
 });
 
 describe("guests and customer deletion (AC-7)", () => {
@@ -485,6 +577,45 @@ describe("promo codes (AC-5)", () => {
       SQLSTATE.check,
       "discount_codes_dates_check",
     );
+  });
+
+  it.each([
+    {
+      field: "maxRedemptions",
+      data: { maxRedemptions: 0 },
+      constraint: "discount_codes_max_redemptions_check",
+    },
+    {
+      field: "perCustomerLimit",
+      data: { perCustomerLimit: 0 },
+      constraint: "discount_codes_per_customer_limit_check",
+    },
+    {
+      field: "minSubtotalCents",
+      data: { minSubtotalCents: -1 },
+      constraint: "discount_codes_min_subtotal_cents_check",
+    },
+  ])("rejects a code whose $field is out of range", async ({ data, constraint }) => {
+    await expectViolation(
+      testDb.discountCode.create({ data: { code: "LIMITS", type: "percent", value: 10, ...data } }),
+      SQLSTATE.check,
+      constraint,
+    );
+  });
+
+  it("accepts a code with limits at their lowest allowed values", async () => {
+    await expect(
+      testDb.discountCode.create({
+        data: {
+          code: "EDGE",
+          type: "percent",
+          value: 10,
+          maxRedemptions: 1,
+          perCustomerLimit: 1,
+          minSubtotalCents: 0,
+        },
+      }),
+    ).resolves.toBeDefined();
   });
 
   it("cannot delete a code that has been redeemed", async () => {

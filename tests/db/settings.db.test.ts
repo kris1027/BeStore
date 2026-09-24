@@ -36,5 +36,19 @@ describe("store settings", () => {
       SQLSTATE.check,
       "store_settings_flat_shipping_cents_check",
     );
+    await expectViolation(
+      testDb.storeSettings.update({ where: { id: 1 }, data: { freeShippingThresholdCents: -1 } }),
+      SQLSTATE.check,
+      "store_settings_free_shipping_threshold_cents_check",
+    );
+  });
+
+  it("accepts a free shipping threshold of 0", async () => {
+    const settings = await testDb.storeSettings.update({
+      where: { id: 1 },
+      data: { freeShippingThresholdCents: 0 },
+    });
+
+    expect(settings.freeShippingThresholdCents).toBe(0);
   });
 });

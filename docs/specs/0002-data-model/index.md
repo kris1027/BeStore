@@ -1,7 +1,7 @@
 # 0002. Data model for BeStore
 
 **Date**: 2026-09-24
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 
