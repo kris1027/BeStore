@@ -7,8 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "typecheck": "next typegen && tsc --noEmit",
-    "postinstall": "prisma generate",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "postinstall": "prisma generate && simple-git-hooks",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:start": "supabase start",
@@ -34,7 +38,12 @@
     "dotenv": "^18.0.3",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
+    "eslint-config-prettier": "^10.1.8",
+    "lint-staged": "^17.5.1",
+    "prettier": "^3.9.9",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "prisma": "7.10.0",
+    "simple-git-hooks": "^2.14.0",
     "supabase": "^2.117.0",
     "tailwindcss": "^4",
     "typescript": "^5",
@@ -43,5 +52,15 @@
   "packageManager": "pnpm@11.15.1",
   "engines": {
     "node": ">=24"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm exec lint-staged && pnpm typecheck"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,mts,mjs,js}": [
+      "eslint --fix --no-warn-ignored",
+      "prettier --write"
+    ],
+    "*.{json,css,yaml,yml}": "prettier --write"
   }
 }

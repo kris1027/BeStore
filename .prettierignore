@@ -1,0 +1,14 @@
+# Generated or managed by tools
+src/generated/
+pnpm-lock.yaml
+supabase/.temp/
+supabase/.branches/
+test-results/
+playwright-report/
+.playwright-mcp/
+.agents/
+.claude/
+skills-lock.json
+
+# Markdown docs are written by the workflow skills (and `next dev` for AGENTS.md); keep them as authored.
+*.md
