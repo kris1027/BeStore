@@ -1,0 +1,12 @@
+// Prisma Migrate owns the `public` schema (spec 0001).
+// Every table gets RLS enabled, with no policies, in the migration that creates it.
+// Models arrive with the data model (feature 3).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
