@@ -48,3 +48,7 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /.playwright-mcp/
+
+# tailwind-4-docs snapshot: the Tailwind docs license says keep it local
+/.agents/skills/tailwind-4-docs/references/docs/
+/.agents/skills/tailwind-4-docs/references/docs-index.tsx
