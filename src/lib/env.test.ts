@@ -26,6 +26,34 @@ describe("env", () => {
     await expect(loadEnv()).resolves.toEqual(validEnv);
   });
 
+  describe("TEST_DATABASE_URL", () => {
+    it("treats a blank value, as copied from .env.example, as unset", async () => {
+      stubEnv();
+      vi.stubEnv("TEST_DATABASE_URL", "");
+
+      const env = await loadEnv();
+
+      expect(env.TEST_DATABASE_URL).toBeUndefined();
+    });
+
+    it("keeps a valid PostgreSQL URL", async () => {
+      const url = "postgresql://postgres:postgres@127.0.0.1:55322/bestore_test";
+      stubEnv();
+      vi.stubEnv("TEST_DATABASE_URL", url);
+
+      const env = await loadEnv();
+
+      expect(env.TEST_DATABASE_URL).toBe(url);
+    });
+
+    it("still rejects a value that is not a PostgreSQL URL", async () => {
+      stubEnv();
+      vi.stubEnv("TEST_DATABASE_URL", "https://example.com/db");
+
+      await expect(loadEnv()).rejects.toThrow("TEST_DATABASE_URL");
+    });
+  });
+
   it("does not expose variables outside the schema", async () => {
     stubEnv();
     vi.stubEnv("UNRELATED_SECRET", "should-not-leak");
