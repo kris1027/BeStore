@@ -13,6 +13,9 @@ const envSchema = z.object({
   NEXT_PUBLIC_SITE_URL: z.url(),
   STORE_CURRENCY: z.string().regex(/^[A-Z]{3}$/, "ISO 4217 code, e.g. EUR"),
   STORE_TIMEZONE: z.string().refine(isIanaTimezone, "IANA timezone, e.g. Europe/Warsaw"),
+  // Only `pnpm test:db` uses it (the app never does); it must never be the dev or a deployed database.
+  // A blank line (as copied from .env.example) means unset, not an invalid URL.
+  TEST_DATABASE_URL: z.preprocess((v) => (v === "" ? undefined : v), postgresUrl().optional()),
 });
 
 function postgresUrl() {

@@ -10,13 +10,15 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --project unit",
+    "test:db": "tsx scripts/test-db.ts",
     "test:e2e": "playwright test",
     "postinstall": "prisma generate && simple-git-hooks",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
+    "db:migrate": "prisma migrate dev && prisma generate",
     "db:start": "supabase start",
-    "db:stop": "supabase stop"
+    "db:stop": "supabase stop",
+    "db:seed": "prisma db seed"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",
@@ -46,6 +48,7 @@
     "simple-git-hooks": "^2.14.0",
     "supabase": "^2.117.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^5.0.1"
   },
