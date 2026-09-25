@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { type EnvKey, stubEnv, validEnv } from "../../tests/valid-env";
+import { type EnvKey, optionalEnvKeys, stubEnv, validEnv } from "../../tests/valid-env";
+
+const requiredEnvKeys = (Object.keys(validEnv) as EnvKey[]).filter(
+  (key) => !(optionalEnvKeys as readonly string[]).includes(key),
+);
 
 // env.ts validates process.env when it is first imported, so each test loads a fresh copy.
 async function loadEnv() {
@@ -63,20 +67,15 @@ describe("env", () => {
     expect(env).not.toHaveProperty("UNRELATED_SECRET");
   });
 
-  it.each(Object.keys(validEnv) as EnvKey[])(
-    "fails and names %s when it is missing",
-    async (key) => {
-      stubEnv({ [key]: undefined });
+  it.each(requiredEnvKeys)("fails and names %s when it is missing", async (key) => {
+    stubEnv({ [key]: undefined });
 
-      await expect(loadEnv()).rejects.toThrow(
-        expect.objectContaining({
-          message: expect.stringMatching(
-            new RegExp(`Invalid environment variables[\\s\\S]*${key}`),
-          ),
-        }),
-      );
-    },
-  );
+    await expect(loadEnv()).rejects.toThrow(
+      expect.objectContaining({
+        message: expect.stringMatching(new RegExp(`Invalid environment variables[\\s\\S]*${key}`)),
+      }),
+    );
+  });
 
   it.each([
     "DATABASE_URL",
@@ -171,6 +170,60 @@ describe("env", () => {
       stubEnv({ STORE_TIMEZONE: zone });
 
       await expect(loadEnv()).rejects.toThrow("IANA timezone, e.g. Europe/Warsaw");
+    });
+  });
+
+  describe("STORE_LOCALE", () => {
+    it.each(["", undefined])("defaults to en when it is %j", async (value) => {
+      stubEnv({ STORE_LOCALE: value });
+
+      await expect(loadEnv()).resolves.toMatchObject({ STORE_LOCALE: "en" });
+    });
+
+    it.each(["en", "en-GB", "pl-PL", "de"])("accepts the language tag %s", async (tag) => {
+      stubEnv({ STORE_LOCALE: tag });
+
+      await expect(loadEnv()).resolves.toMatchObject({ STORE_LOCALE: tag });
+    });
+
+    it("stores the canonical form of the tag", async () => {
+      stubEnv({ STORE_LOCALE: "EN-gb" });
+
+      await expect(loadEnv()).resolves.toMatchObject({ STORE_LOCALE: "en-GB" });
+    });
+
+    it.each(["xx-invalid-", "zz-ZZ", "english", "en_GB"])(
+      "rejects %j with the BCP 47 hint",
+      async (tag) => {
+        stubEnv({ STORE_LOCALE: tag });
+
+        await expect(loadEnv()).rejects.toThrow("BCP 47 language tag that Intl supports");
+      },
+    );
+  });
+
+  describe("VERCEL_ENV", () => {
+    it.each(["", undefined])("is unset when it is %j, as in local development", async (value) => {
+      stubEnv();
+      vi.stubEnv("VERCEL_ENV", value);
+
+      const env = await loadEnv();
+
+      expect(env.VERCEL_ENV).toBeUndefined();
+    });
+
+    it.each(["production", "preview", "development"])("accepts %s", async (value) => {
+      stubEnv();
+      vi.stubEnv("VERCEL_ENV", value);
+
+      await expect(loadEnv()).resolves.toMatchObject({ VERCEL_ENV: value });
+    });
+
+    it("rejects a value Vercel never sets", async () => {
+      stubEnv();
+      vi.stubEnv("VERCEL_ENV", "staging");
+
+      await expect(loadEnv()).rejects.toThrow("VERCEL_ENV");
     });
   });
 });

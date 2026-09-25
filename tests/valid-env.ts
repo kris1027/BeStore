@@ -11,14 +11,19 @@ export const validEnv = {
   NEXT_PUBLIC_SITE_URL: "http://localhost:3000",
   STORE_CURRENCY: "EUR",
   STORE_TIMEZONE: "Europe/Warsaw",
+  STORE_LOCALE: "en",
 } as const;
+
+// Variables with a default, so leaving them out is valid.
+export const optionalEnvKeys = ["STORE_LOCALE"] as const;
 
 export type EnvKey = keyof typeof validEnv;
 
 export function stubEnv(overrides: Partial<Record<EnvKey, string | undefined>> = {}) {
   // Clear optional variables too, so one set in the shell (CI sets TEST_DATABASE_URL job
-  // wide) cannot leak into the parsed env.
+  // wide, Vercel sets VERCEL_ENV) cannot leak into the parsed env.
   vi.stubEnv("TEST_DATABASE_URL", undefined);
+  vi.stubEnv("VERCEL_ENV", undefined);
   const values = { ...validEnv, ...overrides };
   for (const key of Object.keys(values) as EnvKey[]) {
     vi.stubEnv(key, values[key]);

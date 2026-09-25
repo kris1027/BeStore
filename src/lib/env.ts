@@ -13,6 +13,20 @@ const envSchema = z.object({
   NEXT_PUBLIC_SITE_URL: z.url(),
   STORE_CURRENCY: z.string().regex(/^[A-Z]{3}$/, "ISO 4217 code, e.g. EUR"),
   STORE_TIMEZONE: z.string().refine(isIanaTimezone, "IANA timezone, e.g. Europe/Warsaw"),
+  // Language and number, price and date formats; also <html lang>.
+  STORE_LOCALE: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z
+      .string()
+      .refine(isSupportedLocale, "BCP 47 language tag that Intl supports, e.g. en, en-GB, pl-PL")
+      .transform((tag) => Intl.getCanonicalLocales(tag)[0] ?? tag)
+      .default("en"),
+  ),
+  // Set by Vercel (production, preview, development); unset locally. Gates /style-guide.
+  VERCEL_ENV: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.enum(["production", "preview", "development"]).optional(),
+  ),
   // Only `pnpm test:db` uses it (the app never does); it must never be the dev or a deployed database.
   // A blank line (as copied from .env.example) means unset, not an invalid URL.
   TEST_DATABASE_URL: z.preprocess((v) => (v === "" ? undefined : v), postgresUrl().optional()),
@@ -35,6 +49,15 @@ function isIanaTimezone(value: string) {
   try {
     new Intl.DateTimeFormat("en", { timeZone: value });
     return true;
+  } catch {
+    return false;
+  }
+}
+
+// supportedLocalesOf throws on a malformed tag and drops a well formed one Intl has no data for.
+function isSupportedLocale(value: string) {
+  try {
+    return Intl.NumberFormat.supportedLocalesOf(value).length === 1;
   } catch {
     return false;
   }
