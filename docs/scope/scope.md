@@ -14,7 +14,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 1 | Stack & architecture | Foundation | done |
 | 2 | Coding standards & tooling | Foundation | done |
 | 3 | Data model | Foundation | done |
-| 4 | Design system & UI foundation | Foundation | planned |
+| 4 | Design system & UI foundation | Foundation | in-progress |
 | 5 | Admin sign in | Slice 1 | planned |
 | 6 | Core buy loop | Slice 1 | planned |
 | 7 | Card payment & paid orders | Slice 1 | planned |
@@ -65,10 +65,18 @@ spec [0002](../specs/0002-data-model/index.md) · code in [prisma/](../../prisma
 - [x] Verify it: `/check verify data model`
 - [x] Test it: `/test data model`
 
-### 4. Design system & UI foundation · needs a decision
+### 4. Design system & UI foundation · in-progress
 Visual language, layout, and base components shared by the storefront and the admin panel, built to WCAG AA from the start.
 **Done when:** `design.md` covers type, color, spacing, and components; base components work by keyboard and screen reader and meet AA contrast.
-- [ ] Design it (spec): `/architect design system & UI foundation`
+spec [0003](../specs/0003-design-system-ui-foundation/index.md) · design [design.md](../design.md) · code in [src/components/](../../src/components/), [src/lib/brand/](../../src/lib/brand/), [app/style-guide/](../../app/style-guide/), [app/globals.css](../../app/globals.css)
+- [x] Design it (spec): `/architect design system & UI foundation`
+- [x] Build it: `/develop design system & UI foundation`
+  - [x] Thin thread: shadcn on Base UI, brand files, fonts, `STORE_LOCALE`, first storefront shell, gated `/style-guide`, axe and Playwright in CI (AC-1, AC-5, AC-11, AC-16)
+  - [x] Tokens with measured contrast, the core component set on the style guide, design lint, placeholder and reduced motion (AC-3, AC-4, AC-12, AC-14, AC-15)
+  - [x] Storefront and admin shells complete, with keyboard and axe tests on desktop and phone (AC-6, AC-7, AC-8, AC-9)
+  - [x] Money formatting and `Price`, error pages, and `docs/design.md` (AC-2, AC-10, AC-13)
+- [ ] Verify it: `/check verify design system & UI foundation`
+- [ ] Test it: `/test design system & UI foundation`
 
 ## Slice 1: Core buy loop (the walking skeleton)
 
@@ -170,6 +178,7 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Several languages & currencies**: selling abroad · needs a decision
 - **Product reviews**: customer ratings on product pages · needs a decision
 - **Wishlist**: save products for later · needs a decision
+- **Dark mode**: a dark token set with its own contrast pass and a theme switch; the semantic tokens rule keeps it a token change · needs a decision · from spec 0003
 
 ## Legend
 
