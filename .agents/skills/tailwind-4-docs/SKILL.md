@@ -26,8 +26,8 @@ The docs snapshot is not bundled with this skill because the upstream repository
 
 Run the sync script to download the Tailwind docs locally. This requires network access, git, and Python 3:
 
-```
-python skills/tailwind-4-docs/scripts/sync_tailwind_docs.py --accept-docs-license
+```bash
+python .agents/skills/tailwind-4-docs/scripts/sync_tailwind_docs.py --accept-docs-license
 ```
 
 This pulls content from `tailwindlabs/tailwindcss.com`. That repo is source-available and explicitly not open-source, so the user must accept its license before downloading and keep the snapshot local.
