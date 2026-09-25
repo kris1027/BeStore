@@ -29,6 +29,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 16 | Legal pages & cookie consent | Launch | planned |
 | 17 | SEO for storefront pages | Launch | planned |
 | 18 | Analytics & error tracking | Launch | planned |
+| 19 | Production deploy | Launch | planned |
 
 ## Foundations
 
@@ -87,11 +88,11 @@ Only admins reach the admin panel. One role, a few admin accounts, no public sig
 **Done when:** an admin can sign in and out; every admin page and admin action refuses anyone who is not signed in as an admin.
 spec [0004](../specs/0004-admin-sign-in/index.md) · code in [src/features/admin-auth/](../../src/features/admin-auth/), [app/admin/](../../app/admin/), [scripts/admin/](../../scripts/admin/), [docs/runbooks/admin-accounts.md](../runbooks/admin-accounts.md)
 - [x] Design it (spec): `/architect admin sign in`
-- [ ] Build it: `/develop admin sign in`
+- [x] Build it: `/develop admin sign in`
   - [x] Thin thread: Supabase clients, proxy, `admin:create`, password sign in and out, `requireAdmin()`, welcome page, real Supabase in CI e2e (AC-1, AC-2, AC-3, AC-8, AC-11)
   - [x] Required TOTP: enroll and verify, `aal2` enforcement, wrong code lockout, `admin:reset-mfa`, then denials and the 12 hour cap with `admin:disable` (AC-4, AC-5, AC-6, AC-7, AC-12, AC-16, AC-17)
   - [x] Password reset through Resend SMTP, `/auth/confirm`, TOTP before the new password (AC-9, AC-10)
-  - [ ] Auth event logging, keyboard and axe on every auth page, production runbook and Firewall rule (AC-13, AC-14, AC-15)
+  - [x] Auth event logging, keyboard and axe on every auth page, production runbook (AC-13, AC-14); the production Firewall rule (AC-15) moved to feature 19
 - [ ] Verify it: `/check verify admin sign in`
 - [ ] Test it: `/test admin sign in`
 - [ ] Review it (fresh model): `/check review admin sign in`
@@ -179,6 +180,14 @@ Make products findable: titles, descriptions, canonical links, sitemap, product 
 See how customers move through the store and know when something breaks.
 **Done when:** the funnel (view product, add to cart, start checkout, pay) is tracked with consent respected; front end and server errors, including failed payments, raise alerts.
 - [ ] Design it (spec): `/architect analytics & error tracking`
+
+### 19. Production deploy
+The last step: ship to Vercel and the production Supabase project, and turn on the production only settings every earlier slice left for deploy time.
+**Done when:** the production app runs on Vercel against production Supabase, and each production only item below is applied and checked there.
+- [ ] Build it: `/develop production deploy`
+  - [ ] Admin sign in, from the runbook [docs/runbooks/admin-accounts.md](../runbooks/admin-accounts.md): production Supabase auth settings, Resend SMTP, recovery template, redirect URLs, asymmetric JWT keys, the first real admin (spec 0004 AC-10, AC-11)
+  - [ ] Vercel Firewall rate limit on `POST` to `/admin/sign-in`, `/admin/mfa`, `/admin/forgot-password`: 10 per minute per IP, deny 10 minutes (spec 0004 AC-15)
+- [ ] Verify it: `/check verify production deploy`
 
 ## Deferred
 Out of scope for the current build pass, kept so the plan stays honest.
