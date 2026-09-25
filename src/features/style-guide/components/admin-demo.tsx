@@ -1,15 +1,7 @@
 "use client";
 
-import {
-  LayoutDashboardIcon,
-  LogOutIcon,
-  PackageIcon,
-  ShoppingCartIcon,
-  TagIcon,
-  UserIcon,
-} from "lucide-react";
+import { LogOutIcon, UserIcon } from "lucide-react";
 
-import type { AdminNavItem } from "@/components/layout/admin-nav";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { Price } from "@/components/price";
 import { Badge } from "@/components/ui/badge";
@@ -34,13 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-// Demo only: real admin routes pass adminNavItems from src/components/layout/admin-nav.ts.
-const demoNav: readonly AdminNavItem[] = [
-  { href: "/style-guide/admin", label: "Dashboard", icon: LayoutDashboardIcon },
-  { href: "/style-guide/admin/orders", label: "Orders", icon: ShoppingCartIcon },
-  { href: "/style-guide/admin/products", label: "Products", icon: PackageIcon },
-  { href: "/style-guide/admin/discounts", label: "Discounts", icon: TagIcon },
-];
+import { demoNav } from "@/features/style-guide/admin-demo-nav";
 
 const orders = [
   { id: "1042", customer: "Ada Lovelace", status: "Paid", total: 12900 },
@@ -77,7 +63,26 @@ function UserMenu() {
   );
 }
 
-export function AdminDemo() {
+type AdminDemoProps = {
+  // One of demoSections; the dashboard when absent.
+  readonly section?: string;
+};
+
+export function AdminDemo({ section }: AdminDemoProps) {
+  const sectionItem = demoNav.find((item) => item.href === `/style-guide/admin/${section}`);
+  if (sectionItem) {
+    return (
+      <AdminShell nav={demoNav} userMenu={<UserMenu />}>
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold">{sectionItem.label}</h1>
+          <p className="text-sm text-muted-foreground">
+            Admin shell demo. The admin feature that owns this section builds the real page.
+          </p>
+        </div>
+      </AdminShell>
+    );
+  }
+
   return (
     <AdminShell nav={demoNav} userMenu={<UserMenu />}>
       <div className="flex flex-col gap-1">

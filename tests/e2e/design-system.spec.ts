@@ -233,6 +233,28 @@ test.describe("admin shell", () => {
     await expect(trigger).toBeFocused();
   });
 
+  // Each demo nav link must lead to a real page: a Link to a missing route logs a 404 on every
+  // production prefetch and dead ends on click.
+  for (const section of ["Orders", "Products", "Discounts"]) {
+    test(`the ${section} demo link opens a page that marks it current`, async ({ page }) => {
+      const response = await page.goto(`/style-guide/admin/${section.toLowerCase()}`);
+
+      expect(response?.status()).toBe(200);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(section);
+      if (isPhone(page)) {
+        await page.getByRole("button", { name: "Toggle Sidebar" }).click();
+      }
+      await expect(
+        page.getByRole("navigation", { name: "Admin" }).getByRole("link", { name: section }),
+      ).toHaveAttribute("aria-current", "page");
+    });
+  }
+
+  test("an unknown demo section is a 404", async ({ page }) => {
+    const response = await page.goto("/style-guide/admin/nope");
+    expect(response?.status()).toBe(404);
+  });
+
   test("the desktop sidebar collapses and expands", async ({ page }) => {
     test.skip(isPhone(page), "Desktop layout only");
     await page.goto("/style-guide/admin");
