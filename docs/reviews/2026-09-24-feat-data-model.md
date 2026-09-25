@@ -30,3 +30,12 @@ This change lands the whole BeStore data model in one migration: catalog, people
 ## Test coverage
 
 Excellent and verified live. All 15 acceptance criteria (AC-1 through AC-15) have at least one real test, most have several, and I re-ran the whole `pnpm test:db` suite (66 tests, 6 files) plus `pnpm test` (59 unit tests) against the actual local Supabase Postgres and everything passed. The only gap is the handful of untested CHECK constraints noted above under Minor; these are all simple range/positivity checks on columns not yet written to by any application code, so the risk is low.
+
+## Resolved in this PR (follow up, 2026-09-25)
+
+The findings above describe the branch as it was reviewed. Both are fixed now:
+
+- 🟡 **Untested CHECK constraints**: fixed in `0166ace`. `tests/db/orders.db.test.ts` and `tests/db/settings.db.test.ts` now break each listed constraint by name (`orders_discount_value_check`, `order_lines_tax_cents_check`, `order_lines_tax_rate_bps_check`, `refund_lines_quantity_check`, the three `discount_codes_*` limit checks, `store_settings_free_shipping_threshold_cents_check`).
+- ⚪ **Shared counter in `tests/db/fixtures.ts`**: fixed in `0166ace`. `createCustomer` builds its email from `crypto.randomUUID()`.
+
+Counts at merge: `pnpm test:db` 79 tests (6 files), `pnpm test` 63 unit tests, all passing in CI.
