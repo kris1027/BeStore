@@ -75,8 +75,8 @@ spec [0003](../specs/0003-design-system-ui-foundation/index.md) · design [desig
   - [x] Tokens with measured contrast, the core component set on the style guide, design lint, placeholder and reduced motion (AC-3, AC-4, AC-12, AC-14, AC-15)
   - [x] Storefront and admin shells complete, with keyboard and axe tests on desktop and phone (AC-6, AC-7, AC-8, AC-9)
   - [x] Money formatting and `Price`, error pages, and `docs/design.md` (AC-2, AC-10, AC-13)
-- [ ] Verify it: `/check verify design system & UI foundation`
-- [ ] Test it: `/test design system & UI foundation`
+- [x] Verify it: `/check verify design system & UI foundation`
+- [x] Test it: `/test design system & UI foundation`
 
 ## Slice 1: Core buy loop (the walking skeleton)
 

@@ -24,23 +24,23 @@ _Steps derived from spec 0003 acceptance criteria and its Value sourcing table. 
 - [x] `cat components.json` → `style: base-vega`, `baseColor: neutral`, `iconLibrary: lucide`, `cssVariables: true` → AC-1
 - [x] Build with `VERCEL_ENV=production` and `pnpm start` → `/style-guide` and `/style-guide/admin` return 404; without it they return 200 with `<meta name="robots" content="noindex, nofollow">` → AC-5
 - [x] Start with `STORE_LOCALE=xx-invalid-` → boot fails naming STORE_LOCALE with the BCP 47 hint; unset → `<html lang="en">`; `STORE_LOCALE=pl-PL` → `<html lang="pl-PL">` → AC-11
-- [ ] Temporarily change `brand.name` in `src/lib/brand/brand.ts` → `pnpm test` still passes and the title, wordmark and footer all show the new name → AC-12
+- [x] Temporarily change `brand.name` in `src/lib/brand/brand.ts` → `pnpm test` still passes and the title, wordmark and footer all show the new name → AC-12
 - [x] Open `docs/design.md` → covers brand direction, every color token with its measured ratio, type scale, spacing and layout, radius, image ratio, motion, focus, component inventory with usage rules, rebrand checklist → AC-2, AC-3
-- [ ] Check the CI run on the PR → the new Playwright step builds and runs against `pnpm start` with `VERCEL_ENV` unset → AC-16
+- [x] Check the CI run on the PR → the new Playwright step builds and runs against `pnpm start` with `VERCEL_ENV` unset → AC-16
 
 ## Value sourcing
 - [x] `<html lang>` follows `STORE_LOCALE` (try `en-GB`) → lang changes, default `en` when unset
 - [x] Page titles use `brand.name`: `/style-guide` title is `Style guide · <brand name>`
 - [x] Provider locale and currency: set `STORE_CURRENCY=PLN STORE_LOCALE=pl-PL` → `/style-guide` Money section shows `19,99 zł` for the store currency row; only these two values appear in the client payload, never other env values (search the page source for `CART_COOKIE_SECRET` → none)
-- [ ] `global-error` uses `lang="en"` regardless of `STORE_LOCALE` (known, see spec follow up)
+- [x] `global-error` uses `lang="en"` regardless of `STORE_LOCALE` (known, see spec follow up)
 - [ ] Footer year uses `STORE_TIMEZONE`: with `STORE_TIMEZONE=Pacific/Kiritimati` near New Year UTC, the year matches Kiritimati, not UTC (unit check of the formatter if a clock mock is easier)
-- [ ] Contact email: set `brand.contactEmail` to an address → footer shows a mailto link; `null` → hidden
+- [x] Contact email: set `brand.contactEmail` to an address → footer shows a mailto link; `null` → hidden
 - [x] Footer links and header actions come only from the `footerLinks` and `actions` props (style guide passes demo ones; `/` shows none)
 - [x] Header nav comes from `storeNavItems` (empty on `/`); admin sidebar items come from the `nav` prop
 - [x] `Price` with `currency="JPY"` shows `¥1,999` for 1999 while the store currency is EUR
 - [x] `formatMoney` fraction digits come from Intl: JPY 0, EUR 2, KWD 3 (money.test.ts)
 - [x] Style guide gate reads `VERCEL_ENV`, not `NODE_ENV`: `pnpm build && pnpm start` locally (NODE_ENV production) still serves `/style-guide`
-- [ ] Product box ratio comes from `--aspect-product`: change it to `1 / 1` and the placeholder box turns square
+- [x] Product box ratio comes from `--aspect-product`: change it to `1 / 1` and the placeholder box turns square
 - [x] Sticky header offset: `scroll-padding-top` equals `--header-height` (3.5rem below md, 4rem from md)
 - [x] Design lint reads the name from `brand.name` at run time (change the name and a file with the old literal stops failing)
 - [x] Empty image: `/placeholder.svg` with `alt=""`
