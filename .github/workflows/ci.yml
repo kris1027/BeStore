@@ -46,22 +46,32 @@ jobs:
       - run: pnpm test
       - run: pnpm test:db
       - run: pnpm exec playwright install --with-deps chromium
-      # Accessibility and keyboard tests against a production build (spec 0003, AC-16). The
-      # values mirror tests/valid-env.ts: these pages need no database. VERCEL_ENV stays unset,
-      # so /style-guide is served.
-      - name: pnpm test:e2e
-        run: pnpm test:e2e
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:55322/postgres?pgbouncer=true
-          DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:55322/postgres
-          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:55321
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: anon-key
-          SUPABASE_SERVICE_ROLE_KEY: service-role-key
-          CART_COOKIE_SECRET: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-          NEXT_PUBLIC_SITE_URL: http://localhost:3000
-          STORE_CURRENCY: EUR
-          STORE_TIMEZONE: Europe/Warsaw
-          STORE_LOCALE: en
+      # Admin sign in e2e runs against a real local Supabase stack (spec 0004), never a mock.
+      # Services the app does not use stay off; Mailpit stays on for the password reset test.
+      - name: Start local Supabase
+        run: pnpm exec supabase start -x studio,realtime,storage-api,imgproxy,edge-runtime,logflare,vector,supavisor
+      # `supabase start` does not apply Prisma migrations. NEXT_PUBLIC_* values are baked in at
+      # build time, so the stack's keys are mapped before `pnpm build` (the Playwright web server).
+      - name: Map Supabase keys and migrate
+        run: |
+          eval "$(pnpm exec supabase status -o env | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=')"
+          {
+            echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55322/postgres"
+            echo "DIRECT_URL=postgresql://postgres:postgres@127.0.0.1:55322/postgres"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+            echo "CART_COOKIE_SECRET=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            echo "NEXT_PUBLIC_SITE_URL=http://localhost:3000"
+            echo "STORE_CURRENCY=EUR"
+            echo "STORE_TIMEZONE=Europe/Warsaw"
+            echo "STORE_LOCALE=en"
+          } >> "$GITHUB_ENV"
+      - run: pnpm exec prisma migrate deploy
+      - run: pnpm test:stack
+      # Accessibility, keyboard and admin sign in tests against a production build. VERCEL_ENV
+      # stays unset, so /style-guide is served.
+      - run: pnpm test:e2e
       - uses: actions/upload-artifact@v7
         if: failure()
         with:

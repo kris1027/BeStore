@@ -15,7 +15,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 2 | Coding standards & tooling | Foundation | done |
 | 3 | Data model | Foundation | done |
 | 4 | Design system & UI foundation | Foundation | in-progress |
-| 5 | Admin sign in | Slice 1 | planned |
+| 5 | Admin sign in | Slice 1 | in-progress |
 | 6 | Core buy loop | Slice 1 | planned |
 | 7 | Card payment & paid orders | Slice 1 | planned |
 | 8 | Shipping address & flat rate | Slice 2 | planned |
@@ -82,10 +82,20 @@ spec [0003](../specs/0003-design-system-ui-foundation/index.md) · design [desig
 
 The thinnest real thread: an admin signs in and adds a product, a customer finds it, buys it, pays, and the paid order shows up in admin. Real database, real payment, real UI, just narrow.
 
-### 5. Admin sign in · needs a decision · GA
+### 5. Admin sign in · in-progress · GA
 Only admins reach the admin panel. One role, a few admin accounts, no public sign up.
 **Done when:** an admin can sign in and out; every admin page and admin action refuses anyone who is not signed in as an admin.
-- [ ] Design it (spec): `/architect admin sign in`
+spec [0004](../specs/0004-admin-sign-in/index.md) · code in [src/features/admin-auth/](../../src/features/admin-auth/), [app/admin/](../../app/admin/), [scripts/admin/](../../scripts/admin/), [docs/runbooks/admin-accounts.md](../runbooks/admin-accounts.md)
+- [x] Design it (spec): `/architect admin sign in`
+- [ ] Build it: `/develop admin sign in`
+  - [x] Thin thread: Supabase clients, proxy, `admin:create`, password sign in and out, `requireAdmin()`, welcome page, real Supabase in CI e2e (AC-1, AC-2, AC-3, AC-8, AC-11)
+  - [x] Required TOTP: enroll and verify, `aal2` enforcement, wrong code lockout, `admin:reset-mfa`, then denials and the 12 hour cap with `admin:disable` (AC-4, AC-5, AC-6, AC-7, AC-12, AC-16, AC-17)
+  - [x] Password reset through Resend SMTP, `/auth/confirm`, TOTP before the new password (AC-9, AC-10)
+  - [ ] Auth event logging, keyboard and axe on every auth page, production runbook and Firewall rule (AC-13, AC-14, AC-15)
+- [ ] Verify it: `/check verify admin sign in`
+- [ ] Test it: `/test admin sign in`
+- [ ] Review it (fresh model): `/check review admin sign in`
+- [ ] Document it: `/document admin sign in`
 
 ### 6. Core buy loop · needs a decision
 The narrow end to end path: an admin creates a product with variants, price, stock, and one image; the storefront shows a product list and a product page; a customer picks a variant, adds it to a cart, and reaches checkout as a guest.
