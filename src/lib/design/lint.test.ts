@@ -69,6 +69,30 @@ describe("findDesignViolations", () => {
     expect(findDesignViolations(source, name)).toEqual([]);
   });
 
+  it.each([
+    'className="md:hover:bg-red-500"',
+    'className="border-t-slate-300"',
+    'className="ring-offset-white"',
+    'className="text-black/80"',
+  ])("flags the variant or opacity form %s", (source) => {
+    expect(findDesignViolations(source, name)).not.toEqual([]);
+  });
+
+  it("reports every hit on a line", () => {
+    const hits = findDesignViolations('className="bg-red-500 text-white dark:bg-card"', name);
+
+    expect(hits.map((hit) => hit.match)).toEqual(["bg-red-500", "text-white", "dark:bg-card"]);
+  });
+
+  it("treats regex characters in the store name literally", () => {
+    expect(findDesignViolations('"A.B Shop"', "A.B Shop")).toHaveLength(1);
+    expect(findDesignViolations('"AxB Shop"', "A.B Shop")).toEqual([]);
+  });
+
+  it("allows an empty source", () => {
+    expect(findDesignViolations("", name)).toEqual([]);
+  });
+
   it("reports the line of each hit", () => {
     expect(findDesignViolations("ok\nclassName='bg-blue-500'", name)).toEqual([
       { line: 2, match: "bg-blue-500" },
