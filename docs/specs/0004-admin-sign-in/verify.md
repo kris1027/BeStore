@@ -28,9 +28,9 @@ Setup: `pnpm db:start` (restart it once after pulling, so the new `supabase/conf
 - [x] Session start is the earliest `amr` timestamp: re-verifying a code does not extend the 12 hour cap (unit test in `access.test.ts`)
 - [x] `now` is the server clock: expiry is decided with an injected `nowMs` (unit tests in `proxy-decision.test.ts`, `access.test.ts`)
 - [x] Rename the admin in `admin_users` → the menu and welcome page show the new name on the next request
-- [ ] A factor id is never taken from the browser: `verifyTotp` accepts only the code
+- [x] A factor id is never taken from the browser: `verifyTotp` accepts only the code
 - [x] Wrong code count comes from `auth.mfa_challenges` for that factor: wrong codes from two different browsers add up to the same lockout
-- [ ] QR issuer in the authenticator app shows the store name from `brand.name`
+- [x] QR issuer in the authenticator app shows the store name from `brand.name`
 - [x] Reset email is sent only when `admin_users` has the lower cased email and `disabled_at` is empty (try a disabled admin: no email)
 - [x] Reset link host is the Supabase Site URL (`http://localhost:3000` locally)
 - [x] The `reason` query param shows only the fixed messages: `?reason=<script>` shows nothing

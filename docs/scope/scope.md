@@ -93,9 +93,9 @@ spec [0004](../specs/0004-admin-sign-in/index.md) · code in [src/features/admin
   - [x] Required TOTP: enroll and verify, `aal2` enforcement, wrong code lockout, `admin:reset-mfa`, then denials and the 12 hour cap with `admin:disable` (AC-4, AC-5, AC-6, AC-7, AC-12, AC-16, AC-17)
   - [x] Password reset through Resend SMTP, `/auth/confirm`, TOTP before the new password (AC-9, AC-10)
   - [x] Auth event logging, keyboard and axe on every auth page, production runbook (AC-13, AC-14); the production Firewall rule (AC-15) moved to feature 19
-- [ ] Verify it: `/check verify admin sign in`
+- [x] Verify it: `/check verify admin sign in`
 - [ ] Test it: `/test admin sign in`
-- [ ] Review it (fresh model): `/check review admin sign in`
+- [x] Review it (fresh model): `/check review admin sign in`
 - [ ] Document it: `/document admin sign in`
 
 ### 6. Core buy loop · needs a decision
