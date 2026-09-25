@@ -8,6 +8,12 @@ async function expectNotFound(page: Page) {
   await expect(page.getByText(/Signed in as/)).toHaveCount(0);
 }
 
+// The tab title is a hint too: a denied page load must carry the store 404 title, not the
+// admin page's own (Next.js resolves metadata apart from the page render).
+async function expectNotFoundTitle(page: Page) {
+  await expect(page).toHaveTitle("Page not found · BeStore");
+}
+
 test("a signed in non admin gets a 404 on admin pages", async ({ page }) => {
   const customer = await createTestUser({ admin: false });
   await injectSession(page, customer);
@@ -15,9 +21,20 @@ test("a signed in non admin gets a 404 on admin pages", async ({ page }) => {
   const response = await page.goto("/admin");
   expect(response?.status()).toBe(404);
   await expectNotFound(page);
+  await expectNotFoundTitle(page);
+  // The served HTML too, before any script runs: no admin title or title template in it.
+  const html = await (await page.request.get("/admin")).text();
+  expect(html).toContain("<title>Page not found · BeStore</title>");
+  expect(html).not.toMatch(/Welcome|· Admin/);
 
   const mfa = await page.goto("/admin/mfa");
   expect(mfa?.status()).toBe(404);
+  await expectNotFound(page);
+  await expectNotFoundTitle(page);
+
+  const reset = await page.goto("/admin/reset-password");
+  expect(reset?.status()).toBe(404);
+  await expectNotFoundTitle(page);
 });
 
 test("a disabled admin gets a 404 on their next page and their next action", async ({ page }) => {
@@ -37,4 +54,5 @@ test("a disabled admin gets a 404 on their next page and their next action", asy
   const response = await page.goto("/admin");
   expect(response?.status()).toBe(404);
   await expectNotFound(page);
+  await expectNotFoundTitle(page);
 });

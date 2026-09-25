@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 
 import { AuthCard } from "@/features/admin-auth/components/auth-frame";
 import { ResetPasswordForm } from "@/features/admin-auth/components/reset-password-form";
-import { requireAdminSession } from "@/features/admin-auth/require-admin";
+import { adminMetadata, requireAdminSession } from "@/features/admin-auth/require-admin";
 
-export const metadata: Metadata = { title: "Choose a new password" };
+export function generateMetadata(): Promise<Metadata> {
+  return adminMetadata({ title: "Choose a new password" });
+}
 
 // Needs aal2: the TOTP step comes before the new password, so the inbox alone is not enough.
 export default async function ResetPasswordPage() {

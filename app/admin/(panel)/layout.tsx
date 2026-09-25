@@ -3,12 +3,17 @@ import type { Metadata } from "next";
 import { adminNavItems } from "@/components/layout/admin-nav";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { UserMenu } from "@/features/admin-auth/components/user-menu";
-import { requireAdmin } from "@/features/admin-auth/require-admin";
+import { adminMetadata, requireAdmin } from "@/features/admin-auth/require-admin";
 
-export const metadata: Metadata = {
-  title: { default: "Admin", template: "%s · Admin" },
-  robots: { index: false, follow: false },
-};
+export function generateMetadata(): Promise<Metadata> {
+  return adminMetadata(
+    {
+      title: { default: "Admin", template: "%s · Admin" },
+      robots: { index: false, follow: false },
+    },
+    { layout: true },
+  );
+}
 
 // Layouts do not re-run on every client navigation, so this call only feeds the user menu:
 // every panel page and admin action calls requireAdmin() itself.

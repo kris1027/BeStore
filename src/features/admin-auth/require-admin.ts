@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
@@ -84,6 +85,27 @@ export async function requireAdminSession(
       logAuthEvent("auth.access.denied", { adminId: state.userId, ip: requestIp(requestHeaders) });
       notFound();
   }
+}
+
+// Next.js resolves metadata apart from the page render, so a static `metadata` export still
+// sends the page's title to a visitor the page itself 404s (AC-6: no hint the panel exists).
+// Admin segments behind the guard build their metadata here: only an allowed visitor gets it.
+// Anyone else gets a page title matching app/not-found.tsx (empty page metadata would stream the
+// bare store name, unlike every other 404), and nothing from a layout, so the root title
+// template still applies. It never 404s itself (a notFound() from a layout's metadata drops the
+// 404 title entirely); the page's own guard does that.
+export async function adminMetadata(
+  metadata: Metadata,
+  options: { readonly allowAal1?: boolean; readonly layout?: boolean } = {},
+): Promise<Metadata> {
+  const state = await loadSessionState();
+  const verdict = decideAdminAccess({
+    ...state,
+    nowMs: Date.now(),
+    allowAal1: options.allowAal1 ?? false,
+  });
+  if (verdict.kind === "allow") return metadata;
+  return options.layout ? {} : { title: "Page not found" };
 }
 
 export async function requireAdmin(): Promise<Admin> {

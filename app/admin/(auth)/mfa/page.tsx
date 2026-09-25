@@ -8,10 +8,12 @@ import { TotpCodeForm } from "@/features/admin-auth/components/totp-code-form";
 import { TotpSetup } from "@/features/admin-auth/components/totp-setup";
 import { authMessages } from "@/features/admin-auth/messages";
 import { mfaViewFor } from "@/features/admin-auth/mfa-view";
-import { requireAdminSession } from "@/features/admin-auth/require-admin";
+import { adminMetadata, requireAdminSession } from "@/features/admin-auth/require-admin";
 import { safeAdminPath } from "@/features/admin-auth/safe-admin-path";
 
-export const metadata: Metadata = { title: "Authenticator code" };
+export function generateMetadata(): Promise<Metadata> {
+  return adminMetadata({ title: "Authenticator code" }, { allowAal1: true });
+}
 
 export default async function MfaPage({ searchParams }: PageProps<"/admin/mfa">) {
   const { next } = await searchParams;
