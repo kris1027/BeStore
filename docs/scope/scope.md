@@ -14,7 +14,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 1 | Stack & architecture | Foundation | done |
 | 2 | Coding standards & tooling | Foundation | done |
 | 3 | Data model | Foundation | done |
-| 4 | Design system & UI foundation | Foundation | in-progress |
+| 4 | Design system & UI foundation | Foundation | done |
 | 5 | Admin sign in | Slice 1 | done |
 | 6 | Core buy loop | Slice 1 | planned |
 | 7 | Card payment & paid orders | Slice 1 | planned |
@@ -66,7 +66,7 @@ spec [0002](../specs/0002-data-model/index.md) · code in [prisma/](../../prisma
 - [x] Verify it: `/check verify data model`
 - [x] Test it: `/test data model`
 
-### 4. Design system & UI foundation · in-progress
+### 4. Design system & UI foundation · done
 Visual language, layout, and base components shared by the storefront and the admin panel, built to WCAG AA from the start.
 **Done when:** `design.md` covers type, color, spacing, and components; base components work by keyboard and screen reader and meet AA contrast.
 spec [0003](../specs/0003-design-system-ui-foundation/index.md) · design [design.md](../design.md) · code in [src/components/](../../src/components/), [src/lib/brand/](../../src/lib/brand/), [app/style-guide/](../../app/style-guide/), [app/globals.css](../../app/globals.css)
@@ -96,7 +96,7 @@ spec [0004](../specs/0004-admin-sign-in/index.md) · code in [src/features/admin
 - [x] Verify it: `/check verify admin sign in`
 - [x] Test it: `/test admin sign in`
 - [x] Review it (fresh model): `/check review admin sign in`
-- [ ] Document it: `/document admin sign in`
+- [x] Document it: `/document admin sign in`
 
 ### 6. Core buy loop · needs a decision
 The narrow end to end path: an admin creates a product with variants, price, stock, and one image; the storefront shows a product list and a product page; a customer picks a variant, adds it to a cart, and reaches checkout as a guest.
