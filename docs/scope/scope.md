@@ -109,7 +109,7 @@ spec [0005](../specs/0005-core-buy-loop/index.md) · code in [src/features/catal
   - [x] Product image: signed upload to Storage, alt text, image config, Storage in CI (AC-5)
   - [x] Full cart and checkout stub: quantity and remove, stale line flags, header count, `/checkout` summary (AC-10, AC-11, AC-12, AC-13)
   - [x] Expired cart cron, logs, and the accessibility pass (AC-16, AC-17, AC-18)
-- [ ] Verify it: `/check verify core buy loop`
+- [x] Verify it: `/check verify core buy loop`
 - [ ] Test it: `/test core buy loop`
 
 ### 7. Card payment & paid orders · needs a decision · GA
