@@ -62,6 +62,7 @@ import {
   MAX_OPTION_VALUES,
   suggestSku,
 } from "../variant-grid";
+import { ImageField, type StorageTarget, type UploadedImage } from "./image-field";
 
 const productsPath = "/admin/products";
 
@@ -77,6 +78,7 @@ type FormState = {
   description: string;
   optionTypes: OptionTypeField[];
   variants: VariantField[];
+  imageAlt: string;
 };
 
 const newId = () => crypto.randomUUID();
@@ -94,6 +96,8 @@ const fieldId = (path: string) => path.replace(/\./g, "-");
 // Schema paths name an option value by index ("optionTypes.0.values.1"); the form stores it as
 // an object, so its input lives one level down.
 function formPath(path: string): string {
+  if (path === "image.altText") return "imageAlt";
+  if (path === "image" || path.startsWith("image.")) return "root.image";
   if (/^optionTypes\.\d+\.values\.\d+$/.test(path)) return `${path}.value`;
   if (/^(root|optionTypes|variants|optionTypes\.\d+\.values)$/.test(path)) {
     return `root.${fieldId(path)}`;
@@ -123,12 +127,13 @@ function variantRows(optionTypes: readonly OptionTypeField[]) {
   return { count, rows };
 }
 
-export function ProductForm() {
+export function ProductForm({ storage }: { readonly storage: StorageTarget }) {
   const router = useRouter();
   const { currency } = useStoreFormat();
   const [pending, startTransition] = useTransition();
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<NewProductStatus | null>(null);
+  const [image, setImage] = useState<UploadedImage | null>(null);
   // Suggestions follow the name and values until the admin types their own.
   const slugEdited = useRef(false);
   const editedSkus = useRef(new Set<string>());
@@ -140,6 +145,7 @@ export function ProductForm() {
       description: "",
       optionTypes: [],
       variants: [defaultVariant("")],
+      imageAlt: "",
     },
   });
   const { control, register, setValue, getValues, setError, clearErrors, formState } = form;
@@ -218,6 +224,9 @@ export function ProductForm() {
         stock: variant.stock,
         sku: variant.sku,
       })),
+      image: image
+        ? { path: image.path, altText: state.imageAlt, width: image.width, height: image.height }
+        : null,
     };
 
     const parsed = productFormSchema(currency).safeParse(payload);
@@ -405,26 +414,41 @@ export function ProductForm() {
           </Card>
         </div>
 
-        <Card className="min-w-0 lg:sticky lg:top-20">
-          <CardHeader>
-            <CardTitle>
-              <h2>Save</h2>
-            </CardTitle>
-            <CardDescription>
-              A draft stays hidden. Publishing puts the product on the storefront right away.
-            </CardDescription>
-          </CardHeader>
-          <CardFooter className="flex flex-col items-stretch gap-2">
-            <Button type="button" size="lg" disabled={pending} onClick={() => submit("active")}>
-              {submitting === "active" ? <Spinner data-icon="inline-start" /> : null}
-              Publish
-            </Button>
-            <Button type="submit" size="lg" variant="outline" disabled={pending}>
-              {submitting === "draft" ? <Spinner data-icon="inline-start" /> : null}
-              Save as draft
-            </Button>
-          </CardFooter>
-        </Card>
+        <div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-20">
+          <ImageField
+            storage={storage}
+            image={image}
+            onImageChange={(next) => {
+              setImage(next);
+              clearErrors("imageAlt");
+              clearErrors("root.image");
+            }}
+            altInput={register("imageAlt")}
+            altError={errorAt(errors, "imageAlt")}
+            imageError={errorAt(errors, "root.image")}
+            disabled={pending}
+          />
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <h2>Save</h2>
+              </CardTitle>
+              <CardDescription>
+                A draft stays hidden. Publishing puts the product on the storefront right away.
+              </CardDescription>
+            </CardHeader>
+            <CardFooter className="flex flex-col items-stretch gap-2">
+              <Button type="button" size="lg" disabled={pending} onClick={() => submit("active")}>
+                {submitting === "active" ? <Spinner data-icon="inline-start" /> : null}
+                Publish
+              </Button>
+              <Button type="submit" size="lg" variant="outline" disabled={pending}>
+                {submitting === "draft" ? <Spinner data-icon="inline-start" /> : null}
+                Save as draft
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
       </div>
     </form>
   );

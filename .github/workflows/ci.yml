@@ -47,9 +47,10 @@ jobs:
       - run: pnpm test:db
       - run: pnpm exec playwright install --with-deps chromium
       # Admin sign in e2e runs against a real local Supabase stack (spec 0004), never a mock.
-      # Services the app does not use stay off; Mailpit stays on for the password reset test.
+      # Services the app does not use stay off; Mailpit stays on for the password reset test and
+      # Storage for the product image upload (spec 0005).
       - name: Start local Supabase
-        run: pnpm exec supabase start -x studio,realtime,storage-api,imgproxy,edge-runtime,logflare,vector,supavisor
+        run: pnpm exec supabase start -x studio,realtime,imgproxy,edge-runtime,logflare,vector,supavisor
       # `supabase start` does not apply Prisma migrations. NEXT_PUBLIC_* values are baked in at
       # build time, so the stack's keys are mapped before `pnpm build` (the Playwright web server).
       - name: Map Supabase keys and migrate

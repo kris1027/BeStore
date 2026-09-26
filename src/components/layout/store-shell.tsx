@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { Wordmark } from "@/components/wordmark";
 import { brand } from "@/lib/brand/brand";
@@ -37,11 +38,17 @@ export function StoreShell({
       <header className="sticky top-0 z-40 h-(--header-height) border-b bg-background">
         <div className={cn(storeContainer, "flex h-full items-center gap-4")}>
           <div className="flex items-center gap-1">
-            <StoreMobileNav items={navItems} />
+            {/* The navs read the pathname, which a route with unknown params (a product page)
+                only knows at request time; Suspense keeps the rest of the shell static. */}
+            <Suspense fallback={null}>
+              <StoreMobileNav items={navItems} />
+            </Suspense>
             <Wordmark />
           </div>
           <div className="flex flex-1 justify-center">
-            <StoreDesktopNav items={navItems} />
+            <Suspense fallback={null}>
+              <StoreDesktopNav items={navItems} />
+            </Suspense>
           </div>
           <div className="flex items-center gap-1">{actions}</div>
         </div>

@@ -7,7 +7,9 @@ import { catalogTag, productTag } from "@/lib/cache-tags";
 import { db } from "@/lib/db";
 import { uniqueViolation } from "@/lib/db-errors";
 import { env } from "@/lib/env";
+import { PRODUCT_IMAGE_BUCKET } from "@/lib/product-image";
 import type { ActionResult } from "@/lib/result";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 import { logCatalogEvent } from "../log";
 import {
@@ -98,8 +100,30 @@ async function insertProduct(product: ProductFormValues, status: NewProductStatu
       });
     }
 
+    if (product.image) {
+      await tx.productImage.create({
+        data: {
+          productId: created.id,
+          storagePath: product.image.path,
+          altText: product.image.altText,
+          width: product.image.width,
+          height: product.image.height,
+          position: 0,
+        },
+        select: { id: true },
+      });
+    }
+
     return created;
   });
+}
+
+// The path pattern is checked by the schema; this confirms the upload really happened.
+async function imageExists(path: string): Promise<boolean> {
+  const { data, error } = await createSupabaseAdminClient()
+    .storage.from(PRODUCT_IMAGE_BUCKET)
+    .exists(path);
+  return !error && data === true;
 }
 
 // spec 0005, AC-3 and AC-4: everything in one transaction, or nothing and a field error.
@@ -117,6 +141,14 @@ export async function createProduct(
   // Only the two buttons send a status, so anything else is a tampered request.
   if (!parsedStatus.success) return { ok: false, error: { form: "unavailable" } };
   const product = parsed.data;
+
+  // Before the transaction: Storage and Postgres share no rollback.
+  if (product.image && !(await imageExists(product.image.path))) {
+    return {
+      ok: false,
+      error: { fields: { image: ["The image did not finish uploading. Choose it again."] } },
+    };
+  }
 
   const taken = await takenErrors(product);
   if (taken) return { ok: false, error: { fields: taken } };

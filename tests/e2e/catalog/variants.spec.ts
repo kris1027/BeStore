@@ -88,7 +88,9 @@ test("the form shows each refusal on its field", async ({ page }) => {
   // Checks across fields (duplicates) run once each field on its own is valid.
   await page.getByLabel("URL name").fill("bad-input");
   await addOption(page, 0, "Size", ["S", "s"]);
-  for (const price of await page.getByLabel(/^Price for/).all()) await price.fill("5");
+  for (const value of ["S", "s"]) {
+    await page.getByLabel(`Price for ${value}`, { exact: true }).fill("5");
+  }
   await page.getByRole("button", { name: "Save as draft" }).click();
   await expect(page.getByText("This value is already there.")).toBeVisible();
   await expect(page.getByText("Another variant uses this SKU.")).toBeVisible();

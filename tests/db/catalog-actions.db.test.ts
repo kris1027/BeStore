@@ -9,13 +9,19 @@ const mocks = vi.hoisted(() => ({
   requireAdmin: vi.fn(),
   updateTag: vi.fn(),
   info: vi.fn(),
+  exists: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", async () => ({ db: (await import("./client")).testDb }));
-vi.mock("@/lib/env", () => ({ env: { STORE_CURRENCY: "EUR" } }));
+vi.mock("@/lib/env", () => ({
+  env: { STORE_CURRENCY: "EUR", NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:55321" },
+}));
 vi.mock("next/cache", () => ({ updateTag: mocks.updateTag }));
 vi.mock("@/features/admin-auth/require-admin", () => ({ requireAdmin: mocks.requireAdmin }));
+vi.mock("@/lib/supabase/admin", () => ({
+  createSupabaseAdminClient: () => ({ storage: { from: () => ({ exists: mocks.exists }) } }),
+}));
 vi.mock("@/lib/logger", () => ({ logger: { info: mocks.info, warn: vi.fn() } }));
 
 const { createProduct } = await import("@/features/catalog/actions/create-product");
@@ -172,6 +178,69 @@ describe("createProduct", () => {
       },
     });
     expect(await counts()).toEqual({ products: 0, variants: 0, types: 0, values: 0, links: 0 });
+  });
+
+  describe("with an image", () => {
+    const path = "products/0199a1b2-c3d4-7e5f-8a9b-0123456789ab.png";
+    const image = { path, altText: "A mug", width: 400, height: 500 };
+
+    it("writes the image row after confirming the upload exists", async () => {
+      mocks.exists.mockResolvedValue({ data: true, error: null });
+
+      expect((await createProduct({ ...simple, image }, "active")).ok).toBe(true);
+
+      expect(mocks.exists).toHaveBeenCalledWith(path);
+      expect(await testDb.productImage.findFirstOrThrow()).toMatchObject({
+        storagePath: path,
+        altText: "A mug",
+        width: 400,
+        height: 500,
+        position: 0,
+        optionValueId: null,
+      });
+    });
+
+    it("refuses an upload that never landed and writes nothing", async () => {
+      mocks.exists.mockResolvedValue({ data: false, error: null });
+
+      expect(await createProduct({ ...simple, image }, "active")).toEqual({
+        ok: false,
+        error: { fields: { image: ["The image did not finish uploading. Choose it again."] } },
+      });
+      expect(await counts()).toEqual({ products: 0, variants: 0, types: 0, values: 0, links: 0 });
+    });
+
+    it.each([
+      "products/../secret.png",
+      "other/0199a1b2-c3d4-7e5f-8a9b-0123456789ab.png",
+      "products/0199a1b2-c3d4-4e5f-8a9b-0123456789ab.png",
+      "products/0199a1b2-c3d4-7e5f-8a9b-0123456789ab.gif",
+    ])("refuses the forged path %s without asking Storage", async (forged) => {
+      const result = await createProduct(
+        { ...simple, image: { ...image, path: forged } },
+        "active",
+      );
+
+      expect(result).toEqual({
+        ok: false,
+        error: { fields: { "image.path": ["Choose the image again."] } },
+      });
+      expect(mocks.exists).not.toHaveBeenCalled();
+    });
+
+    it("requires alt text", async () => {
+      const result = await createProduct(
+        { ...simple, image: { ...image, altText: " " } },
+        "active",
+      );
+
+      expect(result).toEqual({
+        ok: false,
+        error: {
+          fields: { "image.altText": ["Describe the image for people who cannot see it."] },
+        },
+      });
+    });
   });
 
   it("refuses any status but the two buttons", async () => {

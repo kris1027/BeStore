@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { parseMoney, type ParseMoneyError } from "@/lib/money";
+import { PRODUCT_IMAGE_PATH } from "@/lib/product-image-rules";
 import { SLUG_MAX_LENGTH, SLUG_PATTERN } from "@/lib/slug";
 
 import {
@@ -35,6 +36,22 @@ const optionTypeSchema = z.object({
     .min(1, "Add at least one value.")
     .max(MAX_OPTION_VALUES, `Up to ${MAX_OPTION_VALUES} values.`),
 });
+
+const dimension = z.number().int().min(1).max(10_000);
+
+// Optional: at most one image, and alt text whenever there is one (AC-5).
+const imageSchema = z
+  .object({
+    path: z.string().regex(PRODUCT_IMAGE_PATH, "Choose the image again."),
+    altText: z
+      .string()
+      .trim()
+      .min(1, "Describe the image for people who cannot see it.")
+      .max(300, "Keep it under 300 characters."),
+    width: dimension,
+    height: dimension,
+  })
+  .nullable();
 
 function variantSchema(currency: string) {
   return z.object({
@@ -82,6 +99,7 @@ export function productFormSchema(currency: string) {
         .array(optionTypeSchema)
         .max(MAX_OPTION_TYPES, `Up to ${MAX_OPTION_TYPES} options.`),
       variants: z.array(variantSchema(currency)).min(1).max(MAX_COMBINATIONS),
+      image: imageSchema.default(null),
     })
     .superRefine((product, ctx) => {
       const typeNames = new Set<string>();

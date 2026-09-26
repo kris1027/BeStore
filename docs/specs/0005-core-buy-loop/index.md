@@ -230,7 +230,7 @@ Tracer Bullet: milestone 1 threads one real product from the admin form to a car
 8. [x] Product page picker: radio groups, disabled sold out values, initial selection, price and availability updates, `variant-label.ts`, satisfies **AC-7**
 
 **Milestone 3: product image**
-9. [ ] `src/lib/supabase/admin.ts`, `createProductImageUpload`, browser upload with `uploadToSignedUrl`, dimension read, alt text, the path and existence check in `createProduct`; `next.config.ts` image settings; enable `storage-api` in CI; e2e with a fixture image, satisfies **AC-5**, **AC-6**
+9. [x] `src/lib/supabase/admin.ts`, `createProductImageUpload`, browser upload with `uploadToSignedUrl`, dimension read, alt text, the path and existence check in `createProduct`; `next.config.ts` image settings; enable `storage-api` in CI; e2e with a fixture image, satisfies **AC-5**, **AC-6**
 
 **Milestone 4: full cart and checkout stub**
 10. [ ] `setCartItemQuantity`, `removeCartItem`, `cart-lines.ts` flags and fixes, disabled Checkout with its reason, `CartLink` in the header behind Suspense, toasts and a live region, `/checkout` summary with its redirects, `noindex` on both pages, satisfies **AC-10**, **AC-11**, **AC-12**, **AC-13**
