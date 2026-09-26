@@ -31,7 +31,7 @@ vi.mock("next/headers", () => ({
   }),
 }));
 
-const { addToCart } = await import("@/features/cart/actions");
+const { addToCart, removeCartItem, setCartItemQuantity } = await import("@/features/cart/actions");
 
 resetDatabaseBeforeEach();
 
@@ -195,5 +195,111 @@ describe("addToCart", () => {
       "cart.cookie.invalid",
     );
     expect(JSON.stringify(mocks.warn.mock.calls)).not.toContain("forged");
+  });
+});
+
+// A cart with one line of `quantity`, named by the cookie; returns the line.
+async function cartWithLine(stock: number, quantity: number, suffix = "a") {
+  const { product, variant } = await createSimpleProduct(suffix, stock);
+  const cart = await testDb.cart.create({
+    data: {
+      expiresAt: new Date(Date.now() + 86_400_000),
+      items: { create: { variantId: variant.id, quantity } },
+    },
+    include: { items: true },
+  });
+  mocks.jar.set("bestore_cart", { value: signCartId(cart.id, secret) });
+  return { product, variant, cart, item: cart.items[0]! };
+}
+
+// covers: spec 0005 AC-10, AC-15
+describe("setCartItemQuantity", () => {
+  it("sets the quantity and renews the cart", async () => {
+    const { cart, item } = await cartWithLine(8, 2);
+
+    expect(await setCartItemQuantity({ itemId: item.id, quantity: 5 })).toEqual({
+      ok: true,
+      data: { lineQuantity: 5 },
+    });
+    const after = await testDb.cart.findUniqueOrThrow({
+      where: { id: cart.id },
+      include: { items: true },
+    });
+    expect(after.items[0]?.quantity).toBe(5);
+    expect(after.expiresAt.getTime()).toBeGreaterThan(Date.now() + 29 * 86_400_000);
+    expect(mocks.refresh).toHaveBeenCalledOnce();
+  });
+
+  it("caps at the stock and reports it", async () => {
+    const { item } = await cartWithLine(3, 1);
+
+    expect(await setCartItemQuantity({ itemId: item.id, quantity: 9 })).toEqual({
+      ok: true,
+      data: { lineQuantity: 3, cappedTo: 3 },
+    });
+  });
+
+  it("answers sold out and writes nothing when the stock is gone", async () => {
+    const { variant, item } = await cartWithLine(3, 2);
+    await testDb.productVariant.update({ where: { id: variant.id }, data: { stockQuantity: 0 } });
+
+    expect(await setCartItemQuantity({ itemId: item.id, quantity: 1 })).toEqual({
+      ok: false,
+      error: "sold_out",
+    });
+    expect((await testDb.cartItem.findUniqueOrThrow({ where: { id: item.id } })).quantity).toBe(2);
+  });
+
+  it("answers unavailable for a product that left the storefront", async () => {
+    const { product, item } = await cartWithLine(3, 1);
+    await testDb.product.update({ where: { id: product.id }, data: { status: "draft" } });
+
+    expect(await setCartItemQuantity({ itemId: item.id, quantity: 2 })).toEqual({
+      ok: false,
+      error: "unavailable",
+    });
+  });
+
+  it("treats a line from another cart as not found", async () => {
+    const other = await cartWithLine(5, 1, "other");
+    await cartWithLine(5, 1, "mine");
+
+    expect(await setCartItemQuantity({ itemId: other.item.id, quantity: 3 })).toEqual({
+      ok: false,
+      error: "not_found",
+    });
+    expect(
+      (await testDb.cartItem.findUniqueOrThrow({ where: { id: other.item.id } })).quantity,
+    ).toBe(1);
+  });
+
+  it("refuses without a cart cookie", async () => {
+    const { item } = await cartWithLine(5, 1);
+    mocks.jar.clear();
+
+    expect(await setCartItemQuantity({ itemId: item.id, quantity: 2 })).toEqual({
+      ok: false,
+      error: "not_found",
+    });
+  });
+});
+
+describe("removeCartItem", () => {
+  it("removes the line from the cookie's cart", async () => {
+    const { item } = await cartWithLine(5, 1);
+
+    expect(await removeCartItem({ itemId: item.id })).toEqual({ ok: true, data: {} });
+    expect(await testDb.cartItem.count()).toBe(0);
+  });
+
+  it("never removes a line from another cart", async () => {
+    const other = await cartWithLine(5, 1, "other");
+    await cartWithLine(5, 1, "mine");
+
+    expect(await removeCartItem({ itemId: other.item.id })).toEqual({
+      ok: false,
+      error: "not_found",
+    });
+    expect(await testDb.cartItem.count({ where: { id: other.item.id } })).toBe(1);
   });
 });

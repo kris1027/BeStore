@@ -101,13 +101,13 @@ spec [0004](../specs/0004-admin-sign-in/index.md) · code in [src/features/admin
 ### 6. Core buy loop · in-progress
 The narrow end to end path: an admin creates a product with variants, price, stock, and one image; the storefront shows a product list and a product page; a customer picks a variant, adds it to a cart, and reaches checkout as a guest.
 **Done when:** a product created in admin appears on the storefront; a customer can choose a variant, change quantities in the cart, and the cart survives a page reload; out of stock variants cannot be added.
-spec [0005](../specs/0005-core-buy-loop/index.md) · code in [src/features/catalog/](../../src/features/catalog/), [src/features/cart/](../../src/features/cart/), [src/lib/cart/](../../src/lib/cart/), [app/(store)/](../../app/(store)/), [app/admin/(panel)/products/](../../app/admin/(panel)/products/)
+spec [0005](../specs/0005-core-buy-loop/index.md) · code in [src/features/catalog/](../../src/features/catalog/), [src/features/cart/](../../src/features/cart/), [src/lib/cart/](../../src/lib/cart/), [app/(store)/](../../app/(store)/), [app/admin/(panel)/products/](../../app/admin/(panel)/products/), [src/features/checkout/](../../src/features/checkout/)
 - [x] Design it (spec): `/architect core buy loop`
 - [ ] Build it: `/develop core buy loop`
   - [x] Thin thread: Cache Components on with the admin and auth refit (proxy admin gate with real 404s, sign out as a POST route), admin create and list for a simple product, cached home grid and product page, add to cart with the signed cookie, cart survives reload in e2e (AC-1, AC-3, AC-6, AC-8, AC-9, AC-14, AC-15, AC-19, AC-20)
   - [x] Options and variants: option types, generated variant grid, field errors, product page picker with availability (AC-2, AC-4, AC-7)
   - [x] Product image: signed upload to Storage, alt text, image config, Storage in CI (AC-5)
-  - [ ] Full cart and checkout stub: quantity and remove, stale line flags, header count, `/checkout` summary (AC-10, AC-11, AC-12, AC-13)
+  - [x] Full cart and checkout stub: quantity and remove, stale line flags, header count, `/checkout` summary (AC-10, AC-11, AC-12, AC-13)
   - [ ] Expired cart cron, logs, and the accessibility pass (AC-16, AC-17, AC-18)
 - [ ] Verify it: `/check verify core buy loop`
 - [ ] Test it: `/test core buy loop`

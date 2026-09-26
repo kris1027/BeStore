@@ -71,10 +71,12 @@ test("an admin publishes a product and a customer keeps it in the cart across a 
   await customer.getByRole("button", { name: "View cart" }).click();
   await expect(customer).toHaveURL("/cart");
   await expect(customer.getByRole("link", { name })).toBeVisible();
-  await expect(customer.getByText("Quantity 2")).toBeVisible();
+  const quantity = customer.getByRole("group", { name: `Quantity of ${name}` }).locator("output");
+  await expect(quantity).toHaveText("2");
+  await expect(customer.getByRole("link", { name: "Cart, 2 items" })).toBeVisible();
 
   await customer.reload();
-  await expect(customer.getByText("Quantity 2")).toBeVisible();
+  await expect(quantity).toHaveText("2");
 
   // Asking for more than the stock caps the line at what is left (AC-8).
   await customer.goto(`/products/${slugOf(name)}`);
@@ -82,7 +84,7 @@ test("an admin publishes a product and a customer keeps it in the cart across a 
   await customer.getByRole("button", { name: "Add to cart" }).click();
   await expect(customer.getByText("Only 3 available")).toBeVisible();
   await customer.goto("/cart");
-  await expect(customer.getByText("Quantity 3")).toBeVisible();
+  await expect(quantity).toHaveText("3");
 });
 
 test("a draft stays off the storefront", async ({ page, browser }) => {

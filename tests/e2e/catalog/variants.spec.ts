@@ -67,7 +67,7 @@ test("options build a variant grid that keeps typed rows, and the picker follows
   await page.getByRole("button", { name: "Add to cart" }).click();
   await expect(page.getByText("Added to cart")).toBeVisible();
   await page.goto("/cart");
-  await expect(page.getByText("M / Oat")).toBeVisible();
+  await expect(page.getByText("M / Oat", { exact: true })).toBeVisible();
 });
 
 test("the form shows each refusal on its field", async ({ page }) => {

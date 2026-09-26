@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { Price } from "@/components/price";
 import { ProductImage } from "@/components/product-image";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Empty,
   EmptyContent,
@@ -15,6 +15,10 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { loadCart } from "@/lib/cart/load-cart";
+
+import { CartLineControls } from "./cart-line-controls";
+
+export const checkoutPath = "/checkout";
 
 // Reads the cookie, so it streams in behind the page's Suspense boundary (spec 0005, AC-12).
 export async function CartContents() {
@@ -70,12 +74,24 @@ export async function CartContents() {
                       <p className="text-sm text-muted-foreground">{line.variantLabel}</p>
                     ) : null}
                     <p className="text-sm text-muted-foreground">
-                      <Price cents={line.priceCents} /> each · Quantity {line.quantity}
+                      <Price cents={line.priceCents} /> each
                     </p>
                   </div>
                   <p className="font-medium">
                     <Price cents={line.totalCents} />
                   </p>
+                  <div className="basis-full">
+                    <CartLineControls
+                      itemId={line.id}
+                      quantity={line.quantity}
+                      flag={line.flag}
+                      productLabel={
+                        line.variantLabel
+                          ? `${line.productName}, ${line.variantLabel}`
+                          : line.productName
+                      }
+                    />
+                  </div>
                 </div>
               </div>
             </li>
@@ -96,6 +112,21 @@ export async function CartContents() {
           </span>
         </div>
         <p className="text-sm text-muted-foreground">Shipping is added at checkout.</p>
+        {cart.canCheckout ? (
+          <Link href={checkoutPath} className={buttonVariants({ size: "lg", className: "h-11" })}>
+            Checkout
+          </Link>
+        ) : (
+          <>
+            {/* Disabled with its reason (AC-11): a flagged line must be fixed first. */}
+            <Button size="lg" className="h-11" disabled aria-describedby="checkout-blocked">
+              Checkout
+            </Button>
+            <p id="checkout-blocked" className="text-sm text-destructive">
+              Some items need your attention. Fix or remove them to check out.
+            </p>
+          </>
+        )}
       </section>
     </div>
   );

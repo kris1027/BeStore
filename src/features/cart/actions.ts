@@ -105,3 +105,85 @@ export async function addToCart(
   refresh();
   return { ok: true, data };
 }
+
+export type CartLineError = "invalid" | "not_found" | "unavailable" | "sold_out";
+
+const setQuantitySchema = z.object({
+  itemId: z.uuid(),
+  quantity: z.number().int().min(1).max(MAX_LINE_QUANTITY),
+});
+
+const removeSchema = z.object({ itemId: z.uuid() });
+
+// Runs `write` on the cookie's live cart, locked, then renews the cart and its cookie. A line id
+// from any other cart reads as not found (spec 0005, AC-15).
+async function withCookieCart<T>(
+  write: (tx: Tx, cartId: string) => Promise<ActionResult<T, CartLineError>>,
+): Promise<ActionResult<T, CartLineError>> {
+  const cookieCartId = await readCartId();
+  if (cookieCartId === null) return { ok: false, error: "not_found" };
+  const expiresAt = cartExpiry(Date.now());
+
+  const result = await db.$transaction(async (tx) => {
+    const cartId = await lockLiveCart(tx, cookieCartId);
+    if (cartId === null) return { ok: false as const, error: "not_found" as const };
+    const outcome = await write(tx, cartId);
+    if (outcome.ok) await tx.cart.update({ where: { id: cartId }, data: { expiresAt } });
+    return outcome;
+  });
+  if (!result.ok) return result;
+
+  await setCartCookie(cookieCartId, expiresAt);
+  refresh();
+  return result;
+}
+
+// spec 0005, AC-10: the same caps as adding. A line whose variant sold out since it was added
+// has a cap of 0, which the quantity CHECK refuses, so it is answered as sold out untouched.
+export async function setCartItemQuantity(
+  input: unknown,
+): Promise<
+  ActionResult<{ readonly lineQuantity: number; readonly cappedTo?: number }, CartLineError>
+> {
+  const parsed = setQuantitySchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "invalid" };
+  const { itemId, quantity } = parsed.data;
+
+  return withCookieCart(async (tx, cartId) => {
+    const item = await tx.cartItem.findFirst({
+      where: { id: itemId, cartId },
+      select: {
+        variant: {
+          select: { stockQuantity: true, archived: true, product: { select: { status: true } } },
+        },
+      },
+    });
+    if (!item) return { ok: false, error: "not_found" };
+    const { variant } = item;
+    if (variant.archived || variant.product.status !== "active") {
+      return { ok: false, error: "unavailable" };
+    }
+    const cap = lineCap(variant.stockQuantity);
+    if (cap === 0) return { ok: false, error: "sold_out" };
+
+    const lineQuantity = Math.min(quantity, cap);
+    await tx.cartItem.update({ where: { id: itemId }, data: { quantity: lineQuantity } });
+    return {
+      ok: true,
+      data: { lineQuantity, ...(lineQuantity < quantity ? { cappedTo: lineQuantity } : {}) },
+    };
+  });
+}
+
+export async function removeCartItem(
+  input: unknown,
+): Promise<ActionResult<Record<string, never>, CartLineError>> {
+  const parsed = removeSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "invalid" };
+  const { itemId } = parsed.data;
+
+  return withCookieCart(async (tx, cartId) => {
+    const { count } = await tx.cartItem.deleteMany({ where: { id: itemId, cartId } });
+    return count === 0 ? { ok: false, error: "not_found" } : { ok: true, data: {} };
+  });
+}
