@@ -1,7 +1,16 @@
 import { expect, test } from "@playwright/test";
 
 import { expectNoA11yViolations } from "../a11y";
-import { createTestUser, enterCode, signInFully, signInWithPassword, totpCode } from "./support";
+import {
+  createTestUser,
+  enterCode,
+  latestEmailHtml,
+  resetLinkFrom,
+  signInFully,
+  signInWithPassword,
+  totpCode,
+  wrongCode,
+} from "./support";
 
 // Spec 0004, AC-14: every auth page, in its error states too, on desktop and phone.
 
@@ -61,6 +70,31 @@ test("the MFA views have no axe violations", async ({ page }) => {
 
   await enterCode(page, "000000", "Verify and continue");
   await expect(page.getByText("That code is incorrect.", { exact: false })).toBeVisible();
+  await expectNoA11yViolations(page);
+});
+
+test("the MFA code view of an enrolled admin has no axe violations", async ({ page }) => {
+  const admin = await createTestUser({ enrolled: true });
+  await signInWithPassword(page, admin);
+  await expect(page.getByLabel("6 digit code")).toBeVisible();
+  await expectNoA11yViolations(page);
+
+  await enterCode(page, await wrongCode(admin.secret ?? ""));
+  await expect(page.getByText("That code is incorrect.", { exact: false })).toBeVisible();
+  await expectNoA11yViolations(page);
+});
+
+test("the MFA not set up view of a reset link session has no axe violations", async ({ page }) => {
+  const admin = await createTestUser();
+  await page.goto("/admin/forgot-password");
+  await page.getByLabel("Email").fill(admin.email);
+  await page.getByRole("button", { name: "Send reset link" }).click();
+  await page.goto(resetLinkFrom(await latestEmailHtml(admin.email)));
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  await expect(
+    page.getByText("Your authenticator is not set up. Contact the store owner."),
+  ).toBeVisible();
   await expectNoA11yViolations(page);
 });
 

@@ -105,7 +105,15 @@ export async function resetPassword(
   }
 
   // Whoever else holds a session (perhaps the reason for the reset) is signed out everywhere.
-  await supabase.auth.signOut({ scope: "others" });
+  // The password is changed either way; a failed revoke is logged because the other sessions
+  // may still be live.
+  const { error: revokeError } = await supabase.auth.signOut({ scope: "others" });
+  if (revokeError) {
+    logger.error(
+      { adminId: admin.id, reason: classifyAuthError(revokeError) },
+      "auth.password.revoke_others_failed",
+    );
+  }
   logAuthEvent("auth.password.changed", { adminId: admin.id, ip: requestIp(await headers()) });
   redirect("/admin");
 }

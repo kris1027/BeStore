@@ -10,7 +10,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { classifyAuthError } from "../auth-errors";
 import { factorToVerify, loadTotpFactors } from "../factors";
 import { logAuthEvent, requestIp } from "../log";
-import { countRecentWrongCodes, isLockedOut } from "../mfa-lockout";
+import { isLockedOut, withFactorLock } from "../mfa-lockout";
 import { requireAdminSession } from "../require-admin";
 import { safeAdminPath, signInPath } from "../safe-admin-path";
 import { totpCodeSchema } from "../schemas";
@@ -81,16 +81,22 @@ export async function verifyTotp(
     return { ok: false, error: { form: "mfa_not_set_up" } };
   }
 
-  if (isLockedOut(await countRecentWrongCodes(factorId))) {
+  const attempt = await withFactorLock(factorId, async (wrongCodes) => {
+    if (isLockedOut(wrongCodes)) return { locked: true } as const;
+    const { error } = await supabase.auth.mfa.challengeAndVerify({
+      factorId,
+      code: parsed.data.code,
+    });
+    return { locked: false, error } as const;
+  });
+  // Outside the lock: redirect() throws, and the session ends only after the lock is released.
+  if (attempt.locked) {
     await endLocalSession(supabase);
     logAuthEvent("auth.mfa.locked", { adminId, ip });
     redirect(signInPath({ reason: "too_many_codes" }));
   }
 
-  const { error } = await supabase.auth.mfa.challengeAndVerify({
-    factorId,
-    code: parsed.data.code,
-  });
+  const { error } = attempt;
   if (error) {
     const failure = classifyAuthError(error);
     if (failure !== "rejected") return { ok: false, error: { form: failureMessage(failure) } };

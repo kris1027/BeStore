@@ -214,6 +214,21 @@ describe("resetPassword", () => {
   });
 
   // covers: AC-10
+  it("still finishes the reset, and logs it, when other sessions cannot be signed out", async () => {
+    mocks.signOut.mockResolvedValue({ error: { status: 503 } });
+
+    await expect(outcome(() => resetPassword(values))).resolves.toBe("redirect:/admin");
+    expect(mocks.error).toHaveBeenCalledWith(
+      { adminId: ADMIN_ID, reason: "unavailable" },
+      "auth.password.revoke_others_failed",
+    );
+    expect(mocks.info).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "auth.password.changed", adminId: ADMIN_ID }),
+      "auth.password.changed",
+    );
+  });
+
+  // covers: AC-10
   it("names each missing part of a weak password without calling the Auth server", async () => {
     const result = await resetPassword({ password: "short", confirm: "short" });
 

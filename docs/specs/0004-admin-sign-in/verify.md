@@ -38,7 +38,7 @@ Setup: `pnpm db:start` (restart it once after pulling, so the new `supabase/conf
 
 ## Commands
 - [x] `pnpm test` → unit suites pass (access, safe path, proxy decision, schemas, error mapping, log record, logger redaction) → AC-5, AC-6, AC-7, AC-10, AC-12, AC-13
-- [x] `pnpm test:stack` → the `auth.mfa_challenges` columns and the three script cores pass against the local stack → AC-11, AC-16
+- [x] `pnpm test:stack` → the `auth.mfa_challenges` columns, a parallel burst of wrong codes stopping at 5, and the three script cores pass against the local stack → AC-11, AC-16
 - [x] `pnpm test:e2e` → admin specs (sign in, denials, password reset, a11y) pass on desktop and phone → AC-1 to AC-6, AC-8, AC-9, AC-10, AC-12, AC-14, AC-16, AC-17
 - [x] `printf 'Passw0rd!x\nPassw0rd!x\n' | pnpm admin:create --email x@example.com --name X` → prints the admin id; `pnpm admin:reset-mfa --email x@example.com` → removes factors and sessions → AC-11
 
@@ -46,4 +46,4 @@ Setup: `pnpm db:start` (restart it once after pulling, so the new `supabase/conf
 - [ ] Production: Firewall rule on POST to the three auth pages, 10 per minute per IP, deny 10 minutes (see the runbook) → AC-15
 
 ## Acceptance-criteria coverage
-- AC-1 e2e redirect + matcher unit test · AC-2 e2e happy path · AC-3 e2e same message + field errors · AC-4 e2e enroll, reload, reset session · AC-5 e2e pages (the action path is covered by `requireAdminSession` in every action plus unit tests) · AC-6 e2e page and action 404 · AC-7 unit tests only (Playwright cannot move the server clock) · AC-8 e2e sign out and Back · AC-9 e2e Mailpit flow · AC-10 e2e and unit · AC-11 stack tests · AC-12 unit and e2e · AC-13 unit (record shape, redaction) · AC-14 e2e axe and keyboard · AC-15 manual in production at deploy (scope feature 19) · AC-16 e2e lockout and stack pin · AC-17 e2e
+- AC-1 e2e redirect + matcher unit test · AC-2 e2e happy path · AC-3 e2e same message + field errors · AC-4 e2e enroll, reload, reset session · AC-5 e2e pages (the action path is covered by `requireAdminSession` in every action plus unit tests) · AC-6 e2e page and action 404 · AC-7 unit tests only (Playwright cannot move the server clock) · AC-8 e2e sign out and Back · AC-9 e2e Mailpit flow · AC-10 e2e and unit · AC-11 stack tests · AC-12 unit and e2e · AC-13 unit (record shape, redaction) · AC-14 e2e axe (every MFA view: setup, enrolled verify, reset link not set up) and keyboard · AC-15 manual in production at deploy (scope feature 19) · AC-16 e2e lockout, stack pin and parallel burst stack test · AC-17 e2e

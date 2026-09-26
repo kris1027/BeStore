@@ -31,10 +31,12 @@ vi.mock("next/headers", () => ({
 }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("../require-admin", () => ({ requireAdminSession: mocks.requireAdminSession }));
-// The count reads auth.mfa_challenges (pinned by the stack test); the threshold stays real.
+// The locked count reads auth.mfa_challenges (pinned by the stack test); the threshold stays
+// real.
 vi.mock("../mfa-lockout", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../mfa-lockout")>()),
-  countRecentWrongCodes: mocks.countRecentWrongCodes,
+  withFactorLock: async (factorId: string, run: (wrongCodes: number) => Promise<unknown>) =>
+    run(await mocks.countRecentWrongCodes(factorId)),
 }));
 vi.mock("@/lib/db", () => ({ db: {} }));
 vi.mock("@/lib/supabase/server", () => ({
