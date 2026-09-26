@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 
-import { adminNavItems } from "@/components/layout/admin-nav";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { UserMenu } from "@/features/admin-auth/components/user-menu";
 import { adminMetadata, requireAdmin } from "@/features/admin-auth/require-admin";
+
+// Reads the session or search params at the top level; allowed to block until converted
+// to Suspense (spec 0005, Caching model).
+export const instant = false;
 
 export function generateMetadata(): Promise<Metadata> {
   return adminMetadata(
@@ -25,7 +28,7 @@ export default async function AdminPanelLayout({
   const admin = await requireAdmin();
 
   return (
-    <AdminShell nav={adminNavItems} userMenu={<UserMenu name={admin.name} email={admin.email} />}>
+    <AdminShell userMenu={<UserMenu name={admin.name} email={admin.email} />}>
       {children}
     </AdminShell>
   );

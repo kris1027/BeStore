@@ -1,5 +1,8 @@
 export const adminHome = "/admin";
 
+// A POST route handler (spec 0005, AC-20).
+export const signOutPath = "/admin/sign-out";
+
 // Pages a `next` must never point back at; the reset page is allowed, since the reset link
 // sends the admin through the MFA step on the way there.
 const authPages = ["/admin/sign-in", "/admin/mfa", "/admin/forgot-password"] as const;

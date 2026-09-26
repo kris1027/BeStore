@@ -2,10 +2,10 @@ import Link from "next/link";
 
 import { Wordmark } from "@/components/wordmark";
 import { brand } from "@/lib/brand/brand";
-import { env } from "@/lib/env";
 import { cn } from "@/lib/utils";
 
 import { storeContainer } from "./container";
+import { FooterYear } from "./footer-year";
 import type { NavItem } from "./nav";
 import { StoreDesktopNav, StoreMobileNav } from "./store-nav-menu";
 import { storeNavItems } from "./store-nav";
@@ -26,13 +26,6 @@ export function StoreShell({
   navItems = storeNavItems,
   children,
 }: StoreShellProps) {
-  // The store's year, not the server's: on New Year's Eve they can differ. A static page
-  // freezes it at build time until the next deploy, which is fine for a year.
-  const year = new Intl.DateTimeFormat("en", {
-    year: "numeric",
-    timeZone: env.STORE_TIMEZONE,
-  }).format(new Date());
-
   return (
     <div className="flex min-h-svh flex-col">
       <a
@@ -66,7 +59,7 @@ export function StoreShell({
           <div className="flex flex-col gap-2">
             <Wordmark className="self-start" />
             <p className="text-sm text-muted-foreground">
-              © {year} {brand.name}
+              © <FooterYear /> {brand.name}
             </p>
             {brand.contactEmail ? (
               <a
