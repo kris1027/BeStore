@@ -16,7 +16,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 3 | Data model | Foundation | done |
 | 4 | Design system & UI foundation | Foundation | done |
 | 5 | Admin sign in | Slice 1 | done |
-| 6 | Core buy loop | Slice 1 | in-progress |
+| 6 | Core buy loop | Slice 1 | done |
 | 7 | Card payment & paid orders | Slice 1 | planned |
 | 8 | Shipping address & flat rate | Slice 2 | planned |
 | 9 | Admin catalog management | Slice 3 | planned |
@@ -98,7 +98,7 @@ spec [0004](../specs/0004-admin-sign-in/index.md) · code in [src/features/admin
 - [x] Review it (fresh model): `/check review admin sign in`
 - [x] Document it: `/document admin sign in`
 
-### 6. Core buy loop · in-progress
+### 6. Core buy loop · done
 The narrow end to end path: an admin creates a product with variants, price, stock, and one image; the storefront shows a product list and a product page; a customer picks a variant, adds it to a cart, and reaches checkout as a guest.
 **Done when:** a product created in admin appears on the storefront; a customer can choose a variant, change quantities in the cart, and the cart survives a page reload; out of stock variants cannot be added.
 spec [0005](../specs/0005-core-buy-loop/index.md) · code in [src/features/catalog/](../../src/features/catalog/), [src/features/cart/](../../src/features/cart/), [src/lib/cart/](../../src/lib/cart/), [app/(store)/](../../app/(store)/), [app/admin/(panel)/products/](../../app/admin/(panel)/products/), [src/features/checkout/](../../src/features/checkout/)
@@ -110,7 +110,7 @@ spec [0005](../specs/0005-core-buy-loop/index.md) · code in [src/features/catal
   - [x] Full cart and checkout stub: quantity and remove, stale line flags, header count, `/checkout` summary (AC-10, AC-11, AC-12, AC-13)
   - [x] Expired cart cron, logs, and the accessibility pass (AC-16, AC-17, AC-18)
 - [x] Verify it: `/check verify core buy loop`
-- [ ] Test it: `/test core buy loop`
+- [x] Test it: `/test core buy loop`
 
 ### 7. Card payment & paid orders · needs a decision · GA
 Guest card payment at checkout, confirmed on the server, turning the cart into a paid order that appears in a basic admin order list.

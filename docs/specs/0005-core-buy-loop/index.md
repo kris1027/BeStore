@@ -1,7 +1,7 @@
 # 0005. Core buy loop: admin product create, storefront catalog and guest cart
 
 **Date**: 2026-09-26
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 
