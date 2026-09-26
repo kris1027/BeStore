@@ -226,8 +226,8 @@ Tracer Bullet: milestone 1 threads one real product from the admin form to a car
 6. [x] Cart: `src/lib/cart/cookie.ts` and `load-cart.ts`, `addToCart` (lazy cart plus cookie, row lock, caps), a read only `/cart`; e2e: admin creates and publishes, customer adds, reloads the cart, satisfies **AC-8**, **AC-9**, **AC-10**, **AC-15**
 
 **Milestone 2: options and variants**
-7. [ ] `variant-grid.ts` (combinations, `option_key`, SKU suggestion, 100 limit) with unit tests; the option types editor and the generated grid in the create form; `createProduct` writes types, values, variants and links; field errors for every AC-4 case including mapped 23505s, satisfies **AC-2**, **AC-3**, **AC-4**
-8. [ ] Product page picker: radio groups, disabled sold out values, initial selection, price and availability updates, `variant-label.ts`, satisfies **AC-7**
+7. [x] `variant-grid.ts` (combinations, `option_key`, SKU suggestion, 100 limit) with unit tests; the option types editor and the generated grid in the create form; `createProduct` writes types, values, variants and links; field errors for every AC-4 case including mapped 23505s, satisfies **AC-2**, **AC-3**, **AC-4**
+8. [x] Product page picker: radio groups, disabled sold out values, initial selection, price and availability updates, `variant-label.ts`, satisfies **AC-7**
 
 **Milestone 3: product image**
 9. [ ] `src/lib/supabase/admin.ts`, `createProductImageUpload`, browser upload with `uploadToSignedUrl`, dimension read, alt text, the path and existence check in `createProduct`; `next.config.ts` image settings; enable `storage-api` in CI; e2e with a fixture image, satisfies **AC-5**, **AC-6**

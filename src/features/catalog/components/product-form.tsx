@@ -280,7 +280,7 @@ export function ProductForm() {
       ) : null}
 
       <div className="grid items-start gap-6 lg:grid-cols-3">
-        <div className="flex flex-col gap-6 lg:col-span-2">
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle>
@@ -405,7 +405,7 @@ export function ProductForm() {
           </Card>
         </div>
 
-        <Card className="lg:sticky lg:top-20">
+        <Card className="min-w-0 lg:sticky lg:top-20">
           <CardHeader>
             <CardTitle>
               <h2>Save</h2>
@@ -605,13 +605,16 @@ function VariantsTable({
       <TableBody>
         {fields.map((field, i) => {
           const values = rows.find((row) => row.key === field.key)?.values ?? [];
-          const label = values.length > 0 ? values.join(" / ") : "the product";
+          const label =
+            values.length === 0
+              ? "the product"
+              : values.every((value) => value.trim())
+                ? values.join(" / ")
+                : `variant ${i + 1}`;
           return (
             <TableRow key={field.fieldKey} className="align-top">
               {hasOptions ? (
-                <TableCell className="pt-4 font-medium whitespace-normal">
-                  {values.join(" / ")}
-                </TableCell>
+                <TableCell className="pt-4 font-medium">{values.join(" / ")}</TableCell>
               ) : null}
               {(["price", "stock", "sku"] as const).map((column) => {
                 const path = `variants.${i}.${column}` as const;
