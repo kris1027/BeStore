@@ -11,6 +11,10 @@ import { mfaViewFor } from "@/features/admin-auth/mfa-view";
 import { adminMetadata, requireAdminSession } from "@/features/admin-auth/require-admin";
 import { safeAdminPath } from "@/features/admin-auth/safe-admin-path";
 
+// Reads the session or search params at the top level; allowed to block until converted
+// to Suspense (spec 0005, Caching model).
+export const instant = false;
+
 export function generateMetadata(): Promise<Metadata> {
   return adminMetadata({ title: "Authenticator code" }, { allowAal1: true });
 }

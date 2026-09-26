@@ -13,6 +13,7 @@ export type AuthEvent =
   | "auth.sign_out"
   | "auth.session.expired"
   | "auth.access.denied"
+  | "auth.proxy.lookup_failed"
   | "auth.reset.requested"
   | "auth.password.changed";
 
@@ -50,8 +51,7 @@ export function authEventRecord(event: AuthEvent, fields: AuthEventFields) {
 
 export function logAuthEvent(event: AuthEvent, fields: AuthEventFields) {
   const record = authEventRecord(event, fields);
-  const failed =
-    event.endsWith(".failed") || event.endsWith(".locked") || event.endsWith(".denied");
+  const failed = event.endsWith("failed") || event.endsWith(".locked") || event.endsWith(".denied");
   if (failed) logger.warn(record, event);
   else logger.info(record, event);
 }

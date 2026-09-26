@@ -1,11 +1,12 @@
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { Wordmark } from "@/components/wordmark";
 import { brand } from "@/lib/brand/brand";
-import { env } from "@/lib/env";
 import { cn } from "@/lib/utils";
 
 import { storeContainer } from "./container";
+import { FooterYear } from "./footer-year";
 import type { NavItem } from "./nav";
 import { StoreDesktopNav, StoreMobileNav } from "./store-nav-menu";
 import { storeNavItems } from "./store-nav";
@@ -26,13 +27,6 @@ export function StoreShell({
   navItems = storeNavItems,
   children,
 }: StoreShellProps) {
-  // The store's year, not the server's: on New Year's Eve they can differ. A static page
-  // freezes it at build time until the next deploy, which is fine for a year.
-  const year = new Intl.DateTimeFormat("en", {
-    year: "numeric",
-    timeZone: env.STORE_TIMEZONE,
-  }).format(new Date());
-
   return (
     <div className="flex min-h-svh flex-col">
       <a
@@ -44,11 +38,17 @@ export function StoreShell({
       <header className="sticky top-0 z-40 h-(--header-height) border-b bg-background">
         <div className={cn(storeContainer, "flex h-full items-center gap-4")}>
           <div className="flex items-center gap-1">
-            <StoreMobileNav items={navItems} />
+            {/* The navs read the pathname, which a route with unknown params (a product page)
+                only knows at request time; Suspense keeps the rest of the shell static. */}
+            <Suspense fallback={null}>
+              <StoreMobileNav items={navItems} />
+            </Suspense>
             <Wordmark />
           </div>
           <div className="flex flex-1 justify-center">
-            <StoreDesktopNav items={navItems} />
+            <Suspense fallback={null}>
+              <StoreDesktopNav items={navItems} />
+            </Suspense>
           </div>
           <div className="flex items-center gap-1">{actions}</div>
         </div>
@@ -66,7 +66,7 @@ export function StoreShell({
           <div className="flex flex-col gap-2">
             <Wordmark className="self-start" />
             <p className="text-sm text-muted-foreground">
-              © {year} {brand.name}
+              © <FooterYear /> {brand.name}
             </p>
             {brand.contactEmail ? (
               <a

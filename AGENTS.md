@@ -54,6 +54,9 @@ Stored in `docs/specs/`. Format: `docs/specs/NNNN-title/index.md`. Scope lives i
 - **Data access**: Prisma only, server only (`import "server-only"`); never `supabase.from(...)`. Every new table's migration enables RLS with no policies.
 - **Security**: every admin page, action and route handler calls `requireAdmin()` itself; the proxy is only a first gate. Prices always come from the DB, never the client. Only the Stripe webhook marks an order paid, idempotently.
 - **Money and time**: integer minor units (cents) in `Int` columns, never floats; timestamps in UTC `timestamptz`, shown in `STORE_TIMEZONE`.
+- **Caching**: `cacheComponents` is on. Catalog reads are `'use cache'` functions tagged from `src/lib/cache-tags.ts`; whatever changes what they return must expire the tag (`updateTag` in a server action, `revalidateTag(tag, { expire: 0 })` in a route handler). Request data (cookies, the cart) sits behind Suspense.
+- **Status codes**: under Cache Components a page's `notFound()` / `redirect()` answer 200 (the shell streams first). Where the real status matters, decide it in the proxy before rendering (the admin gate does this).
+- **Cron**: handlers under `app/api/cron/` refuse anything but `Authorization: Bearer ${CRON_SECRET}` (constant time compare); schedules live in `vercel.json`.
 - **Env**: every variable is added to the Zod schema in `src/lib/env.ts` and to `.env.example`.
 - **UI**: WCAG AA baseline on storefront and admin (labels, keyboard use, visible focus, contrast).
 - **Comments**: explain the why (invariants, gotchas), not the what.
@@ -89,5 +92,7 @@ MCP servers: Supabase (connected), Stripe (connected), Vercel (connected), Playw
 ## Context files
 
 - [emails/AGENTS.md](emails/AGENTS.md): React Email templates sent through Resend
+- [src/features/catalog/AGENTS.md](src/features/catalog/AGENTS.md): products, variants, the admin create form, cached storefront reads
+- [src/features/cart/AGENTS.md](src/features/cart/AGENTS.md): the signed cart cookie, cart actions and caps, the expired cart cron
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._
