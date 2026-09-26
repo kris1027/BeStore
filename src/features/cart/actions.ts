@@ -60,6 +60,10 @@ export async function addToCart(
       const cap = lineCap(variant.stockQuantity);
       if (cap === 0) return { ok: false, error: "sold_out" };
 
+      // With no cookie there is nothing to lock, so two first adds racing from two fresh tabs
+      // each create a cart and the last Set-Cookie wins; the other cart expires unseen. Two
+      // cookieless requests look like two visitors, so no server check can merge them. One tab
+      // cannot race itself: Next dispatches a client's Server Functions one at a time.
       const liveCartId = cookieCartId === null ? null : await lockLiveCart(tx, cookieCartId);
       const cartId = liveCartId
         ? (
