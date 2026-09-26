@@ -89,14 +89,16 @@ export async function verifyTotp(
     });
     return { locked: false, error } as const;
   });
+  // A double submit while the first code is still being checked.
+  if (!attempt.ok) return { ok: false, error: { form: "rate_limited" } };
   // Outside the lock: redirect() throws, and the session ends only after the lock is released.
-  if (attempt.locked) {
+  if (attempt.data.locked) {
     await endLocalSession(supabase);
     logAuthEvent("auth.mfa.locked", { adminId, ip });
     redirect(signInPath({ reason: "too_many_codes" }));
   }
 
-  const { error } = attempt;
+  const { error } = attempt.data;
   if (error) {
     const failure = classifyAuthError(error);
     if (failure !== "rejected") return { ok: false, error: { form: failureMessage(failure) } };

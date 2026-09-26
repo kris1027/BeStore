@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => {
     signOut: vi.fn(),
     clearAuthCookies: vi.fn(),
     countRecentWrongCodes: vi.fn(),
+    factorBusy: false,
     info: vi.fn(),
     warn: vi.fn(),
   };
@@ -36,7 +37,9 @@ vi.mock("../require-admin", () => ({ requireAdminSession: mocks.requireAdminSess
 vi.mock("../mfa-lockout", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../mfa-lockout")>()),
   withFactorLock: async (factorId: string, run: (wrongCodes: number) => Promise<unknown>) =>
-    run(await mocks.countRecentWrongCodes(factorId)),
+    mocks.factorBusy
+      ? { ok: false, error: "busy" }
+      : { ok: true, data: await run(await mocks.countRecentWrongCodes(factorId)) },
 }));
 vi.mock("@/lib/db", () => ({ db: {} }));
 vi.mock("@/lib/supabase/server", () => ({
@@ -92,6 +95,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.requireAdminSession.mockResolvedValue(session());
   mocks.countRecentWrongCodes.mockResolvedValue(0);
+  mocks.factorBusy = false;
   mocks.challengeAndVerify.mockResolvedValue({ data: {}, error: null });
   mocks.unenroll.mockResolvedValue({ error: null });
   mocks.signOut.mockResolvedValue({ error: null });
@@ -342,5 +346,17 @@ describe("verifyTotp", () => {
     await outcome(() => verifyTotp({ code: "123456" }, undefined));
 
     expect(mocks.challengeAndVerify).toHaveBeenCalledOnce();
+  });
+
+  it("asks the admin to wait when a code for the same factor is still being checked", async () => {
+    factorsAre(verified);
+    mocks.factorBusy = true;
+
+    await expect(verifyTotp({ code: "123456" }, undefined)).resolves.toEqual({
+      ok: false,
+      error: { form: "rate_limited" },
+    });
+    expect(mocks.challengeAndVerify).not.toHaveBeenCalled();
+    expect(mocks.signOut).not.toHaveBeenCalled();
   });
 });

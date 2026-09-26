@@ -7,7 +7,7 @@ vi.mock("server-only", () => ({}));
 // Spec 0004, AC-16: the wrong code limit reads Supabase's internal auth.mfa_challenges table.
 // This pins the columns it relies on and the one row per attempt behavior, so a Supabase
 // upgrade that reshapes them fails here rather than silently disabling the lockout.
-const { countRecentWrongCodes, isLockedOut, MAX_WRONG_CODES, withFactorLock } =
+const { countRecentWrongCodes, isLockedOut, withFactorLock } =
   await import("@/features/admin-auth/mfa-lockout");
 const { db } = await import("@/lib/db");
 
@@ -48,7 +48,7 @@ describe("auth.mfa_challenges", () => {
     expect(await countRecentWrongCodes(factor.id)).toBe(2);
   });
 
-  it("lets no more than 5 codes through when they arrive at once", async () => {
+  it("checks one code at a time per factor, refusing the rest of a burst as busy", async () => {
     const email = uniqueEmail();
     const created = await serviceClient().auth.admin.createUser({
       email,
@@ -62,18 +62,21 @@ describe("auth.mfa_challenges", () => {
     const { data: factor } = await client.auth.mfa.enroll({ factorType: "totp" });
     if (!factor) throw new Error("enroll failed");
 
-    // The same check verifyTotp runs, fired as one burst.
-    const checked = await Promise.all(
-      Array.from({ length: MAX_WRONG_CODES + 3 }, () =>
+    // The same check verifyTotp runs, fired as one burst larger than the connection pool.
+    const attempts = await Promise.all(
+      Array.from({ length: 12 }, () =>
         withFactorLock(factor.id, async (wrongCodes) => {
-          if (isLockedOut(wrongCodes)) return false;
+          if (isLockedOut(wrongCodes)) return "locked";
           await client.auth.mfa.challengeAndVerify({ factorId: factor.id, code: "000000" });
-          return true;
+          return "checked";
         }),
       ),
     );
 
-    expect(checked.filter(Boolean)).toHaveLength(MAX_WRONG_CODES);
-    expect(await countRecentWrongCodes(factor.id)).toBe(MAX_WRONG_CODES);
+    expect(attempts.filter((a) => a.ok)).toEqual([{ ok: true, data: "checked" }]);
+    expect(attempts.filter((a) => !a.ok)).toHaveLength(11);
+    expect(await countRecentWrongCodes(factor.id)).toBe(1);
+    // No waiter kept a connection: the pool still answers at once.
+    await expect(db.$queryRaw`SELECT 1`).resolves.toBeDefined();
   });
 });
