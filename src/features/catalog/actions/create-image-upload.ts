@@ -3,7 +3,12 @@
 import { z } from "zod";
 
 import { requireAdmin } from "@/features/admin-auth/require-admin";
-import { IMAGE_EXTENSIONS, MAX_IMAGE_BYTES, PRODUCT_IMAGE_BUCKET } from "@/lib/product-image";
+import {
+  IMAGE_EXTENSIONS,
+  isImageContentType,
+  MAX_IMAGE_BYTES,
+  PRODUCT_IMAGE_BUCKET,
+} from "@/lib/product-image";
 import type { ActionResult } from "@/lib/result";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { uuidv7 } from "@/lib/uuid";
@@ -25,10 +30,10 @@ export async function createProductImageUpload(
   const parsed = uploadSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "unsupported_type" };
   const { contentType, size } = parsed.data;
-  if (!(contentType in IMAGE_EXTENSIONS)) return { ok: false, error: "unsupported_type" };
+  if (!isImageContentType(contentType)) return { ok: false, error: "unsupported_type" };
   if (size > MAX_IMAGE_BYTES) return { ok: false, error: "too_large" };
 
-  const extension = IMAGE_EXTENSIONS[contentType as keyof typeof IMAGE_EXTENSIONS];
+  const extension = IMAGE_EXTENSIONS[contentType];
   const path = `products/${uuidv7()}.${extension}`;
   const { data, error } = await createSupabaseAdminClient()
     .storage.from(PRODUCT_IMAGE_BUCKET)

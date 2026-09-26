@@ -20,6 +20,7 @@ export const IMAGE_CONTENT_TYPES = Object.keys(IMAGE_EXTENSIONS) as ImageContent
 export const PRODUCT_IMAGE_PATH =
   /^products\/[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(png|jpg|webp|avif)$/;
 
+// Own keys only: `in` would also accept inherited names such as "toString" or "__proto__".
 export function isImageContentType(value: unknown): value is ImageContentType {
-  return typeof value === "string" && value in IMAGE_EXTENSIONS;
+  return typeof value === "string" && Object.hasOwn(IMAGE_EXTENSIONS, value);
 }
