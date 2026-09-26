@@ -14,8 +14,8 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 1 | Stack & architecture | Foundation | done |
 | 2 | Coding standards & tooling | Foundation | done |
 | 3 | Data model | Foundation | done |
-| 4 | Design system & UI foundation | Foundation | in-progress |
-| 5 | Admin sign in | Slice 1 | planned |
+| 4 | Design system & UI foundation | Foundation | done |
+| 5 | Admin sign in | Slice 1 | done |
 | 6 | Core buy loop | Slice 1 | planned |
 | 7 | Card payment & paid orders | Slice 1 | planned |
 | 8 | Shipping address & flat rate | Slice 2 | planned |
@@ -29,6 +29,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 16 | Legal pages & cookie consent | Launch | planned |
 | 17 | SEO for storefront pages | Launch | planned |
 | 18 | Analytics & error tracking | Launch | planned |
+| 19 | Production deploy | Launch | planned |
 
 ## Foundations
 
@@ -65,7 +66,7 @@ spec [0002](../specs/0002-data-model/index.md) · code in [prisma/](../../prisma
 - [x] Verify it: `/check verify data model`
 - [x] Test it: `/test data model`
 
-### 4. Design system & UI foundation · in-progress
+### 4. Design system & UI foundation · done
 Visual language, layout, and base components shared by the storefront and the admin panel, built to WCAG AA from the start.
 **Done when:** `design.md` covers type, color, spacing, and components; base components work by keyboard and screen reader and meet AA contrast.
 spec [0003](../specs/0003-design-system-ui-foundation/index.md) · design [design.md](../design.md) · code in [src/components/](../../src/components/), [src/lib/brand/](../../src/lib/brand/), [app/style-guide/](../../app/style-guide/), [app/globals.css](../../app/globals.css)
@@ -82,10 +83,20 @@ spec [0003](../specs/0003-design-system-ui-foundation/index.md) · design [desig
 
 The thinnest real thread: an admin signs in and adds a product, a customer finds it, buys it, pays, and the paid order shows up in admin. Real database, real payment, real UI, just narrow.
 
-### 5. Admin sign in · needs a decision · GA
+### 5. Admin sign in · done · GA
 Only admins reach the admin panel. One role, a few admin accounts, no public sign up.
 **Done when:** an admin can sign in and out; every admin page and admin action refuses anyone who is not signed in as an admin.
-- [ ] Design it (spec): `/architect admin sign in`
+spec [0004](../specs/0004-admin-sign-in/index.md) · code in [src/features/admin-auth/](../../src/features/admin-auth/), [app/admin/](../../app/admin/), [scripts/admin/](../../scripts/admin/), [docs/runbooks/admin-accounts.md](../runbooks/admin-accounts.md)
+- [x] Design it (spec): `/architect admin sign in`
+- [x] Build it: `/develop admin sign in`
+  - [x] Thin thread: Supabase clients, proxy, `admin:create`, password sign in and out, `requireAdmin()`, welcome page, real Supabase in CI e2e (AC-1, AC-2, AC-3, AC-8, AC-11)
+  - [x] Required TOTP: enroll and verify, `aal2` enforcement, wrong code lockout, `admin:reset-mfa`, then denials and the 12 hour cap with `admin:disable` (AC-4, AC-5, AC-6, AC-7, AC-12, AC-16, AC-17)
+  - [x] Password reset through Resend SMTP, `/auth/confirm`, TOTP before the new password (AC-9, AC-10)
+  - [x] Auth event logging, keyboard and axe on every auth page, production runbook (AC-13, AC-14); the production Firewall rule (AC-15) moved to feature 19
+- [x] Verify it: `/check verify admin sign in`
+- [x] Test it: `/test admin sign in`
+- [x] Review it (fresh model): `/check review admin sign in`
+- [x] Document it: `/document admin sign in`
 
 ### 6. Core buy loop · needs a decision
 The narrow end to end path: an admin creates a product with variants, price, stock, and one image; the storefront shows a product list and a product page; a customer picks a variant, adds it to a cart, and reaches checkout as a guest.
@@ -169,6 +180,14 @@ Make products findable: titles, descriptions, canonical links, sitemap, product 
 See how customers move through the store and know when something breaks.
 **Done when:** the funnel (view product, add to cart, start checkout, pay) is tracked with consent respected; front end and server errors, including failed payments, raise alerts.
 - [ ] Design it (spec): `/architect analytics & error tracking`
+
+### 19. Production deploy
+The last step: ship to Vercel and the production Supabase project, and turn on the production only settings every earlier slice left for deploy time.
+**Done when:** the production app runs on Vercel against production Supabase, and each production only item below is applied and checked there.
+- [ ] Build it: `/develop production deploy`
+  - [ ] Admin sign in, from the runbook [docs/runbooks/admin-accounts.md](../runbooks/admin-accounts.md): production Supabase auth settings, Resend SMTP, recovery template, redirect URLs, asymmetric JWT keys, the first real admin (spec 0004 AC-10, AC-11)
+  - [ ] Vercel Firewall rate limit on `POST` to `/admin/sign-in`, `/admin/mfa`, `/admin/forgot-password`: 10 per minute per IP, deny 10 minutes (spec 0004 AC-15)
+- [ ] Verify it: `/check verify production deploy`
 
 ## Deferred
 Out of scope for the current build pass, kept so the plan stays honest.
