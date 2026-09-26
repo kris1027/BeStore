@@ -79,7 +79,7 @@ export function AdminProductsList({
       ) : (
         <Card>
           <CardContent>
-            <Table>
+            <Table containerProps={{ tabIndex: 0, role: "region", "aria-label": "Products" }}>
               <TableCaption className="sr-only">
                 Products, newest first
                 {products.length === ADMIN_PRODUCT_LIMIT

@@ -63,6 +63,7 @@ jobs:
             echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
             echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
             echo "CART_COOKIE_SECRET=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            echo "CRON_SECRET=cccccccccccccccccccccccccccccccc"
             echo "NEXT_PUBLIC_SITE_URL=http://localhost:3000"
             echo "STORE_CURRENCY=EUR"
             echo "STORE_TIMEZONE=Europe/Warsaw"

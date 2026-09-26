@@ -44,3 +44,43 @@ export async function setProductStatus(productId: string, status: "draft" | "act
     db.query("UPDATE products SET status = $2 WHERE id = $1", [productId, status]),
   );
 }
+
+// Size S and M; S is sold out, so the picker shows it disabled.
+export async function seedProductWithOptions(): Promise<SeededProduct> {
+  const product = await seedProduct({ stock: 0, label: "Knit beanie" });
+  return withDb(async (db) => {
+    await db.query("DELETE FROM product_variants WHERE product_id = $1", [product.id]);
+    const type = await db.query<{ id: string }>(
+      `INSERT INTO product_option_types (id, product_id, name, position)
+       VALUES (gen_random_uuid(), $1, 'Size', 0) RETURNING id`,
+      [product.id],
+    );
+    const values = await db.query<{ id: string; value: string }>(
+      `INSERT INTO product_option_values (id, option_type_id, value, position)
+       VALUES (gen_random_uuid(), $1, 'S', 0), (gen_random_uuid(), $1, 'M', 1)
+       RETURNING id, value`,
+      [type.rows[0]!.id],
+    );
+    let firstVariant = "";
+    for (const [position, value] of values.rows.entries()) {
+      const variant = await db.query<{ id: string }>(
+        `INSERT INTO product_variants
+           (id, product_id, sku, price_cents, stock_quantity, position, option_key, updated_at)
+         VALUES (gen_random_uuid(), $1, $2, 2000, $3, $4, $5, now()) RETURNING id`,
+        [
+          product.id,
+          `${product.slug}-${value.value}`.toUpperCase(),
+          value.value === "S" ? 0 : 4,
+          position,
+          value.id,
+        ],
+      );
+      await db.query(
+        "INSERT INTO variant_option_values (variant_id, option_value_id) VALUES ($1, $2)",
+        [variant.rows[0]!.id, value.id],
+      );
+      if (position === 0) firstVariant = variant.rows[0]!.id;
+    }
+    return { ...product, variantId: firstVariant };
+  });
+}

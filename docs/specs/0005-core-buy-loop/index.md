@@ -236,8 +236,8 @@ Tracer Bullet: milestone 1 threads one real product from the admin form to a car
 10. [x] `setCartItemQuantity`, `removeCartItem`, `cart-lines.ts` flags and fixes, disabled Checkout with its reason, `CartLink` in the header behind Suspense, toasts and a live region, `/checkout` summary with its redirects, `noindex` on both pages, satisfies **AC-10**, **AC-11**, **AC-12**, **AC-13**
 
 **Milestone 5: cleanup, logs and accessibility**
-11. [ ] `CRON_SECRET` in env, `/api/cron/expired-carts`, `vercel.json`, the `cart.cookie.invalid` and `cron.expired_carts` logs, satisfies **AC-16**, **AC-18**
-12. [ ] axe and keyboard e2e for every page in AC-17 on desktop and phone, satisfies **AC-17**
+11. [x] `CRON_SECRET` in env, `/api/cron/expired-carts`, `vercel.json`, the `cart.cookie.invalid` and `cron.expired_carts` logs, satisfies **AC-16**, **AC-18**
+12. [x] axe and keyboard e2e for every page in AC-17 on desktop and phone, satisfies **AC-17**
 
 ## Consequences
 
