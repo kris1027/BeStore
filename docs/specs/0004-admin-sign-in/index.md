@@ -1,7 +1,7 @@
 # 0004. Admin sign in with required TOTP
 
 **Date**: 2026-09-25
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 

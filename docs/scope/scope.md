@@ -15,7 +15,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 2 | Coding standards & tooling | Foundation | done |
 | 3 | Data model | Foundation | done |
 | 4 | Design system & UI foundation | Foundation | in-progress |
-| 5 | Admin sign in | Slice 1 | in-progress |
+| 5 | Admin sign in | Slice 1 | done |
 | 6 | Core buy loop | Slice 1 | planned |
 | 7 | Card payment & paid orders | Slice 1 | planned |
 | 8 | Shipping address & flat rate | Slice 2 | planned |
@@ -83,7 +83,7 @@ spec [0003](../specs/0003-design-system-ui-foundation/index.md) · design [desig
 
 The thinnest real thread: an admin signs in and adds a product, a customer finds it, buys it, pays, and the paid order shows up in admin. Real database, real payment, real UI, just narrow.
 
-### 5. Admin sign in · in-progress · GA
+### 5. Admin sign in · done · GA
 Only admins reach the admin panel. One role, a few admin accounts, no public sign up.
 **Done when:** an admin can sign in and out; every admin page and admin action refuses anyone who is not signed in as an admin.
 spec [0004](../specs/0004-admin-sign-in/index.md) · code in [src/features/admin-auth/](../../src/features/admin-auth/), [app/admin/](../../app/admin/), [scripts/admin/](../../scripts/admin/), [docs/runbooks/admin-accounts.md](../runbooks/admin-accounts.md)
@@ -94,7 +94,7 @@ spec [0004](../specs/0004-admin-sign-in/index.md) · code in [src/features/admin
   - [x] Password reset through Resend SMTP, `/auth/confirm`, TOTP before the new password (AC-9, AC-10)
   - [x] Auth event logging, keyboard and axe on every auth page, production runbook (AC-13, AC-14); the production Firewall rule (AC-15) moved to feature 19
 - [x] Verify it: `/check verify admin sign in`
-- [ ] Test it: `/test admin sign in`
+- [x] Test it: `/test admin sign in`
 - [x] Review it (fresh model): `/check review admin sign in`
 - [ ] Document it: `/document admin sign in`
 
