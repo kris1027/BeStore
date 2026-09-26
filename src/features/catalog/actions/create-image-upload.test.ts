@@ -56,6 +56,18 @@ describe("createProductImageUpload", () => {
     expect(mocks.createSignedUploadUrl).not.toHaveBeenCalled();
   });
 
+  // `in` walks the prototype chain, so an Object.prototype key must not pass as a type.
+  it.each(["toString", "constructor", "__proto__"])(
+    "refuses the content type %j without asking Storage",
+    async (contentType) => {
+      expect(await createProductImageUpload({ contentType, size: 10 })).toEqual({
+        ok: false,
+        error: "unsupported_type",
+      });
+      expect(mocks.createSignedUploadUrl).not.toHaveBeenCalled();
+    },
+  );
+
   it("checks for an admin before anything else", async () => {
     mocks.requireAdmin.mockRejectedValue(new Error("NEXT_NOT_FOUND"));
 
