@@ -1,0 +1,29 @@
+name: Feature request
+description: Define a goal and observable results that make it done.
+labels: [feature]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What should be possible, and what problem does it solve?
+      placeholder: Describe the desired outcome. Implementation details can come later.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List observable results a human or agent can verify.
+      placeholder: |
+        - [ ] A customer or admin can ...
+        - [ ] When ... happens, the app ...
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context and scope
+      description: Optional references, relevant paths, constraints, or exclusions. Remove credentials and customer information before sharing.
+    validations:
+      required: false

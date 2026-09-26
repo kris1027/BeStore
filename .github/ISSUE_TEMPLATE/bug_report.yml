@@ -1,0 +1,36 @@
+name: Bug report
+description: Record a reproducible problem in the storefront, admin, or development workflow.
+labels: [bug]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What went wrong?
+      placeholder: Describe the observed behavior and where it happens.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: How to reproduce
+      description: Steps in the app, a failing command, or a failing test are all useful.
+      placeholder: |
+        1. Open ...
+        2. Select ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+      placeholder: What should happen instead?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Optional paths, browser/device details, screenshots, or sanitized logs. Remove credentials, payment data, session tokens, and customer information before sharing.
+    validations:
+      required: false
