@@ -187,11 +187,17 @@ export function ImageField({
                 if (!file) return;
                 setUploadError(null);
                 setUploading(true);
-                const result = await uploadImage(file, storage);
-                setUploading(false);
-                input.value = "";
-                if (result.ok) onImageChange(result.image);
-                else setUploadError(uploadErrors[result.error]);
+                // A thrown action or fetch (e.g. offline) must not leave the input disabled.
+                try {
+                  const result = await uploadImage(file, storage);
+                  if (result.ok) onImageChange(result.image);
+                  else setUploadError(uploadErrors[result.error]);
+                } catch {
+                  setUploadError(uploadErrors.failed);
+                } finally {
+                  setUploading(false);
+                  input.value = "";
+                }
               }}
             />
             <FieldError id="image-error">{error}</FieldError>
