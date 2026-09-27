@@ -17,7 +17,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 4 | Design system & UI foundation | Foundation | done |
 | 5 | Admin sign in | Slice 1 | done |
 | 6 | Core buy loop | Slice 1 | done |
-| 7 | Card payment & paid orders | Slice 1 | in-progress |
+| 7 | Card payment & paid orders | Slice 1 | done |
 | 8 | Shipping address & flat rate | Slice 2 | planned |
 | 9 | Admin catalog management | Slice 3 | planned |
 | 10 | Admin order management | Slice 4 | planned |
@@ -112,7 +112,7 @@ spec [0005](../specs/0005-core-buy-loop/index.md) · code in [src/features/catal
 - [x] Verify it: `/check verify core buy loop`
 - [x] Test it: `/test core buy loop`
 
-### 7. Card payment & paid orders · in-progress · GA
+### 7. Card payment & paid orders · done · GA
 Guest card payment at checkout, confirmed on the server, turning the cart into a paid order that appears in a basic admin order list.
 **Done when:** a successful payment creates exactly one paid order and reduces stock; a failed or abandoned payment creates no paid order; the order shows in admin with its lines and total; paying twice for the same cart is not possible.
 spec [0006](../specs/0006-card-payment-paid-orders/index.md) · code in [src/features/checkout/](../../src/features/checkout/), [src/features/orders/](../../src/features/orders/), [src/lib/orders/](../../src/lib/orders/)
@@ -126,7 +126,7 @@ spec [0006](../specs/0006-card-payment-paid-orders/index.md) · code in [src/fea
 - [x] Verify it: `/check verify card payment & paid orders`
 - [x] Test it: `/test card payment & paid orders`
 - [x] Review it (fresh model): `/check review card payment & paid orders`
-- [ ] Document it: `/document card payment & paid orders`
+- [x] Document it: `/document card payment & paid orders`
 
 ## Slice 2: Shipping
 

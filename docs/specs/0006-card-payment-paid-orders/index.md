@@ -1,7 +1,7 @@
 # 0006. Card payment and paid orders
 
 **Date**: 2026-09-27
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 
