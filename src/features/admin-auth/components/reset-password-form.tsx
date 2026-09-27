@@ -13,7 +13,7 @@ import { resetPassword } from "../actions/password-reset";
 import { authMessages, passwordRuleMessages } from "../messages";
 import { missingPasswordRules, resetPasswordSchema } from "../schemas";
 import { applyFieldErrors } from "./form-errors";
-import { FormNotice } from "./form-notice";
+import { FormNotice } from "@/components/form-notice";
 
 const ruleList = Object.values(passwordRuleMessages).join(", ").toLowerCase();
 

@@ -13,7 +13,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { signIn } from "../actions/sign-in";
 import { authMessages, type SignInReason } from "../messages";
 import { signInSchema } from "../schemas";
-import { FormNotice } from "./form-notice";
+import { FormNotice } from "@/components/form-notice";
 import { applyFieldErrors } from "./form-errors";
 
 type SignInFormProps = {

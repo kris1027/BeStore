@@ -13,7 +13,7 @@ import { requestPasswordReset } from "../actions/password-reset";
 import { authMessages } from "../messages";
 import { forgotPasswordSchema } from "../schemas";
 import { applyFieldErrors } from "./form-errors";
-import { FormNotice } from "./form-notice";
+import { FormNotice } from "@/components/form-notice";
 
 export function ForgotPasswordForm() {
   const [sent, setSent] = useState(false);

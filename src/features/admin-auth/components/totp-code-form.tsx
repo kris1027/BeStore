@@ -13,7 +13,7 @@ import { verifyTotp } from "../actions/mfa";
 import { authMessages } from "../messages";
 import { totpCodeSchema } from "../schemas";
 import { applyFieldErrors } from "./form-errors";
-import { FormNotice } from "./form-notice";
+import { FormNotice } from "@/components/form-notice";
 
 type TotpCodeFormProps = {
   readonly next: string | null;

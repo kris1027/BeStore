@@ -8,7 +8,7 @@ import { Spinner } from "@/components/ui/spinner";
 
 import { enrollTotp, type EnrollTotpData } from "../actions/mfa";
 import { authMessages } from "../messages";
-import { FormNotice } from "./form-notice";
+import { FormNotice } from "@/components/form-notice";
 import { TotpCodeForm } from "./totp-code-form";
 
 // "ABCD EFGH ..." so the secret can be read aloud or typed by hand.
