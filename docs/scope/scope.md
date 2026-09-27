@@ -17,7 +17,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 4 | Design system & UI foundation | Foundation | done |
 | 5 | Admin sign in | Slice 1 | done |
 | 6 | Core buy loop | Slice 1 | done |
-| 7 | Card payment & paid orders | Slice 1 | planned |
+| 7 | Card payment & paid orders | Slice 1 | in-progress |
 | 8 | Shipping address & flat rate | Slice 2 | planned |
 | 9 | Admin catalog management | Slice 3 | planned |
 | 10 | Admin order management | Slice 4 | planned |
@@ -112,10 +112,21 @@ spec [0005](../specs/0005-core-buy-loop/index.md) · code in [src/features/catal
 - [x] Verify it: `/check verify core buy loop`
 - [x] Test it: `/test core buy loop`
 
-### 7. Card payment & paid orders · needs a decision · GA
+### 7. Card payment & paid orders · in-progress · GA
 Guest card payment at checkout, confirmed on the server, turning the cart into a paid order that appears in a basic admin order list.
 **Done when:** a successful payment creates exactly one paid order and reduces stock; a failed or abandoned payment creates no paid order; the order shows in admin with its lines and total; paying twice for the same cart is not possible.
-- [ ] Design it (spec): `/architect card payment & paid orders`
+spec [0006](../specs/0006-card-payment-paid-orders/index.md) · code in [src/features/checkout/](../../src/features/checkout/), [src/features/orders/](../../src/features/orders/), [src/lib/orders/](../../src/lib/orders/)
+- [x] Design it (spec): `/architect card payment & paid orders`
+- [x] Build it: `/develop card payment & paid orders`
+  - [x] Thin thread: Stripe env and client, email form and `startCheckout`, signed webhook marks one order paid and takes stock, minimal confirmation page and admin list, e2e to the Stripe redirect (AC-1, AC-3, AC-4, AC-11, AC-12, AC-14, AC-19)
+  - [x] Every webhook path once and only once: duplicates, delayed and failed payments, expiry, stock shortfall, amount mismatch, foreign events, rollback on error (AC-5, AC-6, AC-7, AC-8, AC-16)
+  - [x] Checkout guards and paying twice: restart through Stripe, concurrent submits, minimum charge, form errors, cancel notice (AC-2, AC-9, AC-10)
+  - [x] Customer and admin views complete: every confirmation state, admin list views and paging, order detail with events (AC-11, AC-12, AC-13, AC-14)
+  - [x] Safety net, logs and accessibility: daily reconcile cron, log events without emails, keyboard and axe, local full Stripe flow (AC-15, AC-17, AC-18, AC-6)
+- [ ] Verify it: `/check verify card payment & paid orders`
+- [ ] Test it: `/test card payment & paid orders`
+- [ ] Review it (fresh model): `/check review card payment & paid orders`
+- [ ] Document it: `/document card payment & paid orders`
 
 ## Slice 2: Shipping
 
