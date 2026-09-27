@@ -123,8 +123,8 @@ spec [0006](../specs/0006-card-payment-paid-orders/index.md) · code in [src/fea
   - [x] Checkout guards and paying twice: restart through Stripe, concurrent submits, minimum charge, form errors, cancel notice (AC-2, AC-9, AC-10)
   - [x] Customer and admin views complete: every confirmation state, admin list views and paging, order detail with events (AC-11, AC-12, AC-13, AC-14)
   - [x] Safety net, logs and accessibility: daily reconcile cron, log events without emails, keyboard and axe, local full Stripe flow (AC-15, AC-17, AC-18, AC-6)
-- [ ] Verify it: `/check verify card payment & paid orders`
-- [ ] Test it: `/test card payment & paid orders`
+- [x] Verify it: `/check verify card payment & paid orders`
+- [x] Test it: `/test card payment & paid orders`
 - [ ] Review it (fresh model): `/check review card payment & paid orders`
 - [ ] Document it: `/document card payment & paid orders`
 
