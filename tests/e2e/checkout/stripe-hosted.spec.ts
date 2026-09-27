@@ -13,11 +13,23 @@ test.skip(!process.env.STRIPE_E2E, "set STRIPE_E2E=1 with `stripe listen` runnin
 
 async function payOnStripe(page: Page, card: string) {
   await page.waitForURL(/checkout\.stripe\.com/, { timeout: 30_000 });
-  await page.getByLabel("Card number").fill(card);
-  await page.getByLabel("Expiration").fill("12 / 34");
-  await page.getByLabel("CVC").fill("123");
-  await page.getByLabel("Cardholder name").fill("Ada Lovelace");
-  const country = page.getByLabel("Country or region");
+  // With more than one payment method enabled in the dashboard, the card fields sit in a closed
+  // accordion row. Its radio is covered by an invisible button that swallows locator clicks, so
+  // click the row where it is drawn.
+  const cardNumber = page.locator("#cardNumber");
+  const cardRow = page.locator("#payment-method-label-card");
+  await expect(cardNumber.or(cardRow).first()).toBeVisible({ timeout: 20_000 });
+  if (!(await cardNumber.isVisible())) {
+    const row = await cardRow.boundingBox();
+    if (!row) throw new Error("Stripe's card row has no box");
+    await page.mouse.click(row.x + 5, row.y + row.height / 2);
+  }
+  // Field ids, not labels: getByLabel("CVC") also matches the CVC icon.
+  await cardNumber.fill(card);
+  await page.locator("#cardExpiry").fill("12 / 34");
+  await page.locator("#cardCvc").fill("123");
+  await page.locator("#billingName").fill("Ada Lovelace");
+  const country = page.locator("#billingCountry");
   if (await country.isVisible()) await country.selectOption("PL");
   await page.getByTestId("hosted-payment-submit-button").click();
 }
