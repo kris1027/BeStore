@@ -54,6 +54,8 @@ jobs:
       # `supabase start` does not apply Prisma migrations. NEXT_PUBLIC_* values are baked in at
       # build time, so the stack's keys are mapped before `pnpm build` (the Playwright web server).
       - name: Map Supabase keys and migrate
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
         run: |
           eval "$(pnpm exec supabase status -o env | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=')"
           {
@@ -68,6 +70,11 @@ jobs:
             echo "STORE_CURRENCY=EUR"
             echo "STORE_TIMEZONE=Europe/Warsaw"
             echo "STORE_LOCALE=en"
+            # A real Stripe test key lets the e2e reach Stripe's hosted page (spec 0006); a fork
+            # without the secret builds on a placeholder and that one test skips. Events are
+            # signed in the tests with this fixed webhook secret.
+            echo "STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-sk_test_placeholder}"
+            echo "STRIPE_WEBHOOK_SECRET=whsec_ci_webhook_secret"
           } >> "$GITHUB_ENV"
       - run: pnpm exec prisma migrate deploy
       - run: pnpm test:stack
