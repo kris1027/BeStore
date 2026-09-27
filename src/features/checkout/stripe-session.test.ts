@@ -70,4 +70,10 @@ describe("checkoutSessionParams", () => {
     );
     expect(params.cancel_url).toBe("https://shop.example/checkout?cancelled=1");
   });
+
+  it("charges every line in the order's own currency, lower cased for Stripe", () => {
+    const pln = checkoutSessionParams({ ...order, currency: "PLN" }, { siteUrl: "", nowMs });
+
+    expect(pln.line_items?.map((item) => item.price_data?.currency)).toEqual(["pln", "pln"]);
+  });
 });

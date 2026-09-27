@@ -75,6 +75,25 @@ describe("getAdminOrders", () => {
       totalCents: 7500,
     });
   });
+
+  it("counts items as the sum of every line's quantity, not the number of lines", async () => {
+    const { order } = await seedPendingOrder({ quantity: 2 });
+    await testDb.orderLine.create({
+      data: {
+        orderId: order.id,
+        productName: "Socks",
+        sku: "SKU-SOCKS",
+        unitPriceCents: 900,
+        quantity: 3,
+        lineTotalCents: 2700,
+      },
+    });
+    await testDb.order.update({ where: { id: order.id }, data: { status: "paid" } });
+
+    const [row] = (await getAdminOrders({ all: false, before: null })).rows;
+
+    expect(row?.itemCount).toBe(5);
+  });
 });
 
 describe("parseAdminOrdersParams", () => {
@@ -113,6 +132,17 @@ describe("getAdminOrder", () => {
     });
     expect(detail?.lines).toHaveLength(1);
     expect(detail?.events.map((event) => event.type)).toEqual(["created"]);
+  });
+
+  it("shows the name and SKU the customer bought, even after the catalog changes", async () => {
+    const { product, variant } = await seedPendingOrder();
+    const bought = { productName: product.name, sku: variant.sku };
+    await testDb.product.update({ where: { id: product.id }, data: { name: "Renamed" } });
+    await testDb.productVariant.update({ where: { id: variant.id }, data: { sku: "SKU-NEW" } });
+
+    const detail = await getAdminOrder("1001");
+
+    expect(detail?.lines).toEqual([expect.objectContaining(bought)]);
   });
 
   it.each(["9999", "abc", "1000", "-1", undefined])("is null for %j", async (value) => {

@@ -27,7 +27,7 @@ vi.mock("@/lib/logger", () => ({
   logger: { info: mocks.info, warn: vi.fn(), error: mocks.error },
 }));
 
-const { reconcileOrdersRequest } = await import("@/features/orders/reconcile");
+const { reconcileOrders, reconcileOrdersRequest } = await import("@/features/orders/reconcile");
 
 resetDatabaseBeforeEach();
 
@@ -176,6 +176,29 @@ describe("GET /api/cron/reconcile-orders", () => {
     await seedPendingOrder({ sessionId: null });
 
     expect((await run()).body).toMatchObject({ checked: 0 });
+  });
+
+  it("draws the line at 90 minutes: 89 is left alone, 91 is reconciled", async () => {
+    const nowMs = Date.UTC(2026, 8, 27, 12, 0, 0);
+    const minutesAgo = (minutes: number) => new Date(nowMs - minutes * 60 * 1000);
+    const { order: fresh } = await seedPendingOrder({
+      suffix: "89",
+      sessionId: null,
+      createdAt: minutesAgo(89),
+    });
+    const { order: stale } = await seedPendingOrder({
+      suffix: "91",
+      sessionId: null,
+      createdAt: minutesAgo(91),
+    });
+
+    const counts = await reconcileOrders(nowMs);
+
+    expect(counts).toMatchObject({ checked: 1, expired: 1 });
+    const statusOf = async (id: string) =>
+      (await testDb.order.findUniqueOrThrow({ where: { id } })).status;
+    expect(await statusOf(fresh.id)).toBe("pending_payment");
+    expect(await statusOf(stale.id)).toBe("expired");
   });
 
   it("flags an order whose session is over but whose event cannot be found, once", async () => {
