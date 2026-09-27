@@ -125,7 +125,7 @@ spec [0006](../specs/0006-card-payment-paid-orders/index.md) · code in [src/fea
   - [x] Safety net, logs and accessibility: daily reconcile cron, log events without emails, keyboard and axe, local full Stripe flow (AC-15, AC-17, AC-18, AC-6)
 - [x] Verify it: `/check verify card payment & paid orders`
 - [x] Test it: `/test card payment & paid orders`
-- [ ] Review it (fresh model): `/check review card payment & paid orders`
+- [x] Review it (fresh model): `/check review card payment & paid orders`
 - [ ] Document it: `/document card payment & paid orders`
 
 ## Slice 2: Shipping
