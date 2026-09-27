@@ -140,16 +140,23 @@ export function ImageField({
               </FieldDescription>
               <FieldError id="imageAlt-error">{altError}</FieldError>
             </Field>
-            <Button
-              type="button"
-              variant="outline"
-              className="self-start"
-              disabled={disabled}
-              onClick={() => onImageChange(null)}
-            >
-              <XIcon data-icon="inline-start" aria-hidden="true" />
-              Remove image
-            </Button>
+            {/* The server rejects an image only after upload (e.g. it never landed), so its error
+                shows here too; the form focuses #image, which is this button in this state. */}
+            <Field data-invalid={imageError ? true : undefined}>
+              <Button
+                id="image"
+                type="button"
+                variant="outline"
+                className="self-start"
+                disabled={disabled}
+                aria-describedby={imageError ? "image-error" : undefined}
+                onClick={() => onImageChange(null)}
+              >
+                <XIcon data-icon="inline-start" aria-hidden="true" />
+                Remove image
+              </Button>
+              <FieldError id="image-error">{imageError}</FieldError>
+            </Field>
           </>
         ) : (
           <Field data-invalid={error ? true : undefined}>
