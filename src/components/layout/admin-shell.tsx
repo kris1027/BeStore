@@ -19,19 +19,20 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-import type { AdminNavItem } from "./admin-nav";
+import { type AdminNavItem, adminNavItems } from "./admin-nav";
 import { currentHref } from "./nav";
 
 type AdminShellProps = {
-  // Real admin routes pass adminNavItems; the style guide passes demo items.
-  readonly nav: readonly AdminNavItem[];
+  // Real admin routes leave it out and get adminNavItems; the style guide passes demo items.
+  // (The icons are components, which cannot cross from a server layout as props.)
+  readonly nav?: readonly AdminNavItem[];
   // Sign out and the admin's name (feature 5).
   readonly userMenu?: React.ReactNode;
   readonly children: React.ReactNode;
 };
 
 // Layout only: it grants nothing. Every admin page and action still calls requireAdmin() itself.
-export function AdminShell({ nav, userMenu, children }: AdminShellProps) {
+export function AdminShell({ nav = adminNavItems, userMenu, children }: AdminShellProps) {
   return (
     // All admin text is Inter (spec 0003): the heading font token points at the sans font here,
     // so shadcn titles that use font-heading follow without per component overrides.

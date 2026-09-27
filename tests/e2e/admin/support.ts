@@ -43,7 +43,7 @@ export type TestUser = {
   readonly secret: string | null;
 };
 
-async function withDb<T>(run: (client: pg.Client) => Promise<T>): Promise<T> {
+export async function withDb<T>(run: (client: pg.Client) => Promise<T>): Promise<T> {
   const client = new pg.Client({ connectionString: required("DIRECT_URL") });
   await client.connect();
   try {

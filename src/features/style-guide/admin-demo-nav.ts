@@ -2,7 +2,7 @@ import { LayoutDashboardIcon, PackageIcon, ShoppingCartIcon, TagIcon } from "luc
 
 import type { AdminNavItem } from "@/components/layout/admin-nav";
 
-// Demo only: real admin routes pass adminNavItems from src/components/layout/admin-nav.ts.
+// Demo only: real admin routes use adminNavItems from src/components/layout/admin-nav.ts.
 export const demoNav: readonly AdminNavItem[] = [
   { href: "/style-guide/admin", label: "Dashboard", icon: LayoutDashboardIcon },
   { href: "/style-guide/admin/orders", label: "Orders", icon: ShoppingCartIcon },

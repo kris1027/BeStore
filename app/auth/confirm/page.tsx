@@ -5,6 +5,10 @@ import { AuthCard, AuthFrame } from "@/features/admin-auth/components/auth-frame
 import { ConfirmResetLinkForm } from "@/features/admin-auth/components/confirm-reset-link-form";
 import { signInPath } from "@/features/admin-auth/safe-admin-path";
 
+// Reads the session or search params at the top level; allowed to block until converted
+// to Suspense (spec 0005, Caching model).
+export const instant = false;
+
 export const metadata: Metadata = {
   title: "Reset your password",
   robots: { index: false, follow: false },

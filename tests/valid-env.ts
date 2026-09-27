@@ -8,6 +8,7 @@ export const validEnv = {
   NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-key",
   SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
   CART_COOKIE_SECRET: "a".repeat(32),
+  CRON_SECRET: "c".repeat(32),
   NEXT_PUBLIC_SITE_URL: "http://localhost:3000",
   STORE_CURRENCY: "EUR",
   STORE_TIMEZONE: "Europe/Warsaw",

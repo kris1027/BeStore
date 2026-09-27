@@ -1,10 +1,35 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
+import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 
+import type { AdminRow } from "./access";
 import { logAuthEvent, requestIp } from "./log";
-import { adminPathHeader, decideProxy } from "./proxy-decision";
+import {
+  type AdminGateDecision,
+  adminPathHeader,
+  decideAdminGate,
+  decideProxy,
+  needsAdminGate,
+} from "./proxy-decision";
+
+// No route matches it, so a rewrite here renders app/not-found.tsx with a real 404 status.
+const deniedPath = "/admin/__denied";
+
+type AdminRowLookup = { readonly ok: true; readonly row: AdminRow | null } | { readonly ok: false };
+
+async function lookupAdminRow(id: string): Promise<AdminRowLookup> {
+  try {
+    const row = await db.adminUser.findUnique({
+      where: { id },
+      select: { id: true, email: true, name: true, disabledAt: true },
+    });
+    return { ok: true, row };
+  } catch {
+    return { ok: false };
+  }
+}
 
 // Runs on /admin and /auth only (see proxy.ts at the root), never on storefront routes (AC-1).
 export async function adminAuthProxy(request: NextRequest): Promise<NextResponse> {
@@ -62,10 +87,43 @@ export async function adminAuthProxy(request: NextRequest): Promise<NextResponse
     });
   }
 
-  const target =
-    decision.kind === "redirect" ? decision.to : decision.kind === "expire" ? decision.to : null;
+  let gate: AdminGateDecision = { kind: "continue" };
+  const gateInput = {
+    pathname,
+    search,
+    method: request.method,
+    isServerAction: request.headers.has("next-action"),
+  };
+  if (decision.kind === "continue" && claims !== null && needsAdminGate(gateInput)) {
+    const adminId = typeof claims.sub === "string" ? claims.sub : null;
+    const lookup =
+      adminId === null ? { ok: true as const, row: null } : await lookupAdminRow(adminId);
+    if (lookup.ok) {
+      gate = decideAdminGate({ ...gateInput, claims, nowMs: Date.now(), adminRow: lookup.row });
+    } else {
+      // Fail open: the proxy is only the first gate, and the page's requireAdmin() still refuses.
+      logAuthEvent("auth.proxy.lookup_failed", { adminId, ip: requestIp(request.headers) });
+    }
+    if (gate.kind === "not-found") {
+      // requireAdmin() never runs for this request, so the denial is logged here.
+      logAuthEvent("auth.access.denied", { adminId, ip: requestIp(request.headers) });
+    }
+  }
 
-  if (target !== null) {
+  const target =
+    decision.kind === "redirect" || decision.kind === "expire"
+      ? decision.to
+      : gate.kind === "redirect"
+        ? gate.to
+        : null;
+
+  if (gate.kind === "not-found") {
+    const denied = NextResponse.rewrite(new URL(deniedPath, request.url), {
+      request: { headers: requestHeaders },
+    });
+    for (const cookie of response.cookies.getAll()) denied.cookies.set(cookie);
+    response = denied;
+  } else if (target !== null) {
     // A fresh redirect response drops the cookies set above, so copy them across.
     const redirect = NextResponse.redirect(new URL(target, request.url));
     for (const cookie of response.cookies.getAll()) redirect.cookies.set(cookie);

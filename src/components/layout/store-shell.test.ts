@@ -1,13 +1,14 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { env, brand } = vi.hoisted(() => ({
-  env: { STORE_TIMEZONE: "UTC" },
+const { brand } = vi.hoisted(() => ({
   brand: { name: "Acme Store", contactEmail: null as string | null },
 }));
-vi.mock("@/lib/env", () => ({ env }));
 vi.mock("@/lib/brand/brand", () => ({ brand }));
+// The real year is an async cached component (footer-year.test.ts covers it), which the
+// synchronous static renderer cannot run.
+vi.mock("./footer-year", () => ({ FooterYear: () => "2026" }));
 vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
 
 const { StoreShell } = await import("./store-shell");
@@ -25,7 +26,6 @@ function footer(html: string) {
 
 describe("StoreShell", () => {
   beforeEach(() => {
-    env.STORE_TIMEZONE = "UTC";
     brand.contactEmail = null;
   });
 
@@ -43,33 +43,8 @@ describe("StoreShell", () => {
     expect(footer(render())).toContain("Acme Store");
   });
 
-  describe("footer year", () => {
-    // 11:00 UTC on New Year's Eve is already 01:00 on 1 January in Kiritimati (UTC+14).
-    beforeEach(() => {
-      vi.useFakeTimers({ toFake: ["Date"] });
-      vi.setSystemTime(new Date("2026-12-31T11:00:00Z"));
-    });
-
-    afterEach(() => {
-      vi.useRealTimers();
-    });
-
-    it("uses the store's year, not UTC's, when the store is ahead", () => {
-      env.STORE_TIMEZONE = "Pacific/Kiritimati";
-
-      expect(footer(render())).toContain("© 2027 Acme Store");
-    });
-
-    it("uses the UTC year for a UTC store at the same instant", () => {
-      expect(footer(render())).toContain("© 2026 Acme Store");
-    });
-
-    it("uses the store's year when the store is behind UTC", () => {
-      env.STORE_TIMEZONE = "Pacific/Pago_Pago";
-      vi.setSystemTime(new Date("2027-01-01T05:00:00Z"));
-
-      expect(footer(render())).toContain("© 2026 Acme Store");
-    });
+  it("shows the year beside the brand name in the footer", () => {
+    expect(footer(render())).toContain("© 2026 Acme Store");
   });
 
   describe("contact email", () => {
