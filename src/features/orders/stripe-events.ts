@@ -32,6 +32,7 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<EventResul
     if (inserted === 0) return { result: "duplicate" };
 
     if (!isHandledEventType(event.type)) return { result: "ignored" };
+    // Safe: every handled type is a checkout.session.* event, whose object is a Session.
     const session = event.data.object as Stripe.Checkout.Session;
 
     // Found from Stripe's own metadata, never from anything the browser sent.

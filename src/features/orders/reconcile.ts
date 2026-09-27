@@ -90,8 +90,7 @@ async function reconcileOrder(order: {
     if (result === "paid" || result === "expired") return result;
   }
 
-  await flagUnresolved(order, session.status);
-  return "unresolved";
+  return flagUnresolved(order, session.status);
 }
 
 async function findDecisiveEvent(sessionId: string, since: Date): Promise<Stripe.Event | null> {
@@ -111,24 +110,34 @@ async function findDecisiveEvent(sessionId: string, since: Date): Promise<Stripe
 }
 
 // Stripe says the session is over, but no event explains it: a person has to look. The note is
-// written once, not on every daily run.
+// written once, not on every daily run. The status guard matters: the webhook may have resolved
+// the order since the batch was read (the replay then comes back duplicate or stale), and a
+// settled order must not be flagged.
 async function flagUnresolved(
   order: { readonly id: string; readonly needsAttention: boolean },
   sessionStatus: string | null,
-) {
+): Promise<Verdict> {
+  const flagged = await db.$transaction(async (tx) => {
+    const updated = await tx.order.updateMany({
+      where: { id: order.id, status: "pending_payment" },
+      data: { needsAttention: true },
+    });
+    if (updated.count === 0) return false;
+    if (!order.needsAttention) {
+      await tx.orderEvent.create({
+        data: {
+          orderId: order.id,
+          type: "note",
+          actorType: "system",
+          message: `Stripe reports the checkout session as ${sessionStatus ?? "unknown"}, but no Stripe event for it was found. Check the payment in the Stripe dashboard.`,
+        },
+      });
+    }
+    return true;
+  });
+  if (!flagged) return "skipped";
   logReconcileUnresolved(order.id, sessionStatus);
-  if (order.needsAttention) return;
-  await db.$transaction([
-    db.order.update({ where: { id: order.id }, data: { needsAttention: true } }),
-    db.orderEvent.create({
-      data: {
-        orderId: order.id,
-        type: "note",
-        actorType: "system",
-        message: `Stripe reports the checkout session as ${sessionStatus ?? "unknown"}, but no Stripe event for it was found. Check the payment in the Stripe dashboard.`,
-      },
-    }),
-  ]);
+  return "unresolved";
 }
 
 // GET /api/cron/reconcile-orders, run daily by Vercel Cron.

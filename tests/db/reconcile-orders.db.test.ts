@@ -28,6 +28,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 const { reconcileOrders, reconcileOrdersRequest } = await import("@/features/orders/reconcile");
+const { handleStripeEvent } = await import("@/features/orders/stripe-events");
 
 resetDatabaseBeforeEach();
 
@@ -223,6 +224,62 @@ describe("GET /api/cron/reconcile-orders", () => {
       expect.objectContaining({ event: "cron.reconcile_orders", unresolved: 1 }),
       "cron.reconcile_orders",
     );
+  });
+
+  it("does not flag an order the webhook paid while the cron was running", async () => {
+    const { order, variant } = await seedPendingOrder({
+      stock: 5,
+      quantity: 1,
+      sessionId: "cs_test_race",
+      createdAt: twoHoursAgo(),
+    });
+    const paid = sessionEvent("checkout.session.completed", {
+      orderId: order.id,
+      sessionId: "cs_test_race",
+      amountTotal: 2500,
+    });
+    // The webhook lands after the batch was read but before the replay, so the replay is a duplicate.
+    mocks.retrieve.mockImplementation(async () => {
+      await handleStripeEvent(paid);
+      return { id: "cs_test_race", status: "complete", payment_status: "paid" };
+    });
+    mocks.list.mockReturnValue(autoPaging([paid]));
+
+    expect((await run()).body).toEqual({
+      checked: 1,
+      paid: 0,
+      expired: 0,
+      skipped: 1,
+      unresolved: 0,
+    });
+    const settled = await testDb.order.findUniqueOrThrow({ where: { id: order.id } });
+    expect(settled).toMatchObject({ status: "paid", needsAttention: false });
+    expect((await eventsOf(order.id)).filter((e) => e.type === "note")).toHaveLength(0);
+    expect(await stock(variant.id)).toBe(4);
+  });
+
+  it("does not flag an order that was settled when its replayed event turns out stale", async () => {
+    const { order } = await seedPendingOrder({
+      sessionId: "cs_test_stale",
+      createdAt: twoHoursAgo(),
+    });
+    mocks.retrieve.mockImplementation(async () => {
+      await testDb.order.update({ where: { id: order.id }, data: { status: "expired" } });
+      return { id: "cs_test_stale", status: "complete", payment_status: "paid" };
+    });
+    mocks.list.mockReturnValue(
+      autoPaging([
+        sessionEvent("checkout.session.completed", {
+          orderId: order.id,
+          sessionId: "cs_test_stale",
+        }),
+      ]),
+    );
+
+    expect((await run()).body).toMatchObject({ checked: 1, skipped: 1, unresolved: 0 });
+    const settled = await testDb.order.findUniqueOrThrow({ where: { id: order.id } });
+    expect(settled).toMatchObject({ status: "expired", needsAttention: false });
+    expect((await eventsOf(order.id)).filter((e) => e.type === "note")).toHaveLength(0);
   });
 
   it("skips an order when Stripe cannot be reached and carries on with the rest", async () => {
