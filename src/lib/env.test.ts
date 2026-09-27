@@ -130,6 +130,43 @@ describe("env", () => {
     });
   });
 
+  describe("Stripe keys", () => {
+    it.each(["sk_test_abc123", "sk_live_abc123", "rk_test_abc123"])(
+      "accepts the secret key %s",
+      async (key) => {
+        stubEnv({ STRIPE_SECRET_KEY: key });
+
+        await expect(loadEnv()).resolves.toMatchObject({ STRIPE_SECRET_KEY: key });
+      },
+    );
+
+    it.each(["pk_test_abc123", "sk_abc123", "whsec_abc123", "sk_test_"])(
+      "rejects %j as a secret key",
+      async (key) => {
+        stubEnv({ STRIPE_SECRET_KEY: key });
+
+        await expect(loadEnv()).rejects.toThrow("Stripe secret key");
+      },
+    );
+
+    it.each(["sk_test_abc123", "whsec_", "abc"])(
+      "rejects %j as a webhook secret",
+      async (secret) => {
+        stubEnv({ STRIPE_WEBHOOK_SECRET: secret });
+
+        await expect(loadEnv()).rejects.toThrow("Stripe webhook signing secret");
+      },
+    );
+
+    it("does not print a rejected key in the error", async () => {
+      stubEnv({ STRIPE_SECRET_KEY: "pk_live_publishable_secret" });
+
+      const error = await loadEnv().catch((e: Error) => e);
+
+      expect((error as Error).message).not.toContain("pk_live_publishable_secret");
+    });
+  });
+
   describe("STORE_CURRENCY", () => {
     it.each(["EUR", "PLN", "USD"])("accepts the ISO 4217 code %s", async (code) => {
       stubEnv({ STORE_CURRENCY: code });

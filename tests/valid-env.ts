@@ -10,6 +10,8 @@ export const validEnv = {
   CART_COOKIE_SECRET: "a".repeat(32),
   CRON_SECRET: "c".repeat(32),
   NEXT_PUBLIC_SITE_URL: "http://localhost:3000",
+  STRIPE_SECRET_KEY: "sk_test_valid123",
+  STRIPE_WEBHOOK_SECRET: "whsec_valid123",
   STORE_CURRENCY: "EUR",
   STORE_TIMEZONE: "Europe/Warsaw",
   STORE_LOCALE: "en",
