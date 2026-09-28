@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { expectNoA11yViolations } from "../a11y";
+import { expectNoA11yViolations, tabTo } from "../a11y";
 import { createTestUser, injectSession, signInFully } from "../admin/support";
 import { seedProduct } from "../catalog/support";
 import {
@@ -145,4 +145,51 @@ test("the checkout form works by keyboard alone", async ({ page }) => {
 
   await expect(page.getByText("Enter a valid email address.")).toBeVisible();
   await expect(page.getByLabel("Email")).toBeFocused();
+});
+
+test("the confirmation page works by keyboard alone", async ({ page }) => {
+  await page.goto("/checkout/complete?session_id=cs_test_doesnotexist");
+  const back = page.getByRole("link", { name: "Return to checkout" });
+  await expect(back).toBeVisible();
+
+  await tabTo(page, back);
+  await page.keyboard.press("Enter");
+
+  await expect(page).toHaveURL("/checkout");
+});
+
+test("the admin order pages work by keyboard alone", async ({ page, browser, request }) => {
+  const socks = await seedProduct({ stock: 5, priceCents: 1250 });
+  await addToCart(page, socks);
+  const order = await seedPendingOrder(await cartIdOf(page), socks, {
+    quantity: 1,
+    priceCents: 1250,
+  });
+  expect((await postPaidEvent(request, order)).status()).toBe(200);
+
+  const admin = await createTestUser({ enrolled: true });
+  const adminPage = await (await browser.newContext()).newPage();
+  await signInFully(adminPage, admin);
+  await adminPage.goto("/admin/orders");
+  await expect(adminPage.getByRole("heading", { level: 1, name: "Orders" })).toBeVisible();
+
+  const allView = adminPage.getByRole("navigation", { name: "Order views" }).getByRole("link", {
+    name: "All orders",
+  });
+  await tabTo(adminPage, allView);
+  await adminPage.keyboard.press("Enter");
+  await expect(adminPage).toHaveURL(/view=all/);
+  await expect(allView).toHaveAttribute("aria-current", "page");
+
+  const orderLink = adminPage.getByRole("link", { name: `#${order.number}` });
+  await tabTo(adminPage, orderLink);
+  await adminPage.keyboard.press("Enter");
+  await expect(
+    adminPage.getByRole("heading", { level: 1, name: `Order #${order.number}` }),
+  ).toBeVisible();
+
+  const backLink = adminPage.getByRole("main").getByRole("link", { name: "All orders" });
+  await tabTo(adminPage, backLink);
+  await adminPage.keyboard.press("Enter");
+  await expect(adminPage).toHaveURL("/admin/orders");
 });
