@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // Validated once at server start (see instrumentation.ts), so a missing variable fails fast.
 // Variables owned by later features join this schema when that feature lands:
-// STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET (7) · RESEND_API_KEY, EMAIL_FROM (11).
+// RESEND_API_KEY, EMAIL_FROM (11).
 const envSchema = z.object({
   DATABASE_URL: postgresUrl(),
   DIRECT_URL: postgresUrl(),
@@ -13,6 +13,14 @@ const envSchema = z.object({
   // Vercel Cron sends it as `Authorization: Bearer <secret>` (spec 0001).
   CRON_SECRET: z.string().min(32),
   NEXT_PUBLIC_SITE_URL: z.url(),
+  // Test keys everywhere but production (spec 0006). A restricted key (rk_) works too.
+  STRIPE_SECRET_KEY: z
+    .string()
+    .regex(/^(sk|rk)_(test|live)_\w+$/, "Stripe secret key, e.g. sk_test_..."),
+  // One per webhook endpoint; locally the one `stripe listen` prints.
+  STRIPE_WEBHOOK_SECRET: z
+    .string()
+    .regex(/^whsec_\w+$/, "Stripe webhook signing secret, e.g. whsec_..."),
   STORE_CURRENCY: z.string().regex(/^[A-Z]{3}$/, "ISO 4217 code, e.g. EUR"),
   STORE_TIMEZONE: z.string().refine(isIanaTimezone, "IANA timezone, e.g. Europe/Warsaw"),
   // Language and number, price and date formats; also <html lang>.

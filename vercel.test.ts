@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-// spec 0005, AC-16: Vercel calls the expired cart cleanup once a day.
+// spec 0005, AC-16 and spec 0006, AC-15: Vercel calls each cron once a day.
 
 type VercelConfig = { crons?: readonly { path: string; schedule: string }[] };
 
@@ -15,6 +15,12 @@ describe("vercel.json", () => {
     const cron = config.crons?.find((entry) => entry.path === "/api/cron/expired-carts");
 
     // minute hour * * *: a fixed time, every day of every month.
+    expect(cron?.schedule).toMatch(/^\d{1,2} \d{1,2} \* \* \*$/);
+  });
+
+  it("schedules the order reconcile cron once a day", () => {
+    const cron = config.crons?.find((entry) => entry.path === "/api/cron/reconcile-orders");
+
     expect(cron?.schedule).toMatch(/^\d{1,2} \d{1,2} \* \* \*$/);
   });
 });

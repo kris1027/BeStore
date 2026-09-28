@@ -8,3 +8,12 @@ export type DateFormat = {
 export function formatDate(date: Date, { locale, timeZone }: DateFormat): string {
   return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone }).format(date);
 }
+
+// A moment to the minute, for audit trails such as an order's history.
+export function formatDateTime(date: Date, { locale, timeZone }: DateFormat): string {
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone,
+  }).format(date);
+}

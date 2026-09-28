@@ -85,6 +85,9 @@ Installed:
 - [supabase](.agents/skills/supabase/): `supabase/agent-skills`, Auth, Storage, CLI, `@supabase/ssr`
 - [supabase-postgres-best-practices](.agents/skills/supabase-postgres-best-practices/): `supabase/agent-skills`, schema, indexes, RLS, migrations
 - [shadcn](.agents/skills/shadcn/): `shadcn-ui/ui`, adding and styling UI components
+- [stripe-best-practices](.agents/skills/stripe-best-practices/): `stripe/ai`, Checkout Sessions, webhooks, key handling, test sandboxes
+- [stripe-docs](.agents/skills/stripe-docs/): `stripe/ai`, looking up Stripe docs and API reference
+- [upgrade-stripe](.agents/skills/upgrade-stripe/): `stripe/ai`, moving to a newer Stripe API version or SDK
 
 Not for this stack (pulled in with the repos above): prisma-mongodb-upgrade, prisma-compute, prisma-postgres, prisma-postgres-setup, prisma-upgrade-v7, agent-email-inbox, migrate-radix-to-base.
 MCP servers: Supabase (connected), Stripe (connected), Vercel (connected), Playwright (connected)
@@ -94,5 +97,6 @@ MCP servers: Supabase (connected), Stripe (connected), Vercel (connected), Playw
 - [emails/AGENTS.md](emails/AGENTS.md): React Email templates sent through Resend
 - [src/features/catalog/AGENTS.md](src/features/catalog/AGENTS.md): products, variants, the admin create form, cached storefront reads
 - [src/features/cart/AGENTS.md](src/features/cart/AGENTS.md): the signed cart cookie, cart actions and caps, the expired cart cron
+- [src/features/orders/AGENTS.md](src/features/orders/AGENTS.md): the Stripe webhook, order transitions, the reconcile cron, admin orders
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._

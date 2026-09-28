@@ -43,7 +43,7 @@ test("quantity changes and removals persist, and the header counts the items", a
   await expect(page.getByRole("link", { name: "Cart", exact: true })).toBeVisible();
 });
 
-test("checkout shows the order from live prices and a payment notice", async ({ page }) => {
+test("checkout shows the order from live prices and the Pay button", async ({ page }) => {
   const socks = await seedProduct({ stock: 5, priceCents: 1250 });
   await addToCart(page, socks, 2);
 
@@ -52,7 +52,7 @@ test("checkout shows the order from live prices and a payment notice", async ({ 
   await expect(page).toHaveURL("/checkout");
   await expect(page.getByRole("heading", { level: 1, name: "Checkout" })).toBeVisible();
   await expect(page.getByText("2 × €12.50")).toBeVisible();
-  await expect(page.getByText("Payment comes next")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Pay €25.00" })).toBeVisible();
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
 });
 

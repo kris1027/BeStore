@@ -39,7 +39,7 @@ test("the storefront pages have no axe violations", async ({ page }) => {
   await expectNoA11yViolations(page);
 
   await page.goto("/checkout");
-  await expect(page.getByText("Payment comes next")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Pay / })).toBeVisible();
   await expectNoA11yViolations(page);
 
   await setStock(simple.variantId, 0);

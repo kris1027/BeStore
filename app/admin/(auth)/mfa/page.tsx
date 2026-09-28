@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { FormNotice } from "@/features/admin-auth/components/form-notice";
+import { FormNotice } from "@/components/form-notice";
 import { AuthCard } from "@/features/admin-auth/components/auth-frame";
 import { SignOutButton } from "@/features/admin-auth/components/sign-out-button";
 import { TotpCodeForm } from "@/features/admin-auth/components/totp-code-form";

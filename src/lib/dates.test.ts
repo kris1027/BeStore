@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDate } from "./dates";
+import { formatDate, formatDateTime } from "./dates";
 
 describe("formatDate", () => {
   // 23:30 UTC on 31 March is already 1 April in Warsaw (UTC+2 in summer time).
@@ -15,5 +15,15 @@ describe("formatDate", () => {
 
   it("uses the store's locale", () => {
     expect(formatDate(lateEvening, { locale: "pl-PL", timeZone: "UTC" })).toBe("31 mar 2026");
+  });
+});
+
+describe("formatDateTime", () => {
+  it("shows the store's local time", () => {
+    const moment = new Date("2026-03-31T23:30:00Z");
+
+    expect(formatDateTime(moment, { locale: "en", timeZone: "Europe/Warsaw" })).toBe(
+      "Apr 1, 2026, 1:30 AM",
+    );
   });
 });
