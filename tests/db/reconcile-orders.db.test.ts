@@ -296,6 +296,28 @@ describe("GET /api/cron/reconcile-orders", () => {
     });
   });
 
+  it("reads flagged orders last, so they never crowd newer stale orders out of the batch", async () => {
+    const { order: flagged } = await seedPendingOrder({
+      suffix: "a",
+      sessionId: "cs_test_flagged",
+      createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+    });
+    await testDb.order.update({ where: { id: flagged.id }, data: { needsAttention: true } });
+    const { order: fresh } = await seedPendingOrder({
+      suffix: "b",
+      sessionId: null,
+      createdAt: twoHoursAgo(),
+    });
+
+    const counts = await reconcileOrders(Date.now(), 1);
+
+    expect(counts).toEqual({ checked: 1, paid: 0, expired: 1, skipped: 0, unresolved: 0 });
+    expect((await testDb.order.findUniqueOrThrow({ where: { id: fresh.id } })).status).toBe(
+      "expired",
+    );
+    expect(mocks.retrieve).not.toHaveBeenCalled();
+  });
+
   it("skips an order whose database write fails and carries on with the rest", async () => {
     const { order: broken } = await seedPendingOrder({
       suffix: "a",

@@ -19,7 +19,7 @@ import {
 import { expireCatalogTags, handleStripeEvent } from "./stripe-events";
 
 export const RECONCILE_BATCH = 100;
-// The 30 minute session plus an hour for Stripe's own webhook retries.
+// The 31 minute session plus an hour for Stripe's own webhook retries.
 export const STALE_AFTER_MS = 90 * 60 * 1000;
 export const EVENT_SEARCH_CAP = 500;
 
@@ -36,11 +36,16 @@ type Verdict = "paid" | "expired" | "skipped" | "unresolved";
 // spec 0006, AC-15: the safety net for a lost webhook. It never decides "paid" itself: it asks
 // Stripe for the real event and replays it through the webhook's own handler, so an order still
 // ends paid exactly once however often this runs.
-export async function reconcileOrders(nowMs: number = Date.now()): Promise<ReconcileCounts> {
+export async function reconcileOrders(
+  nowMs: number = Date.now(),
+  batchSize: number = RECONCILE_BATCH,
+): Promise<ReconcileCounts> {
   const orders = await db.order.findMany({
     where: { status: "pending_payment", createdAt: { lt: new Date(nowMs - STALE_AFTER_MS) } },
-    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-    take: RECONCILE_BATCH,
+    // Flagged orders wait for a person and stay pending, so read oldest first they would take
+    // the batch every day and newer stale orders would never be looked at. They go last.
+    orderBy: [{ needsAttention: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+    take: batchSize,
     select: { id: true, stripeCheckoutSessionId: true, createdAt: true, needsAttention: true },
   });
 
