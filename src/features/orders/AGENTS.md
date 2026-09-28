@@ -9,7 +9,7 @@ Everything after the customer presses Pay: the signed Stripe webhook that marks 
 - `webhook.ts`: `POST /api/stripe/webhook`. Verifies the `Stripe-Signature` with `STRIPE_WEBHOOK_SECRET` (400 otherwise), then calls `handleStripeEvent`.
 - `stripe-events.ts`: `handleStripeEvent`, the one path from a Stripe event to an order change, shared by the webhook and the cron. Also `expireCatalogTags`.
 - `event-decision.ts`: pure. The four handled `checkout.session.*` types and what each one decides.
-- `reconcile.ts`: `GET /api/cron/reconcile-orders` (daily in `vercel.json`). Replays the decisive Stripe event for pending orders older than 90 minutes.
+- `reconcile.ts`: `GET /api/cron/reconcile-orders` (daily in `vercel.json`). Replays the decisive Stripe event for pending orders older than 90 minutes. Each order's failure is caught, logged and counted as skipped, and flagged (`needs_attention`) orders are read last, so no single order can stall the batch.
 - `admin-queries.ts`, `components/`: `/admin/orders` (keyset paging with `?before=<number>`, `?view=all` adds pending and expired) and `/admin/orders/[number]`.
 - `src/lib/orders/transitions.ts`: `markPaid` and `markExpired`, the only code that changes `orders.status`.
 - `src/lib/orders/snapshot.ts`, `order-image.ts`, `minimum-charge.ts`: pure order line snapshot, line image pick, per currency Stripe minimum.
