@@ -331,6 +331,24 @@ describe("paying twice for one cart", () => {
     expect(await testDb.order.count()).toBe(1);
   });
 
+  it("starts a new checkout when a delayed payment failed on the earlier session meanwhile", async () => {
+    const { order, cart } = await seedPendingOrder({ sessionId: "cs_test_old" });
+    selectCart(cart.id);
+    mocks.retrieve.mockImplementationOnce(async () => {
+      // async_payment_failed lands between our read of the pending order and Stripe's answer.
+      await testDb.order.update({ where: { id: order.id }, data: { status: "expired" } });
+      return { id: "cs_test_old", status: "complete", payment_status: "unpaid" };
+    });
+
+    const result = await startCheckout({ email: "a@example.com" });
+
+    expect(result.ok).toBe(true);
+    expect(mocks.create).toHaveBeenCalledOnce();
+    expect(
+      await testDb.order.count({ where: { cartId: cart.id, status: "pending_payment" } }),
+    ).toBe(1);
+  });
+
   it("expires an earlier order that never got a session without asking Stripe", async () => {
     const { order, cart } = await seedPendingOrder({ sessionId: null });
     selectCart(cart.id);

@@ -158,13 +158,15 @@ async function clearPendingOrder(cartId: string): Promise<Result<null>> {
   return { ok: true, data: null };
 }
 
-async function completedEarlier(orderId: string, sessionId: string): Promise<Result<never>> {
+async function completedEarlier(orderId: string, sessionId: string): Promise<Result<null>> {
   const order = await db.order.findUniqueOrThrow({
     where: { id: orderId },
     select: { status: true },
   });
   // Still pending: a delayed method is processing, or the webhook has not landed yet.
   if (order.status === "pending_payment") return fail({ code: "payment_processing" });
+  // A delayed payment failed meanwhile: nothing was paid, so the cart may start over.
+  if (order.status === "expired") return { ok: true, data: null };
   return fail({
     code: "already_paid",
     confirmationUrl: `/checkout/complete?session_id=${encodeURIComponent(sessionId)}`,
