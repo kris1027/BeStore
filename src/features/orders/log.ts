@@ -67,3 +67,14 @@ export function logReconcileStripeFailed(orderId: string, error: unknown) {
     "cron.reconcile_stripe_failed",
   );
 }
+
+export function logReconcileOrderFailed(orderId: string, error: unknown) {
+  logger.error(
+    {
+      event: "cron.reconcile_order_failed",
+      orderId,
+      message: error instanceof Error ? error.message : String(error),
+    },
+    "cron.reconcile_order_failed",
+  );
+}

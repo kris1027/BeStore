@@ -295,4 +295,47 @@ describe("GET /api/cron/reconcile-orders", () => {
       unresolved: 0,
     });
   });
+
+  it("skips an order whose database write fails and carries on with the rest", async () => {
+    const { order: broken } = await seedPendingOrder({
+      suffix: "a",
+      sessionId: "cs_test_broken",
+      createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+    });
+    const { order: next } = await seedPendingOrder({
+      suffix: "b",
+      sessionId: null,
+      createdAt: twoHoursAgo(),
+    });
+    mocks.retrieve.mockResolvedValue({
+      id: "cs_test_broken",
+      status: "complete",
+      payment_status: "paid",
+    });
+    // The oldest order's flag write fails: it heads every batch, so it must not end the run.
+    const transaction = vi
+      .spyOn(testDb, "$transaction")
+      .mockRejectedValueOnce(new Error("could not serialize access"));
+
+    try {
+      expect((await run()).body).toEqual({
+        checked: 2,
+        paid: 0,
+        expired: 1,
+        skipped: 1,
+        unresolved: 0,
+      });
+    } finally {
+      transaction.mockRestore();
+    }
+    const statusOf = async (id: string) =>
+      (await testDb.order.findUniqueOrThrow({ where: { id } })).status;
+    expect(await statusOf(broken.id)).toBe("pending_payment");
+    expect(await statusOf(next.id)).toBe("expired");
+    expect(mocks.error).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "cron.reconcile_order_failed", orderId: broken.id }),
+      "cron.reconcile_order_failed",
+    );
+    expect(mocks.revalidateTag).toHaveBeenCalledWith("catalog", { expire: 0 });
+  });
 });

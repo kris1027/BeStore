@@ -11,6 +11,7 @@ import { stripe } from "@/lib/stripe";
 import { type HandledEventType, handledEventTypes } from "./event-decision";
 import {
   logReconcile,
+  logReconcileOrderFailed,
   logReconcileStripeFailed,
   logReconcileUnresolved,
   type ReconcileCounts,
@@ -45,19 +46,33 @@ export async function reconcileOrders(nowMs: number = Date.now()): Promise<Recon
 
   const counts = { paid: 0, expired: 0, skipped: 0, unresolved: 0 };
   for (const order of orders) {
-    counts[await reconcileOrder(order)] += 1;
+    counts[await reconcileOrderOrSkip(order)] += 1;
   }
   // Bounds how long a failed tag expiry after a sale can show stale stock.
   expireCatalogTags([]);
   return { checked: orders.length, ...counts };
 }
 
-async function reconcileOrder(order: {
+type StaleOrder = {
   readonly id: string;
   readonly stripeCheckoutSessionId: string | null;
   readonly createdAt: Date;
   readonly needsAttention: boolean;
-}): Promise<Verdict> {
+};
+
+// One order's failure must not end the run. The batch is read oldest first, so an order that
+// fails every time would otherwise stop every later run at the same place. Skipping is safe:
+// a failed write rolls back its own transaction, and the next run tries the order again.
+async function reconcileOrderOrSkip(order: StaleOrder): Promise<Verdict> {
+  try {
+    return await reconcileOrder(order);
+  } catch (error) {
+    logReconcileOrderFailed(order.id, error);
+    return "skipped";
+  }
+}
+
+async function reconcileOrder(order: StaleOrder): Promise<Verdict> {
   const sessionId = order.stripeCheckoutSessionId;
   // Never got a session, so nothing at Stripe can take money for it.
   if (sessionId === null) {

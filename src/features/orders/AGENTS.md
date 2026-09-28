@@ -24,7 +24,7 @@ Everything after the customer presses Pay: the signed Stripe webhook that marks 
 - Stock is taken on paid with a locked `LEAST` update, so it never goes below 0. A shortfall or an amount or currency mismatch still marks the order paid, sets `needs_attention` and writes an event explaining why.
 - After a paid commit, expire `catalog` and each affected `product:<slug>` tag with `revalidateTag(tag, { expire: 0 })` (route handler context).
 - Both admin pages call `requireAdmin()`. Dates show in `STORE_TIMEZONE`.
-- Logs carry order ids, numbers and amounts, never an email or a card detail: `order.paid`, `order.expired`, `order.stock_shortfall`, `order.amount_mismatch`, `stripe.event.processed`, `stripe.event.failed`, `stripe.webhook.invalid_signature`, `cron.reconcile_orders`, `order.reconcile_unresolved`.
+- Logs carry order ids, numbers and amounts, never an email or a card detail: `order.paid`, `order.expired`, `order.stock_shortfall`, `order.amount_mismatch`, `stripe.event.processed`, `stripe.event.failed`, `stripe.webhook.invalid_signature`, `cron.reconcile_orders`, `order.reconcile_unresolved`, `cron.reconcile_order_failed`.
 
 ## Tests
 
