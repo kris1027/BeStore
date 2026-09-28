@@ -1,5 +1,7 @@
 // Pure: what one Stripe Checkout event means for a pending order (spec 0006, Event handling).
 
+import { sessionState } from "@/lib/orders/session-state";
+
 export const handledEventTypes = [
   "checkout.session.completed",
   "checkout.session.async_payment_succeeded",
@@ -23,12 +25,13 @@ export const expiryReasons = {
   sessionExpired: "Checkout session expired",
 } as const;
 
-// `unpaid` on completed is a delayed method (a bank debit): the money is not in yet, so the
-// order waits for async_payment_succeeded or async_payment_failed.
+// A completed event carries a complete session. Anything but paid (a delayed method still
+// settling, or a payment status we do not know) waits for async_payment_succeeded or
+// async_payment_failed, and the reconcile cron flags it if neither comes.
 export function decideEvent(type: HandledEventType, paymentStatus: string): EventDecision {
   switch (type) {
     case "checkout.session.completed":
-      return paymentStatus === "paid" || paymentStatus === "no_payment_required"
+      return sessionState({ status: "complete", payment_status: paymentStatus }) === "paid"
         ? { kind: "pay" }
         : { kind: "processing" };
     case "checkout.session.async_payment_succeeded":

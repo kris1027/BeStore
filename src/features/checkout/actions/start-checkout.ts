@@ -10,6 +10,7 @@ import { env } from "@/lib/env";
 import { logOrderExpired } from "@/lib/orders/log";
 import { minimumChargeCents } from "@/lib/orders/minimum-charge";
 import { orderLineImage } from "@/lib/orders/order-image";
+import { sessionState } from "@/lib/orders/session-state";
 import { type OrderSnapshot, snapshotOrder } from "@/lib/orders/snapshot";
 import { markExpired } from "@/lib/orders/transitions";
 import { productImageUrl } from "@/lib/product-image";
@@ -138,18 +139,19 @@ async function clearPendingOrder(cartId: string): Promise<Result<null>> {
   }
 
   try {
-    let session = await stripe.checkout.sessions.retrieve(sessionId);
-    if (session.status === "open") {
+    let state = sessionState(await stripe.checkout.sessions.retrieve(sessionId));
+    if (state === "open") {
       try {
         await stripe.checkout.sessions.expire(sessionId);
-        session = { ...session, status: "expired" };
+        state = "expired";
       } catch {
         // It may have completed a moment ago: branch once more on what Stripe says now.
-        session = await stripe.checkout.sessions.retrieve(sessionId);
-        if (session.status === "open") return fail({ code: "payment_unavailable" });
+        state = sessionState(await stripe.checkout.sessions.retrieve(sessionId));
+        if (state === "open") return fail({ code: "payment_unavailable" });
       }
     }
-    if (session.status === "complete") return completedEarlier(pending.id, sessionId);
+    // Only an expired session can no longer take money; any other keeps its order.
+    if (state !== "expired") return completedEarlier(pending.id, sessionId);
   } catch {
     return fail({ code: "payment_unavailable" });
   }

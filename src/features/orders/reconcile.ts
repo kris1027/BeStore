@@ -5,6 +5,7 @@ import type Stripe from "stripe";
 import { isCronRequest } from "@/lib/cron-auth";
 import { db } from "@/lib/db";
 import { logOrderExpired } from "@/lib/orders/log";
+import { sessionState } from "@/lib/orders/session-state";
 import { markExpired } from "@/lib/orders/transitions";
 import { stripe } from "@/lib/stripe";
 
@@ -95,8 +96,8 @@ async function reconcileOrder(order: StaleOrder): Promise<Verdict> {
     return "skipped";
   }
   // Still payable, or a delayed method still processing: the webhook will come.
-  if (session.status === "open") return "skipped";
-  if (session.status === "complete" && session.payment_status === "unpaid") return "skipped";
+  const state = sessionState(session);
+  if (state === "open" || state === "processing") return "skipped";
 
   let event: Stripe.Event | null;
   try {

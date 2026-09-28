@@ -3,6 +3,7 @@ import "server-only";
 import type Stripe from "stripe";
 
 import { db } from "@/lib/db";
+import { sessionState } from "@/lib/orders/session-state";
 import { PLACEHOLDER_IMAGE, productImageUrl } from "@/lib/product-image";
 import { stripe } from "@/lib/stripe";
 
@@ -75,10 +76,17 @@ export async function getCompletion(sessionIdParam: unknown): Promise<Completion
     );
     // Stripe unreachable: keep checking, the refresh will ask again.
     if (session === null) return { state: "confirming", number: order.number };
-    if (session.status !== "complete") return { state: "not_completed" };
-    return session.payment_status === "unpaid"
-      ? { state: "processing", number: order.number }
-      : { state: "confirming", number: order.number };
+    switch (sessionState(session)) {
+      case "open":
+      case "expired":
+        return { state: "not_completed" };
+      case "processing":
+        return { state: "processing", number: order.number };
+      // Unknown: never tell someone who may have paid that they did not.
+      case "paid":
+      case "unknown":
+        return { state: "confirming", number: order.number };
+    }
   }
 
   const { email, lines, ...rest } = order;
