@@ -13,12 +13,14 @@ Everything after the customer presses Pay: the signed Stripe webhook that marks 
 - `admin-queries.ts`, `components/`: `/admin/orders` (keyset paging with `?before=<number>`, `?view=all` adds pending and expired) and `/admin/orders/[number]`.
 - `src/lib/orders/transitions.ts`: `markPaid` and `markExpired`, the only code that changes `orders.status`.
 - `src/lib/orders/snapshot.ts`, `order-image.ts`, `minimum-charge.ts`: pure order line snapshot, line image pick, per currency Stripe minimum.
+- `src/lib/orders/session-state.ts`: pure `sessionState`, what a Checkout Session's `status` and `payment_status` pair means (`open`, `paid`, `processing`, `expired`, `unknown`).
 - `src/lib/stripe.ts`: the Stripe client (pinned `STRIPE_API_VERSION`) and `stripeDashboardUrl`. `src/lib/cron-auth.ts`: `isCronRequest`, the constant time Bearer check every cron uses.
 
 ## Conventions
 
 - Only `handleStripeEvent` marks an order paid. The cron never decides paid itself; it fetches the real event from Stripe and replays it through the same handler. Expiry without an event (a checkout restart, an order with no session) still goes through `markExpired`.
 - The `stripe_events` insert (`ON CONFLICT DO NOTHING`) and the order change share one transaction. A replay finds its row and does nothing, and a thrown error rolls both back so Stripe's retry does the work again (the route answers 500).
+- Read a Checkout Session's `status` and `payment_status` only through `sessionState`, never directly, so the webhook, the cron, a checkout restart and the confirmation page cannot disagree. `unknown` (a value newer than the pinned API version) means money may have moved: no caller pays, expires or replaces an order on it.
 - Every write that changes an order must be guarded by `status = 'pending_payment'`. Zero rows updated means another path already settled it, so do nothing else. That includes side writes like the reconcile flag.
 - The order is found from the session's `metadata.order_id`, never from anything the browser sent. Foreign, unhandled and stale events answer 200 and change nothing.
 - Stock is taken on paid with a locked `LEAST` update, so it never goes below 0. A shortfall or an amount or currency mismatch still marks the order paid, sets `needs_attention` and writes an event explaining why.
