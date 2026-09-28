@@ -4,6 +4,7 @@ import { revalidateTag } from "next/cache";
 import type Stripe from "stripe";
 import { z } from "zod";
 
+import type { OrderStatus } from "@/generated/prisma/client";
 import { catalogTag, productTag } from "@/lib/cache-tags";
 import { db } from "@/lib/db";
 import { logOrderExpired, logOrderPaid } from "@/lib/orders/log";
@@ -38,7 +39,7 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<EventResul
     // Found from Stripe's own metadata, never from anything the browser sent.
     const orderId = orderIdSchema.safeParse(session.metadata?.order_id);
     if (!orderId.success) return { result: "not_ours" };
-    const [order] = await tx.$queryRaw<{ status: string }[]>`
+    const [order] = await tx.$queryRaw<{ status: OrderStatus }[]>`
       SELECT status FROM orders WHERE id = ${orderId.data}::uuid FOR UPDATE`;
     if (!order) return { result: "not_ours" };
     if (order.status !== "pending_payment") return { result: "stale" };

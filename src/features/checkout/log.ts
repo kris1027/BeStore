@@ -1,15 +1,10 @@
 import { logger } from "@/lib/logger";
 
+import type { StartCheckoutError } from "./actions/start-checkout";
+
 // spec 0006, Observability and AC-17: order ids, numbers and amounts, never the email.
 
-export type CheckoutRefusal =
-  | "validation"
-  | "cart_changed"
-  | "below_minimum"
-  | "payment_processing"
-  | "already_paid"
-  | "checkout_in_progress"
-  | "payment_unavailable";
+export type CheckoutRefusal = StartCheckoutError["code"];
 
 export function logCheckoutStarted(fields: {
   readonly orderId: string;

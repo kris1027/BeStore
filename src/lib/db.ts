@@ -2,7 +2,7 @@ import "server-only";
 
 import { PrismaPg } from "@prisma/adapter-pg";
 
-import { PrismaClient } from "@/generated/prisma/client";
+import { type Prisma, PrismaClient } from "@/generated/prisma/client";
 import { env } from "@/lib/env";
 
 // One client per server process; reuse it across hot reloads in development.
@@ -13,6 +13,9 @@ function createClient() {
   const adapter = new PrismaPg({ connectionString: env.DATABASE_URL });
   return new PrismaClient({ adapter });
 }
+
+// The client handed to an interactive $transaction callback.
+export type Tx = Prisma.TransactionClient;
 
 export const db = globalForPrisma.prisma ?? createClient();
 

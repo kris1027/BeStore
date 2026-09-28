@@ -4,27 +4,21 @@ import type Stripe from "stripe";
 
 import { canCheckout } from "@/lib/cart/cart-lines";
 import { readCartId } from "@/lib/cart/cookie";
-import { db } from "@/lib/db";
+import { db, type Tx } from "@/lib/db";
 import { uniqueViolation } from "@/lib/db-errors";
 import { env } from "@/lib/env";
 import { logOrderExpired } from "@/lib/orders/log";
 import { minimumChargeCents } from "@/lib/orders/minimum-charge";
 import { orderLineImage } from "@/lib/orders/order-image";
 import { type OrderSnapshot, snapshotOrder } from "@/lib/orders/snapshot";
-import { markExpired, type Tx } from "@/lib/orders/transitions";
+import { markExpired } from "@/lib/orders/transitions";
 import { productImageUrl } from "@/lib/product-image";
 import type { ActionResult } from "@/lib/result";
 import { stripe } from "@/lib/stripe";
 import { uuidv7 } from "@/lib/uuid";
 import { variantLabel } from "@/lib/variant-label";
 
-import {
-  type CheckoutRefusal,
-  logCheckoutRefused,
-  logCheckoutStarted,
-  logStripeFailed,
-  stripeErrorCode,
-} from "../log";
+import { logCheckoutRefused, logCheckoutStarted, logStripeFailed, stripeErrorCode } from "../log";
 import { checkoutSchema } from "../schemas";
 import { checkoutSessionParams } from "../stripe-session";
 
@@ -53,7 +47,7 @@ const expiryReasons = {
 // money for it.
 export async function startCheckout(input: unknown): Promise<Result<{ readonly url: string }>> {
   const result = await run(input);
-  if (!result.ok) logCheckoutRefused(result.error.code satisfies CheckoutRefusal);
+  if (!result.ok) logCheckoutRefused(result.error.code);
   return result;
 }
 

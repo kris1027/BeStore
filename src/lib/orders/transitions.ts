@@ -1,12 +1,11 @@
 import "server-only";
 
 import type { Prisma } from "@/generated/prisma/client";
+import type { Tx } from "@/lib/db";
 
 // The only code that changes orders.status (spec 0006, State transitions). Both functions run
 // inside the caller's transaction and move an order only while it is still pending_payment:
 // zero rows updated means another path already moved it, so they do nothing else.
-
-export type Tx = Prisma.TransactionClient;
 
 export type Shortfall = { readonly sku: string; readonly missing: number };
 
