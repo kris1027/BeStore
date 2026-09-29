@@ -362,6 +362,34 @@ describe("paying twice for one cart", () => {
     );
   });
 
+  // Forces the order two submits can race in: this tab reads the earlier order before the other
+  // tab saves its session id, and only then tries to expire it.
+  it("keeps an earlier order whose session id another tab saved after it was read", async () => {
+    const { order, cart } = await seedPendingOrder({ sessionId: null });
+    selectCart(cart.id);
+    const findFirst = testDb.order.findFirst.bind(testDb.order);
+    const spy = vi.spyOn(testDb.order, "findFirst").mockImplementationOnce((async (
+      args: Parameters<typeof findFirst>[0],
+    ) => {
+      const pending = await findFirst(args);
+      await testDb.order.update({
+        where: { id: order.id },
+        data: { stripeCheckoutSessionId: "cs_test_other_tab" },
+      });
+      return pending;
+    }) as unknown as typeof findFirst);
+
+    const result = await startCheckout({ email: "a@example.com" });
+    spy.mockRestore();
+
+    expect(result).toEqual({ ok: false, error: { code: "checkout_in_progress" } });
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect((await testDb.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe(
+      "pending_payment",
+    );
+    expect(await testDb.order.count()).toBe(1);
+  });
+
   it("answers payment_unavailable and changes nothing when Stripe cannot be reached", async () => {
     const { order, cart } = await seedPendingOrder({ sessionId: "cs_test_old" });
     selectCart(cart.id);
