@@ -19,6 +19,8 @@ export type SessionState =
 export type SessionFields = Pick<Stripe.Checkout.Session, "status" | "payment_status">;
 
 export function sessionState(session: SessionFields): SessionState {
+  // `status` alone settles open and expired: payment has not started on an open session, and an
+  // expired one takes no more, so `payment_status` only matters once a session is complete.
   switch (session.status) {
     case "open":
       return "open";

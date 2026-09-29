@@ -23,6 +23,13 @@ describe("sessionState", () => {
     expect(sessionState({ status: "complete", payment_status: "refunded" })).toBe("unknown");
   });
 
+  it.each([
+    ["open", "open"],
+    ["expired", "expired"],
+  ] as const)("reads %s by its status alone, whatever the payment status", (status, state) => {
+    expect(sessionState({ status, payment_status: "refunded" })).toBe(state);
+  });
+
   it.each([null, "archived"])("is unknown for status %s", (status) => {
     expect(sessionState({ status, payment_status: "paid" })).toBe("unknown");
   });
