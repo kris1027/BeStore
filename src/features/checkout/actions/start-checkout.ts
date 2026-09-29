@@ -122,7 +122,8 @@ async function expire(orderId: string, reason: string): Promise<void> {
 }
 
 // AC-9, step 2: a cart may hold one pending order. Before a new one, the old one's session is
-// ended at Stripe; if Stripe says it already completed, no new order is made.
+// ended at Stripe. If Stripe reports it paid, processing or unknown, the old order is kept and no
+// new one is made.
 async function clearPendingOrder(cartId: string): Promise<Result<null>> {
   const pending = await db.order.findFirst({
     where: { cartId, status: "pending_payment" },
@@ -151,7 +152,7 @@ async function clearPendingOrder(cartId: string): Promise<Result<null>> {
       }
     }
     // Only an expired session can no longer take money; any other keeps its order.
-    if (state !== "expired") return completedEarlier(pending.id, sessionId);
+    if (state !== "expired") return keepEarlierOrder(pending.id, sessionId);
   } catch {
     return fail({ code: "payment_unavailable" });
   }
@@ -160,7 +161,7 @@ async function clearPendingOrder(cartId: string): Promise<Result<null>> {
   return { ok: true, data: null };
 }
 
-async function completedEarlier(orderId: string, sessionId: string): Promise<Result<null>> {
+async function keepEarlierOrder(orderId: string, sessionId: string): Promise<Result<null>> {
   const order = await db.order.findUniqueOrThrow({
     where: { id: orderId },
     select: { status: true },
