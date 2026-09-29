@@ -121,6 +121,21 @@ async function expire(orderId: string, reason: string): Promise<void> {
   if (moved) logOrderExpired(orderId, reason);
 }
 
+// The other tab may save its session id between our read and this write, and its customer then
+// holds a live payment page. Rechecking the id under the row lock closes that gap: the save
+// either landed first (we back off) or waits for us and finds the order moved.
+async function expireWithoutSession(orderId: string): Promise<"cleared" | "in_progress"> {
+  const reason = expiryReasons.replaced;
+  const outcome = await db.$transaction(async (tx) => {
+    const [row] = await tx.$queryRaw<{ stripe_checkout_session_id: string | null }[]>`
+      SELECT stripe_checkout_session_id FROM orders WHERE id = ${orderId}::uuid FOR UPDATE`;
+    if (row !== undefined && row.stripe_checkout_session_id !== null) return "in_progress";
+    return (await markExpired(tx, orderId, reason)) ? "expired" : "cleared";
+  });
+  if (outcome === "expired") logOrderExpired(orderId, reason);
+  return outcome === "in_progress" ? "in_progress" : "cleared";
+}
+
 // AC-9, step 2: a cart may hold one pending order. Before a new one, the old one's session is
 // ended at Stripe. If Stripe reports it paid, processing or unknown, the old order is kept and no
 // new one is made.
@@ -132,11 +147,13 @@ async function clearPendingOrder(cartId: string): Promise<Result<null>> {
   if (!pending) return { ok: true, data: null };
 
   const sessionId = pending.stripeCheckoutSessionId;
-  // No session id: its session was never created, or was expired when saving its id failed.
-  // Another tab midway between those steps finds its order moved when it saves and stops there.
+  // No session id: its session was never created, was expired when saving its id failed, or
+  // another tab is midway through checkout and has not saved it yet.
   if (sessionId === null) {
-    await expire(pending.id, expiryReasons.replaced);
-    return { ok: true, data: null };
+    const outcome = await expireWithoutSession(pending.id);
+    return outcome === "in_progress"
+      ? fail({ code: "checkout_in_progress" })
+      : { ok: true, data: null };
   }
 
   try {
