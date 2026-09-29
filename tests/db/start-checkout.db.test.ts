@@ -349,6 +349,64 @@ describe("paying twice for one cart", () => {
     ).toBe(1);
   });
 
+  it("keeps the earlier order and says it is processing while its delayed payment settles", async () => {
+    const { order, cart } = await seedPendingOrder({ sessionId: "cs_test_old" });
+    selectCart(cart.id);
+    mocks.retrieve.mockResolvedValueOnce({
+      id: "cs_test_old",
+      status: "complete",
+      payment_status: "unpaid",
+    });
+
+    const result = await startCheckout({ email: "a@example.com" });
+
+    expect(result).toEqual({ ok: false, error: { code: "payment_processing" } });
+    expect(mocks.expire).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect((await testDb.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe(
+      "pending_payment",
+    );
+    expect(await testDb.order.count()).toBe(1);
+  });
+
+  // Money may have moved on a session Stripe describes in terms we do not know, so the earlier
+  // order is never replaced on it.
+  it.each([
+    ["an unknown status", { status: "archived", payment_status: "unpaid" }],
+    ["no status", { status: null, payment_status: "unpaid" }],
+    ["complete with an unknown payment status", { status: "complete", payment_status: "refunded" }],
+  ])("never replaces an earlier order whose session has %s", async (_, session) => {
+    const { order, cart } = await seedPendingOrder({ sessionId: "cs_test_old" });
+    selectCart(cart.id);
+    mocks.retrieve.mockResolvedValueOnce({ id: "cs_test_old", ...session });
+
+    const result = await startCheckout({ email: "a@example.com" });
+
+    expect(result).toEqual({ ok: false, error: { code: "payment_processing" } });
+    expect(mocks.expire).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect((await testDb.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe(
+      "pending_payment",
+    );
+  });
+
+  it("keeps the earlier order when expiring fails and Stripe then reports an unknown state", async () => {
+    const { order, cart } = await seedPendingOrder({ sessionId: "cs_test_old" });
+    selectCart(cart.id);
+    mocks.retrieve
+      .mockResolvedValueOnce({ id: "cs_test_old", status: "open", payment_status: "unpaid" })
+      .mockResolvedValueOnce({ id: "cs_test_old", status: "archived", payment_status: "unpaid" });
+    mocks.expire.mockRejectedValueOnce(new Error("cannot expire"));
+
+    const result = await startCheckout({ email: "a@example.com" });
+
+    expect(result).toEqual({ ok: false, error: { code: "payment_processing" } });
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect((await testDb.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe(
+      "pending_payment",
+    );
+  });
+
   it("expires an earlier order that never got a session without asking Stripe", async () => {
     const { order, cart } = await seedPendingOrder({ sessionId: null });
     selectCart(cart.id);

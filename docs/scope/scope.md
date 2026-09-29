@@ -18,7 +18,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 5 | Admin sign in | Slice 1 | done |
 | 6 | Core buy loop | Slice 1 | done |
 | 7 | Card payment & paid orders | Slice 1 | done |
-| 20 | One Stripe session state | Slice 1 follow up | planned |
+| 20 | One Stripe session state | Slice 1 follow up | done |
 | 21 | Report Stripe skill doc bugs upstream | Slice 1 follow up | planned |
 | 8 | Shipping address & flat rate | Slice 2 | planned |
 | 9 | Admin catalog management | Slice 3 | planned |
@@ -132,10 +132,12 @@ spec [0006](../specs/0006-card-payment-paid-orders/index.md) · code in [src/fea
 
 ## Slice 1 follow ups (from the review of feature 7)
 
-### 20. One Stripe session state
+### 20. One Stripe session state · done
 Replace the three places that each work out what a Checkout Session's `status` and `payment_status` mean (`src/features/checkout/queries.ts`, `src/features/orders/reconcile.ts`, `src/features/checkout/actions/start-checkout.ts`, overlapping `decideEvent` in `src/features/orders/event-decision.ts`) with one shared pure function, shipped as its own PR. from spec 0006
 **Done when:** every caller reads the session through the one function, it has unit tests for each status and payment status pair, and every existing checkout, webhook and reconcile test still passes unchanged.
-- [ ] Build it: `/develop one Stripe session state`
+spec [0006](../specs/0006-card-payment-paid-orders/index.md) · code in [src/lib/orders/session-state.ts](../../src/lib/orders/session-state.ts)
+- [x] Build it: `/develop one Stripe session state`
+- [x] Review it (fresh model): `/check review one Stripe session state`
 
 ### 21. Report Stripe skill doc bugs upstream · Prototype
 The vendored `stripe-best-practices` skill has broken `docs.stripe.com/undefined.md` links in `references/tax.md` (lines 23, 38, 41, 57, 87) and a v2 Financial Accounts endpoint in `references/treasury.md` (line 10) that CodeRabbit says is wrong. A local fix would be overwritten on update, so it goes to the source.
