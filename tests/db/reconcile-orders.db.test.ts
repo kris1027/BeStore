@@ -173,6 +173,28 @@ describe("GET /api/cron/reconcile-orders", () => {
     );
   });
 
+  // An unknown session state is not skipped like a live one: the cron still looks for the
+  // decisive event, and without one it flags the order for a person rather than expiring it.
+  it.each([
+    ["an unknown status", { status: "archived", payment_status: "unpaid" }],
+    ["complete with an unknown payment status", { status: "complete", payment_status: "refunded" }],
+  ])("flags, never expires, a session with %s and no event", async (_, session) => {
+    const { order } = await seedPendingOrder({
+      sessionId: "cs_test_odd",
+      createdAt: twoHoursAgo(),
+    });
+    mocks.retrieve.mockResolvedValue({ id: "cs_test_odd", ...session });
+
+    const { body } = await run();
+
+    expect(mocks.list).toHaveBeenCalledOnce();
+    expect(body).toMatchObject({ checked: 1, unresolved: 1, expired: 0, paid: 0 });
+    expect(await testDb.order.findUniqueOrThrow({ where: { id: order.id } })).toMatchObject({
+      status: "pending_payment",
+      needsAttention: true,
+    });
+  });
+
   it("leaves orders younger than 90 minutes alone", async () => {
     await seedPendingOrder({ sessionId: null });
 

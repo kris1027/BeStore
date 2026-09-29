@@ -45,6 +45,10 @@ describe("getCompletion", () => {
     ["processing", { status: "complete", payment_status: "unpaid" }],
     ["not_completed", { status: "open", payment_status: "unpaid" }],
     ["not_completed", { status: "expired", payment_status: "unpaid" }],
+    // Unknown values: never tell someone who may have paid that they did not.
+    ["confirming", { status: "complete", payment_status: "refunded" }],
+    ["confirming", { status: "archived", payment_status: "paid" }],
+    ["confirming", { status: null, payment_status: "unpaid" }],
   ])(
     "reads a pending order as %s from Stripe's session, and changes nothing",
     async (state, session) => {

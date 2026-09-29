@@ -13,6 +13,14 @@ describe("decideEvent", () => {
     expect(decideEvent("checkout.session.completed", "unpaid")).toEqual({ kind: "processing" });
   });
 
+  // A payment status newer than our pinned API version must never mark an order paid.
+  it.each(["refunded", ""])(
+    "waits on completed with a payment status it does not know (%j)",
+    (status) => {
+      expect(decideEvent("checkout.session.completed", status)).toEqual({ kind: "processing" });
+    },
+  );
+
   it("pays on async_payment_succeeded", () => {
     expect(decideEvent("checkout.session.async_payment_succeeded", "paid")).toEqual({
       kind: "pay",
