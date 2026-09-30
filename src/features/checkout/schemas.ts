@@ -10,7 +10,7 @@ export const checkoutMessages = {
 
 // Lowercasing and trimming twice gives the same email, so the server can parse the form's output.
 const emailSchema = z
-  .string()
+  .string({ error: checkoutMessages.emailInvalid })
   .trim()
   .max(254, checkoutMessages.emailInvalid)
   .pipe(z.email(checkoutMessages.emailInvalid))

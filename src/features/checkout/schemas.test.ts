@@ -44,6 +44,12 @@ describe("checkoutSchema", () => {
     },
   );
 
+  it.each([undefined, 42])("refuses the email %j with the field message", (email) => {
+    expect(schema.safeParse({ email, ...address }).error?.issues[0]?.message).toBe(
+      "Enter a valid email address.",
+    );
+  });
+
   it("refuses a request without an address", () => {
     expect(schema.safeParse({ email: "a@example.com" }).success).toBe(false);
   });
