@@ -115,6 +115,39 @@ describe("shippingAddressSchema", () => {
     },
   );
 
+  it("refuses a phone longer than 30 characters, however few digits it holds", () => {
+    const thirty = `+48${" ".repeat(18)}600100200`;
+
+    expect(schema.parse({ ...valid, phone: thirty }).phone).toBe(thirty);
+    expect(messageFor({ phone: `+48${" ".repeat(19)}600100200` }, "phone")).toBe(
+      "Enter a phone number with 7 to 15 digits, or leave it empty.",
+    );
+  });
+
+  // A crafted call can omit a field or send another type; it still gets the field's own message.
+  it.each([undefined, 42])("gives each field its own message for %j", (value) => {
+    const result = schema.safeParse({
+      fullName: value,
+      line1: value,
+      line2: 42,
+      postalCode: value,
+      city: value,
+      phone: 42,
+    });
+    const messages = Object.fromEntries(
+      (result.error?.issues ?? []).map((issue) => [issue.path[0], issue.message]),
+    );
+
+    expect(messages).toEqual({
+      fullName: "Enter your full name.",
+      line1: "Enter your street address.",
+      line2: "Keep this line under 100 characters.",
+      postalCode: "Enter a postal code like 00-950.",
+      city: "Enter your city.",
+      phone: "Enter a phone number with 7 to 15 digits, or leave it empty.",
+    });
+  });
+
   it("names every invalid field at once", () => {
     const result = schema.safeParse({
       fullName: "",

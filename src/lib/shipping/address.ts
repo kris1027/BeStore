@@ -51,19 +51,24 @@ export function postalCodeMessage(country: StoreCountry): string {
 
 const PHONE_PATTERN = /^\+?[0-9 ()-]+$/;
 
+// The digit count alone leaves separators unbounded, so the whole string is capped too.
+const PHONE_MAX_LENGTH = 30;
+
 function isPhone(text: string): boolean {
   const digits = text.replace(/[^0-9]/g, "").length;
-  return PHONE_PATTERN.test(text) && digits >= 7 && digits <= 15;
+  return text.length <= PHONE_MAX_LENGTH && PHONE_PATTERN.test(text) && digits >= 7 && digits <= 15;
 }
 
+// Each base z.string() carries the field's message, so a crafted call that omits a field or
+// sends another type gets the spec's message, not Zod's default text.
 function required(empty: string, max: number, long: string) {
-  return z.string().trim().min(1, empty).max(max, long);
+  return z.string({ error: empty }).trim().min(1, empty).max(max, long);
 }
 
 // Empty after trimming is null; null and undefined come in when the server parses output.
-function optionalText() {
+function optionalText(message: string) {
   return z
-    .string()
+    .string({ error: message })
     .nullish()
     .transform((value) => {
       const trimmed = (value ?? "").trim();
@@ -76,8 +81,10 @@ export function shippingAddressSchema(country: StoreCountry) {
   return z.object({
     fullName: required(addressMessages.fullNameEmpty, 100, addressMessages.fullNameLong),
     line1: required(addressMessages.line1Empty, 100, addressMessages.lineLong),
-    line2: optionalText().pipe(z.string().max(100, addressMessages.lineLong).nullable()),
-    postalCode: z.string().transform((text, ctx) => {
+    line2: optionalText(addressMessages.lineLong).pipe(
+      z.string().max(100, addressMessages.lineLong).nullable(),
+    ),
+    postalCode: z.string({ error: postalMessage }).transform((text, ctx) => {
       const normalized = normalizePostalCode(country, text);
       if (normalized === null) {
         ctx.addIssue({ code: "custom", message: postalMessage });
@@ -86,7 +93,9 @@ export function shippingAddressSchema(country: StoreCountry) {
       return normalized;
     }),
     city: required(addressMessages.cityEmpty, 60, addressMessages.cityLong),
-    phone: optionalText().pipe(z.string().refine(isPhone, addressMessages.phone).nullable()),
+    phone: optionalText(addressMessages.phone).pipe(
+      z.string().refine(isPhone, addressMessages.phone).nullable(),
+    ),
   });
 }
 
