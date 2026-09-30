@@ -19,6 +19,13 @@ describe("shippingSettingsSchema", () => {
     ).toEqual({ flatShippingCents: 1200, freeShippingThresholdCents: 20_000 });
   });
 
+  // covers: AC-10, Value sourcing `updateShippingSettings` cents.
+  it("pads a single decimal, so 12.5 is 1250 cents", () => {
+    expect(
+      schema.parse({ deliveryFee: "12.5", freeDelivery: true, freeDeliveryFrom: "0.5" }),
+    ).toEqual({ flatShippingCents: 1250, freeShippingThresholdCents: 50 });
+  });
+
   it("stores no threshold when free delivery is off, whatever the field holds", () => {
     expect(
       schema.parse({ deliveryFee: "9.99", freeDelivery: false, freeDeliveryFrom: "nonsense" }),
@@ -59,6 +66,14 @@ describe("shippingSettingsSchema", () => {
   ])("refuses the threshold %j with %j", (freeDeliveryFrom, message) => {
     expect(errorsFor({ deliveryFee: "10", freeDelivery: true, freeDeliveryFrom })).toEqual({
       freeDeliveryFrom: message,
+    });
+  });
+
+  // A crafted call can omit a field or send another type; it still gets the field's own message.
+  it.each([undefined, 12])("refuses a fee of %j with the format message", (deliveryFee) => {
+    expect(errorsFor({ deliveryFee, freeDelivery: true, freeDeliveryFrom: 12 })).toEqual({
+      deliveryFee: "Enter an amount like 9.99.",
+      freeDeliveryFrom: "Enter an amount like 9.99.",
     });
   });
 

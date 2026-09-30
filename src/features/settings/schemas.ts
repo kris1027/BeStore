@@ -39,10 +39,11 @@ export function shippingSettingsSchema(currency: string) {
 
   return z
     .object({
-      deliveryFee: z.string(),
+      // The field's message on the base type, so a missing or non string value reads the same.
+      deliveryFee: z.string({ error: messages.format }),
       freeDelivery: z.boolean(),
       // Ignored, whatever it holds, while free delivery is off.
-      freeDeliveryFrom: z.string().optional(),
+      freeDeliveryFrom: z.string({ error: messages.format }).optional(),
     })
     .transform((values, ctx) => {
       const fee = parseMoney(values.deliveryFee, currency);
