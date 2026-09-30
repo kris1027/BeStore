@@ -184,6 +184,24 @@ describe("env", () => {
     );
   });
 
+  describe("STORE_COUNTRY", () => {
+    it("accepts PL", async () => {
+      stubEnv({ STORE_COUNTRY: "PL" });
+
+      await expect(loadEnv()).resolves.toMatchObject({ STORE_COUNTRY: "PL" });
+    });
+
+    // Postal code rules exist per country (spec 0007, AC-15).
+    it.each(["DE", "pl", "POL", ""])(
+      "rejects %j, a country without a postal rule",
+      async (code) => {
+        stubEnv({ STORE_COUNTRY: code });
+
+        await expect(loadEnv()).rejects.toThrow("STORE_COUNTRY");
+      },
+    );
+  });
+
   describe("STORE_TIMEZONE", () => {
     it.each(["Europe/Warsaw", "America/New_York", "America/Argentina/Buenos_Aires", "UTC"])(
       "accepts the IANA zone %s",

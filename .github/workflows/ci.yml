@@ -68,6 +68,7 @@ jobs:
             echo "CRON_SECRET=cccccccccccccccccccccccccccccccc"
             echo "NEXT_PUBLIC_SITE_URL=http://localhost:3000"
             echo "STORE_CURRENCY=EUR"
+            echo "STORE_COUNTRY=PL"
             echo "STORE_TIMEZONE=Europe/Warsaw"
             echo "STORE_LOCALE=en"
             # A real Stripe test key lets the e2e reach Stripe's hosted page (spec 0006); a fork
