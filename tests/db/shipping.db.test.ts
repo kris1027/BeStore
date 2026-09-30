@@ -102,6 +102,18 @@ describe("checkoutPrefill (AC-9)", () => {
     });
   });
 
+  // covers: AC-9, Value sourcing `/checkout` prefill (created_at desc, id desc).
+  it("breaks a created_at tie by the larger id", async () => {
+    const { id: cartId } = await cart();
+    const createdAt = new Date("2026-09-02T10:00:00Z");
+    const first = await createOrder({ cartId, status: "expired", email: "first@example.com" });
+    const second = await createOrder({ cartId, status: "expired", email: "second@example.com" });
+    await testDb.order.updateMany({ where: { cartId }, data: { createdAt } });
+    const winner = first.id > second.id ? first : second;
+
+    expect((await checkoutPrefill(cartId))?.email).toBe(winner.email);
+  });
+
   it("prefills a null column as an empty field", async () => {
     const { id: cartId } = await cart();
     await createOrder({ cartId, email: "slice1@example.com" });
@@ -184,6 +196,25 @@ describe("updateShippingSettings (AC-10, AC-14)", () => {
     );
   });
 
+  // covers: AC-14, Value sourcing log (old and new).
+  it("logs the previous save's values as the next save's from", async () => {
+    await updateShippingSettings({ deliveryFee: "5", freeDelivery: false });
+    await updateShippingSettings({
+      deliveryFee: "7.5",
+      freeDelivery: true,
+      freeDeliveryFrom: "80",
+    });
+
+    const [first, second] = mocks.info.mock.calls.map(([fields]) => fields);
+    expect(first).toMatchObject({
+      to: { flatShippingCents: 500, freeShippingThresholdCents: null },
+    });
+    expect(second).toMatchObject({
+      from: { flatShippingCents: 500, freeShippingThresholdCents: null },
+      to: { flatShippingCents: 750, freeShippingThresholdCents: 8000 },
+    });
+  });
+
   it("clears the threshold when free delivery is switched off", async () => {
     await testDb.storeSettings.update({
       where: { id: 1 },
@@ -263,6 +294,35 @@ describe("the address on admin pages (AC-11, AC-12)", () => {
       },
     });
     expect(await getAdminOrder(without.number)).toMatchObject({ phone: null, address: null });
+  });
+});
+
+// covers: AC-11, AC-13, Value sourcing admin order pages and complete page: the label and amount
+// come from the order's own shipping_cents, never from the settings in effect today.
+describe("an order keeps its own delivery after the settings change", () => {
+  it("shows the fee charged at the time on the admin and confirmation pages", async () => {
+    await testDb.storeSettings.update({
+      where: { id: 1 },
+      data: { flatShippingCents: 1500, freeShippingThresholdCents: null },
+    });
+    const { order } = await seedPendingOrder({ sessionId: "cs_test_charged" });
+    await testDb.order.update({
+      where: { id: order.id },
+      data: {
+        status: "paid",
+        ...shipTo,
+        shippingCents: 1500,
+        totalCents: order.subtotalCents + 1500,
+      },
+    });
+
+    await updateShippingSettings({ deliveryFee: "0", freeDelivery: false });
+
+    expect(await getAdminOrder(order.number)).toMatchObject({ shippingCents: 1500 });
+    expect(await getCompletion("cs_test_charged")).toMatchObject({
+      state: "paid",
+      order: { shippingCents: 1500, totalCents: order.subtotalCents + 1500 },
+    });
   });
 });
 

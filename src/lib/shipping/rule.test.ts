@@ -46,6 +46,11 @@ describe("freeDeliveryGapCents", () => {
     expect(freeDeliveryGapCents(basis(5000, 1000), withThreshold)).toBe(16_000);
   });
 
+  // covers: AC-8, Value sourcing `/cart` gap (threshold 200.00, subtotal 150.00).
+  it("asks for 50.00 more on a 150.00 cart against a 200.00 threshold", () => {
+    expect(freeDeliveryGapCents(basis(15_000), withThreshold)).toBe(5000);
+  });
+
   it("is null once the threshold is reached", () => {
     expect(freeDeliveryGapCents(basis(20_000), withThreshold)).toBeNull();
   });

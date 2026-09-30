@@ -86,6 +86,8 @@ test("an admin sets the fee and threshold, and the cart and checkout show them",
   await expect(summary).toContainText("€9.99");
   await expect(summary).toContainText("€34.99");
   await expect(summary).toContainText("Add €25.00 more for free delivery");
+  // covers: AC-8, the slice 1 placeholder line is gone now that the cart prices delivery.
+  await expect(page.getByText("Shipping is added at checkout")).toHaveCount(0);
   await expectNoA11yViolations(page);
 
   await page.goto("/checkout");
