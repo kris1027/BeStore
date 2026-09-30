@@ -1,6 +1,7 @@
 import { ShoppingBagIcon } from "lucide-react";
 import Link from "next/link";
 
+import { DeliveryRow } from "@/components/delivery-row";
 import { Price } from "@/components/price";
 import { ProductImage } from "@/components/product-image";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -15,14 +16,18 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { loadCart } from "@/lib/cart/load-cart";
+import { NO_DISCOUNT_CENTS } from "@/lib/orders/snapshot";
+import { freeDeliveryGapCents, shippingCents } from "@/lib/shipping/rule";
+import { getShippingSettings } from "@/lib/shipping/settings";
 
 import { CartLineControls } from "./cart-line-controls";
 
 export const checkoutPath = "/checkout";
 
 // Reads the cookie, so it streams in behind the page's Suspense boundary (spec 0005, AC-12).
+// Delivery comes from the cached settings and the one shipping rule (spec 0007, AC-8).
 export async function CartContents() {
-  const cart = await loadCart();
+  const [cart, settings] = await Promise.all([loadCart(), getShippingSettings()]);
 
   if (!cart || cart.lines.length === 0) {
     return (
@@ -44,6 +49,11 @@ export async function CartContents() {
       </Empty>
     );
   }
+
+  const basis = { subtotalCents: cart.subtotalCents, discountCents: NO_DISCOUNT_CENTS };
+  const shipping = shippingCents(basis, settings);
+  const gap = freeDeliveryGapCents(basis, settings);
+  const totalCents = cart.subtotalCents - NO_DISCOUNT_CENTS + shipping;
 
   return (
     <div className="grid items-start gap-10 lg:grid-cols-3">
@@ -111,7 +121,19 @@ export async function CartContents() {
             <Price cents={cart.subtotalCents} />
           </span>
         </div>
-        <p className="text-sm text-muted-foreground">Shipping is added at checkout.</p>
+        <DeliveryRow cents={shipping} />
+        {gap !== null ? (
+          <p className="text-sm text-muted-foreground">
+            Add <Price cents={gap} className="font-medium text-foreground" /> more for free delivery
+          </p>
+        ) : null}
+        <Separator />
+        <div className="flex items-center justify-between text-lg">
+          <span className="font-medium">Total</span>
+          <span className="font-semibold">
+            <Price cents={totalCents} />
+          </span>
+        </div>
         {cart.canCheckout ? (
           <Link href={checkoutPath} className={buttonVariants({ size: "lg", className: "h-11" })}>
             Checkout

@@ -3,12 +3,52 @@ import "server-only";
 import type Stripe from "stripe";
 
 import { db } from "@/lib/db";
+import { env } from "@/lib/env";
 import { sessionState } from "@/lib/orders/session-state";
 import { PLACEHOLDER_IMAGE, productImageUrl } from "@/lib/product-image";
+import { countryDisplayName } from "@/lib/shipping/address";
 import { stripe } from "@/lib/stripe";
 
 import { maskEmail } from "./mask-email";
-import { sessionIdSchema } from "./schemas";
+import { type CheckoutPrefill, sessionIdSchema } from "./schemas";
+
+// spec 0007, AC-9: what the customer typed last for this cart, from its newest order whatever its
+// status. Only the cart in the visitor's own signed cookie is ever asked for, and a paid order's
+// cart is deleted, so this never reaches a paid order. A null column prefills as an empty field.
+export async function checkoutPrefill(cartId: string): Promise<CheckoutPrefill | null> {
+  const order = await db.order.findFirst({
+    where: { cartId },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: {
+      email: true,
+      shipFullName: true,
+      shipLine1: true,
+      shipLine2: true,
+      shipPostalCode: true,
+      shipCity: true,
+      phone: true,
+    },
+  });
+  if (!order) return null;
+  return {
+    email: order.email,
+    fullName: order.shipFullName ?? "",
+    line1: order.shipLine1 ?? "",
+    line2: order.shipLine2 ?? "",
+    postalCode: order.shipPostalCode ?? "",
+    city: order.shipCity ?? "",
+    phone: order.phone ?? "",
+  };
+}
+
+export type DeliveryAddress = {
+  readonly fullName: string;
+  readonly line1: string;
+  readonly line2: string | null;
+  readonly postalCode: string;
+  readonly city: string;
+  readonly countryName: string;
+};
 
 export type CompletedOrder = {
   readonly number: number;
@@ -18,6 +58,8 @@ export type CompletedOrder = {
   readonly subtotalCents: number;
   readonly shippingCents: number;
   readonly totalCents: number;
+  // null for an order made before spec 0007: the page then hides the block (AC-13).
+  readonly address: DeliveryAddress | null;
   readonly lines: readonly {
     readonly id: string;
     readonly productName: string;
@@ -51,6 +93,12 @@ export async function getCompletion(sessionIdParam: unknown): Promise<Completion
       subtotalCents: true,
       shippingCents: true,
       totalCents: true,
+      shipFullName: true,
+      shipLine1: true,
+      shipLine2: true,
+      shipPostalCode: true,
+      shipCity: true,
+      shipCountryCode: true,
       lines: {
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         select: {
@@ -89,13 +137,39 @@ export async function getCompletion(sessionIdParam: unknown): Promise<Completion
     }
   }
 
-  const { email, lines, ...rest } = order;
+  const {
+    email,
+    lines,
+    shipFullName,
+    shipLine1,
+    shipLine2,
+    shipPostalCode,
+    shipCity,
+    shipCountryCode,
+    ...rest
+  } = order;
+  const address =
+    shipFullName !== null &&
+    shipLine1 !== null &&
+    shipPostalCode !== null &&
+    shipCity !== null &&
+    shipCountryCode !== null
+      ? {
+          fullName: shipFullName,
+          line1: shipLine1,
+          line2: shipLine2,
+          postalCode: shipPostalCode,
+          city: shipCity,
+          countryName: countryDisplayName(shipCountryCode, env.STORE_LOCALE),
+        }
+      : null;
   return {
     state: "paid",
     order: {
       ...rest,
       status: order.status,
       maskedEmail: maskEmail(email),
+      address,
       lines: lines.map(({ imagePath, ...line }) => ({
         ...line,
         imageSrc: imagePath === null ? PLACEHOLDER_IMAGE : productImageUrl(imagePath),

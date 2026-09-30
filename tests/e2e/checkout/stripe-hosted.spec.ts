@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 
 import { seedProduct } from "../catalog/support";
-import { addToCart, stockOf } from "./support";
+import { addToCart, fillCheckout, payButton, stockOf } from "./support";
 
 // @stripe, local only (spec 0006): a real payment on Stripe's hosted page, confirmed by the real
 // webhook. Needs a Stripe test key in .env.local and, in another terminal:
@@ -38,8 +38,8 @@ test("@stripe a card payment ends in one paid order that took the stock", async 
   const socks = await seedProduct({ stock: 5, priceCents: 1250 });
   await addToCart(page, socks, 2);
   await page.goto("/checkout");
-  await page.getByLabel("Email").fill("stripe.e2e@example.com");
-  await page.getByRole("button", { name: "Pay €25.00" }).click();
+  await fillCheckout(page, "stripe.e2e@example.com");
+  await payButton(page).click();
 
   await payOnStripe(page, "4242 4242 4242 4242");
 
@@ -56,8 +56,8 @@ test("@stripe a declined card leaves no paid order", async ({ page }) => {
   const socks = await seedProduct({ stock: 5, priceCents: 1250 });
   await addToCart(page, socks);
   await page.goto("/checkout");
-  await page.getByLabel("Email").fill("stripe.e2e@example.com");
-  await page.getByRole("button", { name: "Pay €12.50" }).click();
+  await fillCheckout(page, "stripe.e2e@example.com");
+  await payButton(page).click();
 
   await payOnStripe(page, "4000 0000 0000 0002");
 
