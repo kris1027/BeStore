@@ -19,7 +19,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 6 | Core buy loop | Slice 1 | done |
 | 7 | Card payment & paid orders | Slice 1 | done |
 | 20 | One Stripe session state | Slice 1 follow up | done |
-| 21 | Report Stripe skill doc bugs upstream | Slice 1 follow up | planned |
+| 21 | Report Stripe skill doc bugs upstream | Slice 1 follow up | done |
 | 8 | Shipping address & flat rate | Slice 2 | planned |
 | 9 | Admin catalog management | Slice 3 | planned |
 | 10 | Admin order management | Slice 4 | planned |
@@ -139,10 +139,11 @@ spec [0006](../specs/0006-card-payment-paid-orders/index.md) · code in [src/lib
 - [x] Build it: `/develop one Stripe session state`
 - [x] Review it (fresh model): `/check review one Stripe session state`
 
-### 21. Report Stripe skill doc bugs upstream · Prototype
+### 21. Report Stripe skill doc bugs upstream · done · Prototype
 The vendored `stripe-best-practices` skill has broken `docs.stripe.com/undefined.md` links in `references/tax.md` (lines 23, 38, 41, 57, 87) and a v2 Financial Accounts endpoint in `references/treasury.md` (line 10) that CodeRabbit says is wrong. A local fix would be overwritten on update, so it goes to the source.
 **Done when:** an issue on `stripe/ai` lists the broken links and the endpoint question, and its link is noted here.
-- [ ] Report it: open an issue on `stripe/ai` (`gh issue create --repo stripe/ai`)
+issue [stripe/ai#554](https://github.com/stripe/ai/issues/554)
+- [x] Report it: open an issue on `stripe/ai` (`gh issue create --repo stripe/ai`)
 
 ## Slice 2: Shipping
 
