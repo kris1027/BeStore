@@ -159,8 +159,9 @@ spec [0007](../specs/0007-shipping-address-flat-rate/index.md) · code in `src/l
   - [x] Admin settings page: fee and free delivery threshold, cache tag expiry, change log (AC-10, AC-14)
   - [x] Prefill after cancel, confirmation page delivery and address, admin list Ship to column (AC-9, AC-12, AC-13)
   - [x] Safety net: DB tests for the order row and settings race, e2e for validation, threshold, settings and prefill, axe on every touched page (AC-2, AC-4, AC-7, AC-8, AC-10, AC-16)
-- [ ] Verify it: `/check verify shipping address & flat rate`
-- [ ] Test it: `/test shipping address & flat rate`
+- [x] Verify it: `/check verify shipping address & flat rate`
+- [x] Test it: `/test shipping address & flat rate`
+- [x] Review it (fresh model): `/check review shipping address & flat rate`
 
 ## Slice 2 follow ups (from spec 0007)
 

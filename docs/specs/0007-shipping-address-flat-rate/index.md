@@ -1,7 +1,7 @@
 # 0007. Shipping address and flat rate delivery
 
 **Date**: 2026-09-30
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 
@@ -18,7 +18,7 @@ Checkout now asks where to deliver and charges one flat delivery fee, which drop
 
 **Acceptance criteria**:
 - **AC-1**: `/checkout` shows, above the Pay button, the fields Email, Full name, Address line 1, Address line 2 (optional), Postal code, City, Phone (optional), and the country as plain text (the name of `STORE_COUNTRY` in `STORE_LOCALE`, e.g. "Poland"), not as an input. Each field has a visible label and the matching `autocomplete` token (`email`, `shipping name`, `shipping address-line1`, `shipping address-line2`, `shipping postal-code`, `shipping address-level2`, `tel`).
-- **AC-2**: The same Zod schema checks the form (on submit) and `startCheckout` (on the server). Full name, line 1 and city are required after trimming (only spaces counts as empty); name, line 1 and line 2 accept up to 100 characters, city up to 60. The postal code, after trimming, must match `^[0-9]{2}-?[0-9]{3}$` (ASCII digits only; `00 950`, an en dash, or other digit scripts are refused) and is stored as `NN-NNN`. Phone, when given, must match `^\+?[0-9 ()-]+$` and hold 7 to 15 digits counted over digits only (`+48 600 100 200` passes), and is stored trimmed as typed; an empty phone is stored as null, an empty line 2 as null. Each invalid field shows its own message (see *Validation messages*), announced to screen readers, and focus moves to the first invalid field. A server refusal names the same fields and messages.
+- **AC-2**: The same Zod schema checks the form (on submit) and `startCheckout` (on the server). Full name, line 1 and city are required after trimming (only spaces counts as empty); name, line 1 and line 2 accept up to 100 characters, city up to 60. The postal code, after trimming, must match `^[0-9]{2}-?[0-9]{3}$` (ASCII digits only; `00 950`, an en dash, or other digit scripts are refused) and is stored as `NN-NNN`. Phone, when given, must match `^\+?[0-9 ()-]+$` hold 7 to 15 digits counted over digits only (`+48 600 100 200` passes), and be at most 30 characters, and is stored trimmed as typed; an empty phone is stored as null, an empty line 2 as null. Each invalid field shows its own message (see *Validation messages*), announced to screen readers, and focus moves to the first invalid field. A server refusal names the same fields and messages.
 - **AC-3**: Delivery is `0` when `store_settings.free_shipping_threshold_cents` is set and `subtotal_cents - discount_cents` is at or above it; otherwise it is `store_settings.flat_shipping_cents`. A flat fee of 0 means delivery is always free. This one pure function is the only place the rule lives.
 - **AC-4**: The `/checkout` summary lists Subtotal, a delivery row labelled "Standard delivery" with the fee (or "Free delivery" with "Free" when the fee is 0), and Total; the Pay button reads `Pay <total>` including delivery.
 - **AC-5**: On Pay, `startCheckout` reads `store_settings` inside the same transaction that locks the cart (never from the cache, never from the browser), computes delivery with the AC-3 rule, and creates the pending order with `ship_full_name`, `ship_line1`, `ship_line2`, `ship_city`, `ship_postal_code`, `ship_country_code` (= `STORE_COUNTRY`), `phone`, `shipping_cents`, and `total_cents = subtotal_cents - discount_cents + shipping_cents`. The Stripe minimum charge check uses that total, delivery included.
@@ -121,9 +121,11 @@ Shared by client and server. "Empty" means empty after trimming.
 | line2 | allowed (null) | "Keep this line under 100 characters." | n/a |
 | city | "Enter your city." | "Keep the city under 60 characters." | n/a |
 | postalCode | "Enter a postal code like 00-950." | same | same |
-| phone | allowed (null) | n/a | "Enter a phone number with 7 to 15 digits, or leave it empty." |
+| phone | allowed (null) | same (over 30 characters) | "Enter a phone number with 7 to 15 digits, or leave it empty." |
 
 Settings: "Enter an amount like 9.99." (empty or bad format) · "Delivery fee can be at most 1,000.00." · "Enter an amount above 0." (threshold of 0) · "Free delivery threshold can be at most 100,000.00." Maximums are formatted with the store currency's decimals.
+
+A field that is missing or not a string (only a crafted request can send one) gets its own message from these tables: the Empty message, or the Format message where Empty is allowed or n/a (line 2 uses its Too long message).
 
 ### Value sourcing
 
