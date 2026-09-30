@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { type DateFormat, formatDateTime } from "@/lib/dates";
+import { deliveryLabel } from "@/lib/shipping/rule";
 import { cn } from "@/lib/utils";
 
 import type { AdminOrderDetail as Detail } from "../admin-queries";
@@ -164,7 +165,7 @@ export function AdminOrderDetail({
                   </dd>
                 </>
               ) : null}
-              <dt>Shipping</dt>
+              <dt>{deliveryLabel(order.shippingCents)}</dt>
               <dd className="text-right">
                 <Price cents={order.shippingCents} currency={order.currency} />
               </dd>
@@ -187,6 +188,16 @@ export function AdminOrderDetail({
               <DetailRow label="Email">
                 <span className="break-all">{order.email}</span>
               </DetailRow>
+              <DetailRow label="Delivery address">
+                <DeliveryAddress address={order.address} />
+              </DetailRow>
+              {order.phone !== null ? (
+                <DetailRow label="Phone">
+                  <a href={`tel:${order.phone}`} className="underline-offset-4 hover:underline">
+                    {order.phone}
+                  </a>
+                </DetailRow>
+              ) : null}
               <DetailRow label="Status">{orderStatusLabels[order.status]}</DetailRow>
               <DetailRow label="Created">{formatDateTime(order.createdAt, dateFormat)}</DetailRow>
               <DetailRow label="Paid">
@@ -244,6 +255,22 @@ function DetailRow({
       <dt className="text-muted-foreground">{label}</dt>
       <dd>{children}</dd>
     </div>
+  );
+}
+
+// spec 0007, AC-11.
+function DeliveryAddress({ address }: { readonly address: Detail["address"] }) {
+  if (address === null) return <span className="text-muted-foreground">No address recorded</span>;
+  return (
+    <address className="flex flex-col not-italic">
+      <span className="font-medium">{address.fullName}</span>
+      <span>{address.line1}</span>
+      {address.line2 ? <span>{address.line2}</span> : null}
+      <span>
+        {address.postalCode} {address.city}
+      </span>
+      <span>{address.countryName}</span>
+    </address>
   );
 }
 

@@ -4,6 +4,8 @@ import { z } from "zod";
 
 import type { ActorType, OrderEventType, OrderStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { env } from "@/lib/env";
+import { countryDisplayName } from "@/lib/shipping/address";
 import { stripeDashboardUrl } from "@/lib/stripe";
 
 // Not cached: the admin always sees the live tables. Callers run requireAdmin() first.
@@ -35,6 +37,8 @@ export type AdminOrderRow = {
   readonly itemCount: number;
   readonly currency: string;
   readonly totalCents: number;
+  // "<full name>, <city>", or null for an order with no address (spec 0007, AC-12).
+  readonly shipTo: string | null;
 };
 
 export type AdminOrdersPage = {
@@ -62,15 +66,18 @@ export async function getAdminOrders(params: AdminOrdersParams): Promise<AdminOr
       needsAttention: true,
       currency: true,
       totalCents: true,
+      shipFullName: true,
+      shipCity: true,
       lines: { select: { quantity: true } },
     },
   });
   const page = orders.slice(0, ADMIN_ORDERS_PAGE_SIZE);
   const last = page.at(-1);
   return {
-    rows: page.map(({ lines, ...order }) => ({
+    rows: page.map(({ lines, shipFullName, shipCity, ...order }) => ({
       ...order,
       itemCount: lines.reduce((sum, line) => sum + line.quantity, 0),
+      shipTo: shipFullName !== null && shipCity !== null ? `${shipFullName}, ${shipCity}` : null,
     })),
     olderBefore: orders.length > ADMIN_ORDERS_PAGE_SIZE && last ? last.number : null,
   };
@@ -88,6 +95,16 @@ export type AdminOrderDetail = {
   readonly totalCents: number;
   readonly createdAt: Date;
   readonly paidAt: Date | null;
+  readonly phone: string | null;
+  // null for an order made before spec 0007 (AC-11: "No address recorded").
+  readonly address: {
+    readonly fullName: string;
+    readonly line1: string;
+    readonly line2: string | null;
+    readonly postalCode: string;
+    readonly city: string;
+    readonly countryName: string;
+  } | null;
   readonly stripe: {
     readonly sessionId: string | null;
     readonly sessionUrl: string | null;
@@ -136,6 +153,13 @@ export async function getAdminOrder(numberParam: unknown): Promise<AdminOrderDet
       totalCents: true,
       createdAt: true,
       paidAt: true,
+      phone: true,
+      shipFullName: true,
+      shipLine1: true,
+      shipLine2: true,
+      shipPostalCode: true,
+      shipCity: true,
+      shipCountryCode: true,
       stripeCheckoutSessionId: true,
       stripePaymentIntentId: true,
       lines: {
@@ -167,9 +191,34 @@ export async function getAdminOrder(numberParam: unknown): Promise<AdminOrderDet
   });
   if (!order) return null;
 
-  const { stripeCheckoutSessionId: sessionId, stripePaymentIntentId: paymentIntentId } = order;
+  const {
+    stripeCheckoutSessionId: sessionId,
+    stripePaymentIntentId: paymentIntentId,
+    shipFullName,
+    shipLine1,
+    shipLine2,
+    shipPostalCode,
+    shipCity,
+    shipCountryCode,
+    ...rest
+  } = order;
   return {
-    ...order,
+    ...rest,
+    address:
+      shipFullName !== null &&
+      shipLine1 !== null &&
+      shipPostalCode !== null &&
+      shipCity !== null &&
+      shipCountryCode !== null
+        ? {
+            fullName: shipFullName,
+            line1: shipLine1,
+            line2: shipLine2,
+            postalCode: shipPostalCode,
+            city: shipCity,
+            countryName: countryDisplayName(shipCountryCode, env.STORE_LOCALE),
+          }
+        : null,
     stripe: {
       sessionId,
       sessionUrl: sessionId === null ? null : stripeDashboardUrl({ sessionId }),
