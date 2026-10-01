@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 
 import type { AdminOrdersPage, AdminOrdersParams } from "../admin-queries";
 import { NeedsAttentionBadge, OrderStatusBadge } from "./order-status-badge";
+import { OrderEmail, PersonalDataField } from "./personal-data";
 
 export const adminOrdersPath = "/admin/orders";
 
@@ -117,9 +118,15 @@ export function AdminOrdersList({
                       </Link>
                     </TableCell>
                     <TableCell>{formatDate(order.createdAt, dateFormat)}</TableCell>
-                    <TableCell className="max-w-64 truncate">{order.email}</TableCell>
                     <TableCell className="max-w-64 truncate">
-                      {order.shipTo ?? <span className="text-muted-foreground">Not recorded</span>}
+                      <OrderEmail order={order} placement="list" />
+                    </TableCell>
+                    <TableCell className="max-w-64 truncate">
+                      <PersonalDataField purgedAt={order.piiPurgedAt} placement="list">
+                        {order.shipTo ?? (
+                          <span className="text-muted-foreground">Not recorded</span>
+                        )}
+                      </PersonalDataField>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">

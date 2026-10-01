@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resetDatabaseBeforeEach, testDb } from "./client";
 import { createOrder } from "./fixtures";
@@ -16,10 +16,29 @@ vi.mock("@/lib/stripe", async () => {
 });
 vi.mock("stripe", () => ({ default: class {} }));
 
+const mocks = vi.hoisted(() => ({ error: vi.fn() }));
+vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: mocks.error } }));
+
 const { getAdminOrder, getAdminOrders, parseAdminOrdersParams } =
   await import("@/features/orders/admin-queries");
 
 resetDatabaseBeforeEach();
+
+beforeEach(() => vi.clearAllMocks());
+
+// spec 0008: what the daily purge leaves on an expired order.
+async function purgedOrder() {
+  const order = await createOrder({ status: "expired", email: "ada@example.com" });
+  return testDb.order.update({
+    where: { id: order.id },
+    data: {
+      email: null,
+      shipFullName: null,
+      shipCity: null,
+      piiPurgedAt: new Date("2026-09-01T04:00:00Z"),
+    },
+  });
+}
 
 describe("getAdminOrders", () => {
   it("shows paid and later orders by default, and every order in the all view", async () => {
@@ -96,6 +115,41 @@ describe("getAdminOrders", () => {
   });
 });
 
+describe("getAdminOrders on purged orders (spec 0008)", () => {
+  it("lists a purged order beside the others, with no email and its purge time (AC-8)", async () => {
+    await createOrder({ status: "paid", email: "kept@example.com" });
+    const purged = await purgedOrder();
+
+    const { rows } = await getAdminOrders({ all: true, before: null });
+
+    expect(rows).toHaveLength(2);
+    expect(rows.find((row) => row.id === purged.id)).toMatchObject({
+      email: null,
+      piiPurgedAt: new Date("2026-09-01T04:00:00Z"),
+      shipTo: null,
+    });
+    expect(rows.find((row) => row.id !== purged.id)).toMatchObject({
+      email: "kept@example.com",
+      piiPurgedAt: null,
+    });
+  });
+
+  // A purged order has no email by design, so it must never raise the missing email alarm.
+  it("does not log a purged order as missing its email (AC-9)", async () => {
+    await purgedOrder();
+
+    await getAdminOrders({ all: true, before: null });
+
+    expect(mocks.error).not.toHaveBeenCalled();
+  });
+
+  it("keeps a purged order out of the default view, which shows paid and later only", async () => {
+    await purgedOrder();
+
+    expect((await getAdminOrders({ all: false, before: null })).rows).toEqual([]);
+  });
+});
+
 describe("parseAdminOrdersParams", () => {
   it("reads the view and the page, ignoring anything malformed", () => {
     expect(parseAdminOrdersParams({ view: "all", before: "1050" })).toEqual({
@@ -143,6 +197,20 @@ describe("getAdminOrder", () => {
     const detail = await getAdminOrder("1001");
 
     expect(detail?.lines).toEqual([expect.objectContaining(bought)]);
+  });
+
+  it("returns a purged order with no email, no address and its purge time (spec 0008, AC-8)", async () => {
+    const purged = await purgedOrder();
+
+    const detail = await getAdminOrder(String(purged.number));
+
+    expect(detail).toMatchObject({
+      number: purged.number,
+      status: "expired",
+      email: null,
+      piiPurgedAt: new Date("2026-09-01T04:00:00Z"),
+    });
+    expect(mocks.error).not.toHaveBeenCalled();
   });
 
   it.each(["9999", "abc", "1000", "-1", undefined])("is null for %j", async (value) => {

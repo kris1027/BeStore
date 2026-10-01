@@ -121,26 +121,34 @@ type OrderInput = Partial<{
   subtotalCents: number;
   discountCents: number;
   shippingCents: number;
+  expiredAt: Date;
+  piiPurgedAt: Date;
 }>;
 
-// A pending guest order whose totals add up (total = subtotal - discount + shipping).
+// A pending guest order whose totals add up (total = subtotal - discount + shipping). An expired
+// order gets an expiry time (now unless given), which a CHECK on orders requires. The email is
+// always set, so the result's email is a string: a purged order is made by the purge itself.
 export async function createOrder(input: OrderInput = {}) {
   const subtotalCents = input.subtotalCents ?? 5000;
   const discountCents = input.discountCents ?? 0;
   const shippingCents = input.shippingCents ?? 0;
-  return testDb.order.create({
+  const email = input.email ?? "guest@example.com";
+  const order = await testDb.order.create({
     data: {
       customerId: input.customerId,
       cartId: input.cartId,
       status: input.status,
-      email: input.email ?? "guest@example.com",
+      email,
       currency: "EUR",
       subtotalCents,
       discountCents,
       shippingCents,
       totalCents: subtotalCents - discountCents + shippingCents,
+      expiredAt: input.expiredAt ?? (input.status === "expired" ? new Date() : undefined),
+      piiPurgedAt: input.piiPurgedAt,
     },
   });
+  return { ...order, email };
 }
 
 export async function createAdmin(email = "admin@example.com") {

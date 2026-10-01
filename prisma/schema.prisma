@@ -330,7 +330,8 @@ model Order {
   needsAttention          Boolean       @default(false) @map("needs_attention")
   customerId              String?       @map("customer_id") @db.Uuid
   cartId                  String?       @map("cart_id") @db.Uuid
-  email                   String
+  // Null only once the PII purge has run (spec 0008); a CHECK keeps it present otherwise.
+  email                   String?
   customerName            String?       @map("customer_name")
   phone                   String?
   shipFullName            String?       @map("ship_full_name")
@@ -361,6 +362,8 @@ model Order {
   deliveredAt             DateTime?     @map("delivered_at") @db.Timestamptz(3)
   cancelledAt             DateTime?     @map("cancelled_at") @db.Timestamptz(3)
   expiredAt               DateTime?     @map("expired_at") @db.Timestamptz(3)
+  // Set once by the expired order PII purge (spec 0008), never cleared. Only on expired orders.
+  piiPurgedAt             DateTime?     @map("pii_purged_at") @db.Timestamptz(3)
   createdAt               DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt               DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -381,6 +384,8 @@ model Order {
   @@index([customerId])
   @@index([cartId])
   @@index([discountCodeId])
+  // Only orders still waiting for the purge, so the daily run reads just its backlog.
+  @@index([expiredAt], map: "orders_purge_due_idx", where: raw("status = 'expired'::order_status AND pii_purged_at IS NULL"))
   @@map("orders")
 }
 

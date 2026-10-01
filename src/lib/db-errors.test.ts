@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { uniqueViolation } from "./db-errors";
+import { pgErrorCode, uniqueViolation } from "./db-errors";
 
 function adapterError(code: string, message: string) {
   return Object.assign(new Error("query failed"), {
@@ -21,5 +21,17 @@ describe("uniqueViolation", () => {
     expect(uniqueViolation(adapterError("23514", 'violates check constraint "x"'))).toBeNull();
     expect(uniqueViolation(new Error("boom"))).toBeNull();
     expect(uniqueViolation(null)).toBeNull();
+  });
+});
+
+describe("pgErrorCode", () => {
+  it("returns the SQLSTATE of a Postgres error", () => {
+    expect(pgErrorCode(adapterError("23514", 'violates check constraint "x"'))).toBe("23514");
+  });
+
+  it("returns null for an error that did not come from Postgres", () => {
+    expect(pgErrorCode(new Error("boom"))).toBeNull();
+    expect(pgErrorCode({ meta: {} })).toBeNull();
+    expect(pgErrorCode(null)).toBeNull();
   });
 });

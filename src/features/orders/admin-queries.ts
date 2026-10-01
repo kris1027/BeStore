@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { ActorType, OrderEventType, OrderStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
+import { logEmailMissing } from "@/lib/orders/log";
 import {
   type DeliveryAddress,
   deliveryAddressColumns,
@@ -35,7 +36,10 @@ export type AdminOrderRow = {
   readonly id: string;
   readonly number: number;
   readonly createdAt: Date;
-  readonly email: string;
+  // null only on a purged order (piiPurgedAt set); anything else is a bug the list shows (AC-9).
+  readonly email: string | null;
+  // spec 0008, AC-8: set once the PII purge blanked this expired order.
+  readonly piiPurgedAt: Date | null;
   readonly status: OrderStatus;
   readonly needsAttention: boolean;
   readonly itemCount: number;
@@ -66,6 +70,7 @@ export async function getAdminOrders(params: AdminOrdersParams): Promise<AdminOr
       number: true,
       createdAt: true,
       email: true,
+      piiPurgedAt: true,
       status: true,
       needsAttention: true,
       currency: true,
@@ -77,6 +82,10 @@ export async function getAdminOrders(params: AdminOrdersParams): Promise<AdminOr
   });
   const page = orders.slice(0, ADMIN_ORDERS_PAGE_SIZE);
   const last = page.at(-1);
+  // spec 0008, AC-9: one broken row shows "Email missing" instead of taking the list down.
+  for (const order of page) {
+    if (order.email === null && order.piiPurgedAt === null) logEmailMissing(order.id);
+  }
   return {
     rows: page.map(({ lines, shipFullName, shipCity, ...order }) => ({
       ...order,
@@ -91,7 +100,9 @@ export type AdminOrderDetail = {
   readonly number: number;
   readonly status: OrderStatus;
   readonly needsAttention: boolean;
-  readonly email: string;
+  // null only when piiPurgedAt is set: the query throws otherwise (spec 0008, AC-9).
+  readonly email: string | null;
+  readonly piiPurgedAt: Date | null;
   readonly currency: string;
   readonly subtotalCents: number;
   readonly discountCents: number;
@@ -143,6 +154,7 @@ export async function getAdminOrder(numberParam: unknown): Promise<AdminOrderDet
       status: true,
       needsAttention: true,
       email: true,
+      piiPurgedAt: true,
       currency: true,
       subtotalCents: true,
       discountCents: true,
@@ -182,6 +194,10 @@ export async function getAdminOrder(numberParam: unknown): Promise<AdminOrderDet
     },
   });
   if (!order) return null;
+  // spec 0008, AC-9: the CHECK on orders keeps the email until the purge runs.
+  if (order.email === null && order.piiPurgedAt === null) {
+    throw new Error(`Order ${order.number} has no email and was never purged`);
+  }
 
   const {
     stripeCheckoutSessionId: sessionId,

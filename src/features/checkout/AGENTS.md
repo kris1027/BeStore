@@ -23,6 +23,7 @@ Everything from `/checkout` to the order confirmation. The customer types their 
 - Expected failures are `StartCheckoutError` codes. A validation refusal returns a `fields` map with the same messages the form shows, and the form focuses the first invalid field. Every field missing or of the wrong type still gets its own message.
 - Every schema transform must be safe to run twice: `handleSubmit` sends the parsed output and the server parses it again.
 - The address travels as one `ShipTo` value, saved with `deliveryColumns` and sent to Stripe as `payment_intent_data.shipping`. Empty optional keys are left out, never sent as `""`.
+- `orders.email` can be null on an order purged under spec 0008. `checkoutPrefill` never reaches one (the purge clears `cart_id`) and returns null with `order.email_missing` if it ever sees a null email; `getCompletion` throws on a paid order without one.
 - `getCompletion` is read only. It asks Stripe through `sessionState` only while the order is still pending, and it never changes an order.
 - Logs carry order ids, numbers, amounts and field names only, never an email, name, address, postal code, phone or a Zod error. Use the key `stripeCode`, not `code`, because the logger redacts `code`.
 
@@ -44,5 +45,6 @@ Everything from `/checkout` to the order confirmation. The customer types their 
 
 - [0006 Card payment and paid orders](../../../docs/specs/0006-card-payment-paid-orders/index.md)
 - [0007 Shipping address and flat rate](../../../docs/specs/0007-shipping-address-flat-rate/index.md)
+- [0008 Purge PII from expired orders](../../../docs/specs/0008-purge-expired-order-pii/index.md)
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._

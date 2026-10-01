@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 import type { AdminOrderDetail as Detail } from "../admin-queries";
 import { adminOrdersPath } from "./admin-orders-list";
 import { NeedsAttentionBadge, orderStatusLabels, OrderStatusBadge } from "./order-status-badge";
+import { OrderEmail, PersonalDataField } from "./personal-data";
 
 type Event = Detail["events"][number];
 
@@ -187,10 +188,16 @@ export function AdminOrderDetail({
           <CardContent>
             <dl className="flex flex-col gap-3 text-sm">
               <DetailRow label="Email">
-                <span className="break-all">{order.email}</span>
+                <OrderEmail order={order} placement="detail" dateFormat={dateFormat} />
               </DetailRow>
               <DetailRow label="Delivery address">
-                <DeliveryAddress address={order.address} phone={order.phone} />
+                <PersonalDataField
+                  purgedAt={order.piiPurgedAt}
+                  placement="detail"
+                  dateFormat={dateFormat}
+                >
+                  <DeliveryAddress address={order.address} phone={order.phone} />
+                </PersonalDataField>
               </DetailRow>
               <DetailRow label="Status">{orderStatusLabels[order.status]}</DetailRow>
               <DetailRow label="Created">{formatDateTime(order.createdAt, dateFormat)}</DetailRow>

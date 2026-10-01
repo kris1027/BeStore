@@ -79,8 +79,22 @@ describe("getCompletion", () => {
 
   it("shows not completed for an expired order", async () => {
     const { order } = await seedPendingOrder({ sessionId: "cs_test_old" });
-    await testDb.order.update({ where: { id: order.id }, data: { status: "expired" } });
+    await testDb.order.update({
+      where: { id: order.id },
+      data: { status: "expired", expiredAt: new Date() },
+    });
 
     expect(await getCompletion("cs_test_old")).toEqual({ state: "not_completed" });
+  });
+
+  // spec 0008, AC-9: answered before the null email is ever read.
+  it("shows not completed for a purged order", async () => {
+    const { order } = await seedPendingOrder({ sessionId: "cs_test_purged" });
+    await testDb.order.update({
+      where: { id: order.id },
+      data: { status: "expired", expiredAt: new Date(), email: null, piiPurgedAt: new Date() },
+    });
+
+    expect(await getCompletion("cs_test_purged")).toEqual({ state: "not_completed" });
   });
 });

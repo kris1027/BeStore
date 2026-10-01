@@ -12,6 +12,12 @@ export function logOrderPaid(order: PaidOrder) {
   if (order.mismatch) logAmountMismatch(order.orderId, order.mismatch);
 }
 
+// spec 0008, AC-9: an order with no email that was never purged, which the CHECK on orders
+// forbids. Both the confirmation page and the admin orders list log it. The order id only.
+export function logEmailMissing(orderId: string) {
+  logger.error({ event: "order.email_missing", orderId }, "order.email_missing");
+}
+
 export function logOrderExpired(orderId: string, reason: string) {
   logger.info({ event: "order.expired", orderId, reason }, "order.expired");
 }

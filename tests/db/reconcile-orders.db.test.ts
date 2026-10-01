@@ -286,7 +286,10 @@ describe("GET /api/cron/reconcile-orders", () => {
       createdAt: twoHoursAgo(),
     });
     mocks.retrieve.mockImplementation(async () => {
-      await testDb.order.update({ where: { id: order.id }, data: { status: "expired" } });
+      await testDb.order.update({
+        where: { id: order.id },
+        data: { status: "expired", expiredAt: new Date() },
+      });
       return { id: "cs_test_stale", status: "complete", payment_status: "paid" };
     });
     mocks.list.mockReturnValue(
