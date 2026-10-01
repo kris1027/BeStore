@@ -105,3 +105,54 @@ export type ShippingAddress = z.output<ReturnType<typeof shippingAddressSchema>>
 export function countryDisplayName(code: string, locale: string): string {
   return new Intl.DisplayNames([locale], { type: "region" }).of(code) ?? code;
 }
+
+// An order's stored address, as the order pages show it.
+export type DeliveryAddress = {
+  readonly fullName: string;
+  readonly line1: string;
+  readonly line2: string | null;
+  readonly postalCode: string;
+  readonly city: string;
+  readonly countryName: string;
+};
+
+// The Prisma select for the order columns deliveryAddress reads.
+export const deliveryAddressColumns = {
+  shipFullName: true,
+  shipLine1: true,
+  shipLine2: true,
+  shipPostalCode: true,
+  shipCity: true,
+  shipCountryCode: true,
+} as const;
+
+export type DeliveryAddressRow = {
+  readonly [K in keyof typeof deliveryAddressColumns]: string | null;
+};
+
+// An order row with its ship* columns folded into one `address`, so the raw columns never reach
+// the page beside it. address is null for an order made before spec 0007, which has none (AC-11,
+// AC-13); line2 is the only column that may be null on an order that has one.
+export function withDeliveryAddress<Row extends DeliveryAddressRow>(
+  row: Row,
+  locale: string,
+): Omit<Row, keyof DeliveryAddressRow> & { readonly address: DeliveryAddress | null } {
+  const { shipFullName, shipLine1, shipLine2, shipPostalCode, shipCity, shipCountryCode, ...rest } =
+    row;
+  const address =
+    shipFullName !== null &&
+    shipLine1 !== null &&
+    shipPostalCode !== null &&
+    shipCity !== null &&
+    shipCountryCode !== null
+      ? {
+          fullName: shipFullName,
+          line1: shipLine1,
+          line2: shipLine2,
+          postalCode: shipPostalCode,
+          city: shipCity,
+          countryName: countryDisplayName(shipCountryCode, locale),
+        }
+      : null;
+  return { ...rest, address };
+}

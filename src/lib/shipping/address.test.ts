@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizePostalCode, shippingAddressSchema } from "./address";
+import { normalizePostalCode, withDeliveryAddress, shippingAddressSchema } from "./address";
 
 // spec 0007, AC-2 and Validation messages.
 
@@ -162,4 +162,43 @@ describe("shippingAddressSchema", () => {
       new Set(["fullName", "line1", "postalCode", "city", "phone"]),
     );
   });
+});
+
+describe("withDeliveryAddress", () => {
+  const row = {
+    number: 1001,
+    shipFullName: "Anna Kowalska",
+    shipLine1: "ul. Marszałkowska 1",
+    shipLine2: null,
+    shipPostalCode: "00-950",
+    shipCity: "Warsaw",
+    shipCountryCode: "PL",
+  };
+
+  it("folds the ship columns into one address named in the store locale", () => {
+    expect(withDeliveryAddress(row, "en")).toEqual({
+      number: 1001,
+      address: {
+        fullName: "Anna Kowalska",
+        line1: "ul. Marszałkowska 1",
+        line2: null,
+        postalCode: "00-950",
+        city: "Warsaw",
+        countryName: "Poland",
+      },
+    });
+    expect(withDeliveryAddress(row, "pl").address?.countryName).toBe("Polska");
+  });
+
+  // An order made before spec 0007 has every column null; any required column missing means no
+  // address, never a half filled one.
+  it.each(["shipFullName", "shipLine1", "shipPostalCode", "shipCity", "shipCountryCode"])(
+    "has no address when %s is null",
+    (column) => {
+      expect(withDeliveryAddress({ ...row, [column]: null }, "en")).toEqual({
+        number: 1001,
+        address: null,
+      });
+    },
+  );
 });

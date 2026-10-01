@@ -5,7 +5,11 @@ import { z } from "zod";
 import type { ActorType, OrderEventType, OrderStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
-import { countryDisplayName } from "@/lib/shipping/address";
+import {
+  type DeliveryAddress,
+  deliveryAddressColumns,
+  withDeliveryAddress,
+} from "@/lib/shipping/address";
 import { stripeDashboardUrl } from "@/lib/stripe";
 
 // Not cached: the admin always sees the live tables. Callers run requireAdmin() first.
@@ -97,14 +101,7 @@ export type AdminOrderDetail = {
   readonly paidAt: Date | null;
   readonly phone: string | null;
   // null for an order made before spec 0007 (AC-11: "No address recorded").
-  readonly address: {
-    readonly fullName: string;
-    readonly line1: string;
-    readonly line2: string | null;
-    readonly postalCode: string;
-    readonly city: string;
-    readonly countryName: string;
-  } | null;
+  readonly address: DeliveryAddress | null;
   readonly stripe: {
     readonly sessionId: string | null;
     readonly sessionUrl: string | null;
@@ -154,12 +151,7 @@ export async function getAdminOrder(numberParam: unknown): Promise<AdminOrderDet
       createdAt: true,
       paidAt: true,
       phone: true,
-      shipFullName: true,
-      shipLine1: true,
-      shipLine2: true,
-      shipPostalCode: true,
-      shipCity: true,
-      shipCountryCode: true,
+      ...deliveryAddressColumns,
       stripeCheckoutSessionId: true,
       stripePaymentIntentId: true,
       lines: {
@@ -194,31 +186,10 @@ export async function getAdminOrder(numberParam: unknown): Promise<AdminOrderDet
   const {
     stripeCheckoutSessionId: sessionId,
     stripePaymentIntentId: paymentIntentId,
-    shipFullName,
-    shipLine1,
-    shipLine2,
-    shipPostalCode,
-    shipCity,
-    shipCountryCode,
     ...rest
-  } = order;
+  } = withDeliveryAddress(order, env.STORE_LOCALE);
   return {
     ...rest,
-    address:
-      shipFullName !== null &&
-      shipLine1 !== null &&
-      shipPostalCode !== null &&
-      shipCity !== null &&
-      shipCountryCode !== null
-        ? {
-            fullName: shipFullName,
-            line1: shipLine1,
-            line2: shipLine2,
-            postalCode: shipPostalCode,
-            city: shipCity,
-            countryName: countryDisplayName(shipCountryCode, env.STORE_LOCALE),
-          }
-        : null,
     stripe: {
       sessionId,
       sessionUrl: sessionId === null ? null : stripeDashboardUrl({ sessionId }),

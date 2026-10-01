@@ -6,7 +6,11 @@ import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { sessionState } from "@/lib/orders/session-state";
 import { PLACEHOLDER_IMAGE, productImageUrl } from "@/lib/product-image";
-import { countryDisplayName } from "@/lib/shipping/address";
+import {
+  type DeliveryAddress,
+  deliveryAddressColumns,
+  withDeliveryAddress,
+} from "@/lib/shipping/address";
 import { stripe } from "@/lib/stripe";
 
 import { maskEmail } from "./mask-email";
@@ -40,15 +44,6 @@ export async function checkoutPrefill(cartId: string): Promise<CheckoutPrefill |
     phone: order.phone ?? "",
   };
 }
-
-export type DeliveryAddress = {
-  readonly fullName: string;
-  readonly line1: string;
-  readonly line2: string | null;
-  readonly postalCode: string;
-  readonly city: string;
-  readonly countryName: string;
-};
 
 export type CompletedOrder = {
   readonly number: number;
@@ -93,12 +88,7 @@ export async function getCompletion(sessionIdParam: unknown): Promise<Completion
       subtotalCents: true,
       shippingCents: true,
       totalCents: true,
-      shipFullName: true,
-      shipLine1: true,
-      shipLine2: true,
-      shipPostalCode: true,
-      shipCity: true,
-      shipCountryCode: true,
+      ...deliveryAddressColumns,
       lines: {
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         select: {
@@ -137,39 +127,13 @@ export async function getCompletion(sessionIdParam: unknown): Promise<Completion
     }
   }
 
-  const {
-    email,
-    lines,
-    shipFullName,
-    shipLine1,
-    shipLine2,
-    shipPostalCode,
-    shipCity,
-    shipCountryCode,
-    ...rest
-  } = order;
-  const address =
-    shipFullName !== null &&
-    shipLine1 !== null &&
-    shipPostalCode !== null &&
-    shipCity !== null &&
-    shipCountryCode !== null
-      ? {
-          fullName: shipFullName,
-          line1: shipLine1,
-          line2: shipLine2,
-          postalCode: shipPostalCode,
-          city: shipCity,
-          countryName: countryDisplayName(shipCountryCode, env.STORE_LOCALE),
-        }
-      : null;
+  const { email, lines, ...rest } = withDeliveryAddress(order, env.STORE_LOCALE);
   return {
     state: "paid",
     order: {
       ...rest,
       status: order.status,
       maskedEmail: maskEmail(email),
-      address,
       lines: lines.map(({ imagePath, ...line }) => ({
         ...line,
         imageSrc: imagePath === null ? PLACEHOLDER_IMAGE : productImageUrl(imagePath),
