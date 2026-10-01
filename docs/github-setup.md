@@ -39,7 +39,7 @@ GitHub's unused default labels are removed. Existing `documentation` and `enhanc
 
 ## Main branch rules
 
-The active `Protect main` ruleset targets `refs/heads/main`. It requires a pull request and the GitHub Actions `check` job, with the PR branch up to date with `main`. It blocks force pushes and deletion. Required approving reviews: zero, so the solo developer can merge after CI. CodeRabbit is advisory. No bypass actors are configured.
+The active `Protect main` ruleset targets `refs/heads/main`. It requires a pull request and the GitHub Actions `check` job, with the PR branch up to date with `main`. It blocks force pushes and deletion. Required approving reviews: zero, so the solo developer can merge after CI. No bypass actors are configured.
 
 ## README
 

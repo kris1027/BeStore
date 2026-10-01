@@ -18,6 +18,7 @@ The guest cart: add to cart, `/cart` with quantity and remove, the header count,
 - Only server actions set the cookie. Every cart write renews the cookie and `carts.expires_at` together (30 days).
 - Writes lock the cart row (`SELECT ... FOR UPDATE`) so concurrent adds cannot pass a line's cap: the variant's stock or 10 (`lineCap` in `src/lib/availability.ts`).
 - A line action only touches lines of the cart named by the verified cookie; a line id from another cart answers `not_found`.
+- `/cart` never prices delivery itself: the delivery row, total and free delivery nudge come from `getShippingSettings()` (cached, `storeSettingsTag`) through `orderCharges` and `freeDeliveryGapCents` in `src/lib/shipping/rule.ts` (spec 0007).
 - Rendering a cart never writes. Line flags ("No longer available", "Sold out", "Only N left") are computed at read time, never stored.
 - The cron deletes in batches of 1000 until a batch deletes nothing; lines cascade, orders keep their row with `cart_id` null.
 - Logs: `cart.cookie.invalid` (warn, never the cookie value) and `cron.expired_carts` (count only).

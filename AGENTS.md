@@ -37,6 +37,7 @@ pnpm build
 pnpm lint && pnpm typecheck
 pnpm format                  # Prettier; format:check in CI
 pnpm test                    # Vitest unit + integration (*.test.ts beside the source)
+pnpm test:db                 # Vitest db project against TEST_DATABASE_URL (needs pnpm db:start)
 pnpm test:e2e                # Playwright e2e (tests/e2e/*.spec.ts)
 ```
 
@@ -69,7 +70,6 @@ Installed:
 - ESLint (Next.js config, `@typescript-eslint/no-explicit-any: error`) + Prettier with `prettier-plugin-tailwindcss`; scripts `format`, `format:check`, `test`, `test:e2e`. Prettier skips `*.md` on purpose (skills and `next dev` own those files).
 - Pre commit (simple-git-hooks + lint-staged): lint and format staged files, then `pnpm typecheck`. `SKIP_SIMPLE_GIT_HOOKS=1` bypasses it in an emergency.
 - CI: [.github/workflows/ci.yml](.github/workflows/ci.yml), on pushes to `main` and on every PR: install, lint, format check, typecheck, Vitest (Playwright once flows exist).
-- CodeRabbit reviews every PR. [.coderabbit.yaml](.coderabbit.yaml) skips `.agents/**` and `.claude/skills/**`: those skills are vendored and overwritten on update, so their defects go upstream.
 
 ## Git
 
@@ -98,6 +98,9 @@ MCP servers: Supabase (connected), Stripe (connected), Vercel (connected), Playw
 - [emails/AGENTS.md](emails/AGENTS.md): React Email templates sent through Resend
 - [src/features/catalog/AGENTS.md](src/features/catalog/AGENTS.md): products, variants, the admin create form, cached storefront reads
 - [src/features/cart/AGENTS.md](src/features/cart/AGENTS.md): the signed cart cookie, cart actions and caps, the expired cart cron
+- [src/features/checkout/AGENTS.md](src/features/checkout/AGENTS.md): the checkout form, `startCheckout` and the Stripe session, the confirmation page
 - [src/features/orders/AGENTS.md](src/features/orders/AGENTS.md): the Stripe webhook, order transitions, the reconcile cron, admin orders
+- [src/features/settings/AGENTS.md](src/features/settings/AGENTS.md): the admin settings page, the shipping fee and free delivery threshold
+- [src/lib/shipping/AGENTS.md](src/lib/shipping/AGENTS.md): the shared delivery fee rule, address schema and settings reads
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._

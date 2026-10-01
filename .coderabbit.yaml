@@ -1,6 +1,0 @@
-# Agent skills are copied in from upstream repos (see "Agent skills" in AGENTS.md) and
-# overwritten on update, so review findings there belong upstream, not in this repo.
-reviews:
-  path_filters:
-    - "!.agents/**"
-    - "!.claude/skills/**"
