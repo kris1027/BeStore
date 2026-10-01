@@ -21,7 +21,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 20 | One Stripe session state | Slice 1 follow up | done |
 | 21 | Report Stripe skill doc bugs upstream | Slice 1 follow up | done |
 | 8 | Shipping address & flat rate | Slice 2 | done |
-| 22 | Purge PII from expired orders | Slice 2 follow up | planned |
+| 22 | Purge PII from expired orders | Slice 2 follow up | in-progress |
 | 9 | Admin catalog management | Slice 3 | planned |
 | 10 | Admin order management | Slice 4 | planned |
 | 11 | Order emails | Slice 5 | planned |
@@ -165,11 +165,18 @@ spec [0007](../specs/0007-shipping-address-flat-rate/index.md) · code in `src/l
 
 ## Slice 2 follow ups (from spec 0007)
 
-### 22. Purge PII from expired orders
+### 22. Purge PII from expired orders · in-progress
 Orders that expire without payment keep the customer's name, address, phone and email. A daily cron blanks them once an order has been expired for a set number of days, in line with the privacy policy from feature 16. from spec 0007
 **Done when:** orders expired longer than the retention period hold no name, address, phone or email, paid orders are never touched, and the cron refuses calls without `CRON_SECRET`.
-- [ ] Design it (spec): `/architect purge PII from expired orders`
-- [ ] Build it: `/develop purge PII from expired orders`
+spec [0008](../specs/0008-purge-expired-order-pii/index.md) · code in `src/features/orders/`
+- [x] Design it (spec): `/architect purge PII from expired orders`
+- [x] Build it: `/develop purge PII from expired orders`
+  - [x] Migration (nullable email, `pii_purged_at`, CHECKs, partial index) and the nullable email ripple through readers and fixtures (AC-3, AC-9)
+  - [x] Purge function, cron route, `vercel.json` schedule and logs (AC-1, AC-2, AC-4, AC-5, AC-6, AC-7, AC-10)
+  - [x] Admin list and detail show "Personal data removed" (AC-8)
+  - [x] Safety net: DB tests for the purge, guards, overlap and failure; e2e with axe for a purged order (AC-1 to AC-9)
+- [ ] Verify it: `/check verify purge PII from expired orders`
+- [ ] Test it: `/test purge PII from expired orders`
 
 ## Slice 3: Catalog
 
@@ -254,6 +261,7 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Product reviews**: customer ratings on product pages · needs a decision
 - **Wishlist**: save products for later · needs a decision
 - **Dark mode**: a dark token set with its own contrast pass and a theme switch; the semantic tokens rule keeps it a token change · needs a decision · from spec 0003
+- **Redact customer data at Stripe**: remove the name, email and address Stripe keeps on expired Checkout Sessions, if its redaction tooling fits · needs a decision · from spec 0008
 
 ## Legend
 
