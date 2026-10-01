@@ -175,8 +175,8 @@ spec [0008](../specs/0008-purge-expired-order-pii/index.md) · code in `src/feat
   - [x] Purge function, cron route, `vercel.json` schedule and logs (AC-1, AC-2, AC-4, AC-5, AC-6, AC-7, AC-10)
   - [x] Admin list and detail show "Personal data removed" (AC-8)
   - [x] Safety net: DB tests for the purge, guards, overlap and failure; e2e with axe for a purged order (AC-1 to AC-9)
-- [ ] Verify it: `/check verify purge PII from expired orders`
-- [ ] Test it: `/test purge PII from expired orders`
+- [x] Verify it: `/check verify purge PII from expired orders`
+- [x] Test it: `/test purge PII from expired orders`
 
 ## Slice 3: Catalog
 
