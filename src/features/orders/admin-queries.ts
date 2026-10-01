@@ -5,14 +5,13 @@ import { z } from "zod";
 import type { ActorType, OrderEventType, OrderStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
+import { logEmailMissing } from "@/lib/orders/log";
 import {
   type DeliveryAddress,
   deliveryAddressColumns,
   withDeliveryAddress,
 } from "@/lib/shipping/address";
 import { stripeDashboardUrl } from "@/lib/stripe";
-
-import { logEmailMissing } from "./log";
 
 // Not cached: the admin always sees the live tables. Callers run requireAdmin() first.
 

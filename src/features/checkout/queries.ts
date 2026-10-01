@@ -4,6 +4,7 @@ import type Stripe from "stripe";
 
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
+import { logEmailMissing } from "@/lib/orders/log";
 import { sessionState } from "@/lib/orders/session-state";
 import { PLACEHOLDER_IMAGE, productImageUrl } from "@/lib/product-image";
 import {
@@ -13,7 +14,6 @@ import {
 } from "@/lib/shipping/address";
 import { stripe } from "@/lib/stripe";
 
-import { logEmailMissing } from "./log";
 import { maskEmail } from "./mask-email";
 import { type CheckoutPrefill, sessionIdSchema } from "./schemas";
 

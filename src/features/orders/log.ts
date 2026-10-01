@@ -96,9 +96,3 @@ export function logPurgeExpiredOrdersFailed(
     "cron.purge_expired_orders_failed",
   );
 }
-
-// spec 0008, AC-9: an order with no email that was never purged, which the CHECK on orders
-// forbids. The order id only.
-export function logEmailMissing(orderId: string) {
-  logger.error({ event: "order.email_missing", orderId }, "order.email_missing");
-}
