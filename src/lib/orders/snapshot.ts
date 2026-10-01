@@ -1,4 +1,4 @@
-import { type ShippingSettings, shippingCents } from "@/lib/shipping/rule";
+import { orderCharges, type ShippingSettings } from "@/lib/shipping/rule";
 
 // Pure: the live cart lines, read under the cart lock, frozen into order lines and totals
 // (spec 0006, Value sourcing). Nothing here reads a price or a fee from anywhere but its input.
@@ -43,12 +43,10 @@ export function snapshotOrder(
   }));
   const subtotalCents = lines.reduce((sum, line) => sum + line.lineTotalCents, 0);
   const discountCents = NO_DISCOUNT_CENTS;
-  const shipping = shippingCents({ subtotalCents, discountCents }, settings);
   return {
     lines,
     subtotalCents,
     discountCents,
-    shippingCents: shipping,
-    totalCents: subtotalCents - discountCents + shipping,
+    ...orderCharges({ subtotalCents, discountCents }, settings),
   };
 }

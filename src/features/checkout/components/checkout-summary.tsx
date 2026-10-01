@@ -12,7 +12,7 @@ import { loadCart } from "@/lib/cart/load-cart";
 import { env } from "@/lib/env";
 import { NO_DISCOUNT_CENTS } from "@/lib/orders/snapshot";
 import { countryDisplayName } from "@/lib/shipping/address";
-import { shippingCents } from "@/lib/shipping/rule";
+import { orderCharges } from "@/lib/shipping/rule";
 import { getShippingSettings } from "@/lib/shipping/settings";
 
 import { checkoutPrefill } from "../queries";
@@ -35,11 +35,10 @@ export async function CheckoutSummary({
   if (!cart || !cart.canCheckout) redirect(cartPath);
   const cancelled = params.cancelled === "1";
   const [settings, prefill] = await Promise.all([getShippingSettings(), checkoutPrefill(cart.id)]);
-  const shipping = shippingCents(
+  const { shippingCents: shipping, totalCents } = orderCharges(
     { subtotalCents: cart.subtotalCents, discountCents: NO_DISCOUNT_CENTS },
     settings,
   );
-  const totalCents = cart.subtotalCents - NO_DISCOUNT_CENTS + shipping;
 
   return (
     <div className="flex flex-col gap-8">

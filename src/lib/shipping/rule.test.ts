@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { deliveryLabel, freeDeliveryGapCents, type ShippingSettings, shippingCents } from "./rule";
+import {
+  deliveryLabel,
+  freeDeliveryGapCents,
+  orderCharges,
+  type ShippingSettings,
+  shippingCents,
+} from "./rule";
 
 // spec 0007, AC-3 and AC-8.
 
@@ -37,6 +43,22 @@ describe("shippingCents", () => {
     const settings = { flatShippingCents: 0, freeShippingThresholdCents: null };
 
     expect(shippingCents(basis(1), settings)).toBe(0);
+  });
+});
+
+describe("orderCharges", () => {
+  it("adds the fee to the subtotal after the discount", () => {
+    expect(orderCharges(basis(19_999, 500), withThreshold)).toEqual({
+      shippingCents: 1500,
+      totalCents: 20_999,
+    });
+  });
+
+  it("adds nothing once delivery is free", () => {
+    expect(orderCharges(basis(20_000), withThreshold)).toEqual({
+      shippingCents: 0,
+      totalCents: 20_000,
+    });
   });
 });
 

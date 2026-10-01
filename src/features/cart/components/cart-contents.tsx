@@ -17,7 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { loadCart } from "@/lib/cart/load-cart";
 import { NO_DISCOUNT_CENTS } from "@/lib/orders/snapshot";
-import { freeDeliveryGapCents, shippingCents } from "@/lib/shipping/rule";
+import { freeDeliveryGapCents, orderCharges } from "@/lib/shipping/rule";
 import { getShippingSettings } from "@/lib/shipping/settings";
 
 import { CartLineControls } from "./cart-line-controls";
@@ -51,9 +51,8 @@ export async function CartContents() {
   }
 
   const basis = { subtotalCents: cart.subtotalCents, discountCents: NO_DISCOUNT_CENTS };
-  const shipping = shippingCents(basis, settings);
+  const { shippingCents: shipping, totalCents } = orderCharges(basis, settings);
   const gap = freeDeliveryGapCents(basis, settings);
-  const totalCents = cart.subtotalCents - NO_DISCOUNT_CENTS + shipping;
 
   return (
     <div className="grid items-start gap-10 lg:grid-cols-3">
