@@ -25,6 +25,7 @@ const noSubscription = () => () => {};
 
 const fieldIds: Record<ShippingSettingsField, string> = {
   deliveryFee: "settings-delivery-fee",
+  freeDelivery: "settings-free-delivery",
   freeDeliveryFrom: "settings-free-delivery-from",
 };
 
@@ -99,17 +100,26 @@ export function ShippingSettingsForm({
             </FieldDescription>
           )}
         </Field>
-        <Field orientation="horizontal">
+        <Field
+          orientation="horizontal"
+          data-invalid={errors.freeDelivery ? true : undefined}
+          className="flex-wrap"
+        >
           <Controller
             control={form.control}
             name="freeDelivery"
             render={({ field }) => (
               <Checkbox
-                id="settings-free-delivery"
+                id={fieldIds.freeDelivery}
                 name={field.name}
+                aria-invalid={errors.freeDelivery ? true : undefined}
+                aria-describedby={
+                  errors.freeDelivery ? `${fieldIds.freeDelivery}-error` : undefined
+                }
                 checked={field.value}
                 onCheckedChange={(checked) => {
                   field.onChange(checked);
+                  form.clearErrors("freeDelivery");
                   if (!checked) form.clearErrors("freeDeliveryFrom");
                 }}
                 onBlur={field.onBlur}
@@ -117,7 +127,14 @@ export function ShippingSettingsForm({
               />
             )}
           />
-          <FieldLabel htmlFor="settings-free-delivery">Offer free delivery</FieldLabel>
+          <FieldLabel htmlFor={fieldIds.freeDelivery}>Offer free delivery</FieldLabel>
+          {errors.freeDelivery ? (
+            <FieldError
+              id={`${fieldIds.freeDelivery}-error`}
+              className="basis-full"
+              errors={[errors.freeDelivery]}
+            />
+          ) : null}
         </Field>
         <Field
           data-invalid={freeDelivery && errors.freeDeliveryFrom ? true : undefined}

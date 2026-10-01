@@ -8,6 +8,7 @@ import { fractionDigits, parseMoney } from "@/lib/money";
 
 export const shippingSettingsFields = [
   "deliveryFee",
+  "freeDelivery",
   "freeDeliveryFrom",
 ] as const satisfies readonly (keyof ShippingSettingsValues)[];
 
@@ -30,6 +31,8 @@ function maxLabel(major: number, currency: string): string {
 export function settingsMessages(currency: string) {
   return {
     format: "Enter an amount like 9.99.",
+    // Only a crafted call reaches it: the checkbox always sends true or false.
+    freeDelivery: "Choose whether to offer free delivery.",
     feeTooHigh: `Delivery fee can be at most ${maxLabel(MAX_FEE_MAJOR, currency)}.`,
     thresholdZero: "Enter an amount above 0.",
     thresholdTooHigh: `Free delivery threshold can be at most ${maxLabel(MAX_THRESHOLD_MAJOR, currency)}.`,
@@ -46,7 +49,7 @@ export function shippingSettingsSchema(currency: string) {
     .object({
       // The field's message on the base type, so a missing or non string value reads the same.
       deliveryFee: z.string({ error: messages.format }),
-      freeDelivery: z.boolean(),
+      freeDelivery: z.boolean({ error: messages.freeDelivery }),
       // Ignored, whatever it holds, while free delivery is off.
       freeDeliveryFrom: z.string({ error: messages.format }).optional(),
     })

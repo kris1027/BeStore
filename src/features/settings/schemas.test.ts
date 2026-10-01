@@ -77,6 +77,12 @@ describe("shippingSettingsSchema", () => {
     });
   });
 
+  it.each([undefined, "true", 1])("refuses a free delivery choice of %j", (freeDelivery) => {
+    expect(errorsFor({ deliveryFee: "10", freeDelivery })).toEqual({
+      freeDelivery: "Choose whether to offer free delivery.",
+    });
+  });
+
   it("names both fields at once", () => {
     expect(errorsFor({ deliveryFee: "x", freeDelivery: true, freeDeliveryFrom: "0" })).toEqual({
       deliveryFee: "Enter an amount like 9.99.",
