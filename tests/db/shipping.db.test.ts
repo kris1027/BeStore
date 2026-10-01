@@ -114,6 +114,29 @@ describe("checkoutPrefill (AC-9)", () => {
     expect((await checkoutPrefill(cartId))?.email).toBe(winner.email);
   });
 
+  // spec 0008, AC-9: the purge drops cart_id, so a purged order leaves the cart's history.
+  it("skips a purged order and falls back to the newest one left, or to nothing", async () => {
+    const { id: cartId } = await cart();
+    const kept = await createOrder({ cartId, status: "expired", email: "kept@example.com" });
+    await testDb.order.update({
+      where: { id: kept.id },
+      data: { createdAt: new Date("2026-09-01T10:00:00Z") },
+    });
+    const purged = await createOrder({ cartId, status: "expired", email: "gone@example.com" });
+    const purge = (id: string) =>
+      testDb.order.update({
+        where: { id },
+        data: { email: null, cartId: null, piiPurgedAt: new Date() },
+      });
+    await purge(purged.id);
+
+    expect((await checkoutPrefill(cartId))?.email).toBe("kept@example.com");
+
+    await purge(kept.id);
+
+    expect(await checkoutPrefill(cartId)).toBeNull();
+  });
+
   it("prefills a null column as an empty field", async () => {
     const { id: cartId } = await cart();
     await createOrder({ cartId, email: "slice1@example.com" });

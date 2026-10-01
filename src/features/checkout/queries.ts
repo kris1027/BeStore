@@ -13,17 +13,20 @@ import {
 } from "@/lib/shipping/address";
 import { stripe } from "@/lib/stripe";
 
+import { logEmailMissing } from "./log";
 import { maskEmail } from "./mask-email";
 import { type CheckoutPrefill, sessionIdSchema } from "./schemas";
 
 // spec 0007, AC-9: what the customer typed last for this cart, from its newest order whatever its
 // status. Only the cart in the visitor's own signed cookie is ever asked for, and a paid order's
-// cart is deleted, so this never reaches a paid order. A null column prefills as an empty field.
+// cart is deleted, so this never reaches a paid order. A purged order (spec 0008) has lost its
+// cart_id, so it never comes back here either. A null column prefills as an empty field.
 export async function checkoutPrefill(cartId: string): Promise<CheckoutPrefill | null> {
   const order = await db.order.findFirst({
     where: { cartId },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     select: {
+      id: true,
       email: true,
       shipFullName: true,
       shipLine1: true,
@@ -34,6 +37,12 @@ export async function checkoutPrefill(cartId: string): Promise<CheckoutPrefill |
     },
   });
   if (!order) return null;
+  // spec 0008, AC-9: a CHECK keeps the email on every order not purged, so this is a bug. The
+  // form still opens, empty, rather than failing the checkout page.
+  if (order.email === null) {
+    logEmailMissing(order.id);
+    return null;
+  }
   return {
     email: order.email,
     fullName: order.shipFullName ?? "",
@@ -128,6 +137,9 @@ export async function getCompletion(sessionIdParam: unknown): Promise<Completion
   }
 
   const { email, lines, ...rest } = withDeliveryAddress(order, env.STORE_LOCALE);
+  // spec 0008, AC-9: only an expired order can be purged and it returned above, so a paid order
+  // without an email breaks the CHECK on orders.
+  if (email === null) throw new Error(`Order ${order.number} is paid but has no email`);
   return {
     state: "paid",
     order: {

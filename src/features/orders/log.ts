@@ -78,3 +78,27 @@ export function logReconcileOrderFailed(orderId: string, error: unknown) {
     "cron.reconcile_order_failed",
   );
 }
+
+// spec 0008, AC-6 and AC-7: counts, the error's name and its SQLSTATE only. Never its message
+// or meta, since a Postgres error detail can quote the failing row's email or address.
+export function logPurgeExpiredOrders(purged: number) {
+  logger.info({ event: "cron.purge_expired_orders", purged }, "cron.purge_expired_orders");
+}
+
+// `pgCode`, not `code`: the logger redacts any key named code.
+export function logPurgeExpiredOrdersFailed(
+  purged: number,
+  errorName: string,
+  pgCode: string | null,
+) {
+  logger.error(
+    { event: "cron.purge_expired_orders_failed", purged, errorName, pgCode },
+    "cron.purge_expired_orders_failed",
+  );
+}
+
+// spec 0008, AC-9: an order with no email that was never purged, which the CHECK on orders
+// forbids. The order id only.
+export function logEmailMissing(orderId: string) {
+  logger.error({ event: "order.email_missing", orderId }, "order.email_missing");
+}

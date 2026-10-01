@@ -15,3 +15,10 @@ export function uniqueViolation(error: unknown): string | null {
   const match = /constraint "([^"]+)"/.exec(String(cause.originalMessage ?? ""));
   return match?.[1] ?? "";
 }
+
+// The SQLSTATE of a Postgres error (e.g. 23514 for a check violation), or null when the error
+// did not come from Postgres. Safe to log, unlike the message.
+export function pgErrorCode(error: unknown): string | null {
+  const code = pgCause(error)?.originalCode;
+  return typeof code === "string" ? code : null;
+}

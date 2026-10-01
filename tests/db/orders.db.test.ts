@@ -389,7 +389,8 @@ describe("guests and customer deletion (AC-7)", () => {
       testDb.$executeRaw`
         INSERT INTO orders (id, currency, subtotal_cents, total_cents)
         VALUES (${crypto.randomUUID()}::uuid, 'EUR', 100, 100)`,
-      SQLSTATE.notNull,
+      SQLSTATE.check,
+      "orders_email_present_check",
     );
   });
 

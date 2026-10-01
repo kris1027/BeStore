@@ -543,7 +543,10 @@ describe("paying twice for one cart", () => {
     selectCart(cart.id);
     mocks.retrieve.mockImplementationOnce(async () => {
       // async_payment_failed lands between our read of the pending order and Stripe's answer.
-      await testDb.order.update({ where: { id: order.id }, data: { status: "expired" } });
+      await testDb.order.update({
+        where: { id: order.id },
+        data: { status: "expired", expiredAt: new Date() },
+      });
       return { id: "cs_test_old", status: "complete", payment_status: "unpaid" };
     });
 

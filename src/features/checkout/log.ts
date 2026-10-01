@@ -27,6 +27,11 @@ export function logCheckoutRefused(error: StartCheckoutError) {
   );
 }
 
+// spec 0008, AC-9: the same event the admin orders list logs. The order id only.
+export function logEmailMissing(orderId: string) {
+  logger.error({ event: "order.email_missing", orderId }, "order.email_missing");
+}
+
 // `stripeCode`, not `code`: the logger redacts any key named code.
 export function logStripeFailed(orderId: string, error: unknown) {
   logger.error(

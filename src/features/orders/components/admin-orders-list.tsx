@@ -23,7 +23,8 @@ import {
 import { type DateFormat, formatDate } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
-import type { AdminOrdersPage, AdminOrdersParams } from "../admin-queries";
+import type { AdminOrderRow, AdminOrdersPage, AdminOrdersParams } from "../admin-queries";
+import { emailDisplay } from "../email-display";
 import { NeedsAttentionBadge, OrderStatusBadge } from "./order-status-badge";
 
 export const adminOrdersPath = "/admin/orders";
@@ -117,9 +118,17 @@ export function AdminOrdersList({
                       </Link>
                     </TableCell>
                     <TableCell>{formatDate(order.createdAt, dateFormat)}</TableCell>
-                    <TableCell className="max-w-64 truncate">{order.email}</TableCell>
                     <TableCell className="max-w-64 truncate">
-                      {order.shipTo ?? <span className="text-muted-foreground">Not recorded</span>}
+                      <EmailCell order={order} />
+                    </TableCell>
+                    <TableCell className="max-w-64 truncate">
+                      {order.piiPurgedAt !== null ? (
+                        <span className="text-muted-foreground">Personal data removed</span>
+                      ) : (
+                        (order.shipTo ?? (
+                          <span className="text-muted-foreground">Not recorded</span>
+                        ))
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
@@ -162,6 +171,19 @@ export function AdminOrdersList({
       ) : null}
     </>
   );
+}
+
+// spec 0008, AC-8 and AC-9.
+function EmailCell({ order }: { readonly order: AdminOrderRow }) {
+  const display = emailDisplay(order);
+  switch (display.kind) {
+    case "email":
+      return display.email;
+    case "purged":
+      return <span className="text-muted-foreground">Personal data removed</span>;
+    case "missing":
+      return <span className="text-destructive">Email missing</span>;
+  }
 }
 
 function ViewLink({
