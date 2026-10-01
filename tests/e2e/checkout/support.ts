@@ -39,6 +39,8 @@ export const testAddress = {
   line1: "ul. Marszałkowska 1",
   postalCode: "00950",
   city: "Warsaw",
+  // Seeded orders only; fillCheckout leaves the optional phone empty.
+  phone: "+48 600 100 200",
 } as const;
 
 export async function fillCheckout(page: Page, email = "e2e.customer@example.com") {
@@ -92,8 +94,8 @@ export async function seedPendingOrder(
     const order = await db.query<{ id: string; number: number }>(
       `INSERT INTO orders (id, cart_id, email, currency, subtotal_cents, shipping_cents, total_cents,
          stripe_checkout_session_id, ship_full_name, ship_line1, ship_city, ship_postal_code,
-         ship_country_code, updated_at)
-       VALUES (gen_random_uuid(), $1, $2, 'EUR', $3, $4, $5, $6, $7, $8, $9, $10, $11, now())
+         ship_country_code, phone, updated_at)
+       VALUES (gen_random_uuid(), $1, $2, 'EUR', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now())
        RETURNING id, number`,
       [
         cartId,
@@ -103,8 +105,15 @@ export async function seedPendingOrder(
         total,
         sessionId,
         ...(shipping === undefined
-          ? [null, null, null, null, null]
-          : [testAddress.fullName, testAddress.line1, testAddress.city, "00-950", "PL"]),
+          ? [null, null, null, null, null, null]
+          : [
+              testAddress.fullName,
+              testAddress.line1,
+              testAddress.city,
+              "00-950",
+              "PL",
+              testAddress.phone,
+            ]),
       ],
     );
     const { id, number } = order.rows[0]!;

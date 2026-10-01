@@ -190,15 +190,8 @@ export function AdminOrderDetail({
                 <span className="break-all">{order.email}</span>
               </DetailRow>
               <DetailRow label="Delivery address">
-                <DeliveryAddress address={order.address} />
+                <DeliveryAddress address={order.address} phone={order.phone} />
               </DetailRow>
-              {order.phone !== null ? (
-                <DetailRow label="Phone">
-                  <a href={`tel:${order.phone}`} className="underline-offset-4 hover:underline">
-                    {order.phone}
-                  </a>
-                </DetailRow>
-              ) : null}
               <DetailRow label="Status">{orderStatusLabels[order.status]}</DetailRow>
               <DetailRow label="Created">{formatDateTime(order.createdAt, dateFormat)}</DetailRow>
               <DetailRow label="Paid">
@@ -259,10 +252,16 @@ function DetailRow({
   );
 }
 
-// spec 0007, AC-11.
-function DeliveryAddress({ address }: { readonly address: Detail["address"] }) {
+// spec 0007, AC-11: the phone sits inside the block, after the country.
+function DeliveryAddress({
+  address,
+  phone,
+}: {
+  readonly address: Detail["address"];
+  readonly phone: string | null;
+}) {
   if (address === null) return <span className="text-muted-foreground">No address recorded</span>;
-  return <DeliveryAddressBlock address={address} />;
+  return <DeliveryAddressBlock address={address} phone={phone} />;
 }
 
 function StripeLink({ id, href }: { readonly id: string | null; readonly href: string | null }) {

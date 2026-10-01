@@ -138,6 +138,7 @@ test("a paid order shows where it goes, to the customer and to the admin", async
   await expect(delivering).toContainText(testAddress.fullName);
   await expect(delivering).toContainText("00-950 Warsaw");
   await expect(delivering).toContainText("Poland");
+  await expect(delivering).not.toContainText(testAddress.phone);
   await expect(page.getByText("Standard delivery")).toBeVisible();
   await expect(page.getByText("€9.90")).toBeVisible();
   await expect(page.getByText("€22.40")).toBeVisible();
@@ -159,6 +160,10 @@ test("a paid order shows where it goes, to the customer and to the admin", async
   await expect(address).toContainText(testAddress.line1);
   await expect(address).toContainText("00-950 Warsaw");
   await expect(address).toContainText("Poland");
+  await expect(address.getByRole("link", { name: testAddress.phone })).toHaveAttribute(
+    "href",
+    `tel:${testAddress.phone}`,
+  );
   await expect(adminPage.getByText("Standard delivery")).toBeVisible();
   await expectNoA11yViolations(adminPage);
 });
