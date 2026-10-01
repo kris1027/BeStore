@@ -70,7 +70,6 @@ Installed:
 - ESLint (Next.js config, `@typescript-eslint/no-explicit-any: error`) + Prettier with `prettier-plugin-tailwindcss`; scripts `format`, `format:check`, `test`, `test:e2e`. Prettier skips `*.md` on purpose (skills and `next dev` own those files).
 - Pre commit (simple-git-hooks + lint-staged): lint and format staged files, then `pnpm typecheck`. `SKIP_SIMPLE_GIT_HOOKS=1` bypasses it in an emergency.
 - CI: [.github/workflows/ci.yml](.github/workflows/ci.yml), on pushes to `main` and on every PR: install, lint, format check, typecheck, Vitest (Playwright once flows exist).
-- CodeRabbit reviews every PR. [.coderabbit.yaml](.coderabbit.yaml) skips `.agents/**` and `.claude/skills/**`: those skills are vendored and overwritten on update, so their defects go upstream.
 
 ## Git
 
