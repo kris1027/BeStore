@@ -35,10 +35,10 @@ Keep the expired order row and blank only the columns that identify a person, gu
 **Implementation skills**: `prisma-client-api` (`prisma/skills`, `.agents/skills/prisma-client-api/`) · `prisma-cli` (`prisma/skills`, `.agents/skills/prisma-cli/`) · `supabase-postgres-best-practices` (`supabase/agent-skills`, `.agents/skills/supabase-postgres-best-practices/`) · `playwright-best-practices` (`.agents/skills/playwright-best-practices/`) · `accessibility` (`.agents/skills/accessibility/`)
 
 **Calls made in this spec** (pick, why, runner up):
-- **One raw SQL `UPDATE` per batch with `FOR UPDATE SKIP LOCKED` in the subquery and the due condition repeated in the outer `WHERE`**, the same shape as `deleteExpiredCarts`. Overlapping runs never block each other or purge twice, and each batch is a short statement with short locks. Runner up: Prisma `updateMany` with a `take`, which cannot lock and skip rows.
+- **One raw SQL `UPDATE` per batch, joined to a `MATERIALIZED` CTE that picks the batch with `FOR UPDATE SKIP LOCKED`, and the due condition repeated in the outer `WHERE`**. Not `id IN (subquery)`: Postgres plans that as a nested loop that rescans the locking subquery per row, skips rows the statement already updated, and so ignores the `LIMIT`. Overlapping runs never block each other or purge twice, and each batch is a short statement with short locks. Runner up: Prisma `updateMany` with a `take`, which cannot lock and skip rows.
 - **The cutoff is computed in Postgres (`now() - make_interval(days => 30)`)**, not from the server clock. One clock for `expired_at` (set by `markExpired` with `now()`) and the cutoff. Runner up: a `Date` computed in Node, which drifts from the database clock.
-- **The batch size and the batch step are parameters** (`batch` default `PURGE_BATCH = 1000`, `runBatch` default `purgeBatch`), so the database test proves the loop with a batch of 2 and fails a chosen batch by injecting a `runBatch` that throws. Runner up: a fixed constant and mocking `db.$executeRaw`, which couples the test to Prisma internals.
-- **`purgeExpiredOrders` returns `{ purged, error }` instead of throwing**, so the request wrapper can report the count already committed in the 500 and the log. Runner up: a custom error class carrying the count, which hides a normal outcome inside an exception.
+- **No test only parameters.** The batch size is the constant `PURGE_BATCH = 1000`; the database test proves the loop by seeding more due orders than one batch. The failure path and the time budget are tested by mocking or spying on the db client and spying on `performance.now`, not through test only options. Runner up: injectable `runBatch` and `budgetMs` seams, which widen the production signature for tests alone.
+- **`purgeExpiredOrders` returns `{ ok: true, purged } | { ok: false, purged, error }` instead of throwing**, so the request wrapper can report the count already committed in the 500 and the log. Runner up: a custom error class carrying the count, which hides a normal outcome inside an exception.
 - **A 50 second time budget per run, with `maxDuration = 60`.** The first run after deploy may meet a large backlog; a platform timeout would kill the function without the log or the 500. Stopping early returns a clean `200 { purged }`, and the next day continues. Runner up: a cap on batch count, which does not track how slow each batch is.
 - **Null email handling depends on the page.** Pages where a throw would block everyone (the admin list, the checkout form) degrade and log. Pages about one order (the admin detail, the paid confirmation) throw. Runner up: throw everywhere, where one bad row would take down the whole admin list.
 - **A partial index `orders_purge_due_idx` on `(expired_at) WHERE status = 'expired' AND pii_purged_at IS NULL`**, declared in Prisma with `where: raw(...)` like the existing partial unique. It stays as small as the backlog, and each run reads only due rows. Runner up: rely on `(status, created_at)`, which scans every expired order ever made.
@@ -58,13 +58,15 @@ Reasoning and options: see [rationale.md](rationale.md).
 |---|---|
 | `prisma/schema.prisma` | `Order.email String?`, `Order.piiPurgedAt DateTime? @map("pii_purged_at") @db.Timestamptz(3)`, `@@index([expiredAt], map: "orders_purge_due_idx", where: raw("status = 'expired'::order_status AND pii_purged_at IS NULL"))` (the enum cast written as Postgres normalizes it, so `migrate dev` sees no drift) |
 | `prisma/migrations/<ts>_purge_expired_order_pii/migration.sql` | in this order: `ALTER COLUMN email DROP NOT NULL`, `ADD COLUMN pii_purged_at`, the partial index (generated), then in a hand written section (CHECKs are invisible to drift detection, as in the data model migration): the `expired_at` backfill `UPDATE`, then the three CHECK constraints (AC-3) |
-| `src/features/orders/purge-expired.ts` | `EXPIRED_ORDER_PII_RETENTION_DAYS`, `PURGE_BATCH`, `PURGE_TIME_BUDGET_MS = 50_000`, `purgeBatch(batch): Promise<number>` (one statement), `purgeExpiredOrders({ batch, runBatch = purgeBatch, budgetMs }): Promise<{ purged: number; error: unknown \| null }>` (never throws; carries the count out on failure), `purgeExpiredOrdersRequest(request)` |
+| `src/features/orders/purge-expired.ts` | `EXPIRED_ORDER_PII_RETENTION_DAYS`, `PURGE_BATCH`, `PURGE_TIME_BUDGET_MS = 50_000`, `purgeBatch(): Promise<number>` (one statement, module private), `purgeExpiredOrders(): Promise<{ ok: true; purged: number } \| { ok: false; purged: number; error: unknown }>` (never throws; carries the count out on failure), `purgeExpiredOrdersRequest(request)` (no options) |
 | `src/lib/db-errors.ts` | export `pgErrorCode(error): string \| null` (the SQLSTATE at `meta.driverAdapterError.cause.originalCode`, built on the existing `pgCause`) |
-| `src/features/orders/log.ts` | `cron.purge_expired_orders` (info, `purged`), `cron.purge_expired_orders_failed` (error, `purged`, `errorName`, `pgCode`), `order.email_missing` (error, `orderId`) |
+| `src/features/orders/log.ts` | `cron.purge_expired_orders` (info, `purged`), `cron.purge_expired_orders_failed` (error, `purged`, `errorName`, `pgCode`) |
+| `src/lib/orders/log.ts` | `logEmailMissing`, `order.email_missing` (error, `orderId`): one definition, imported by both the orders and checkout features |
 | `app/api/cron/purge-expired-orders/route.ts` | thin `GET`: `await connection()`, then `purgeExpiredOrdersRequest(request)`; `export const maxDuration = 60` |
 | `vercel.json` | add `{ "path": "/api/cron/purge-expired-orders", "schedule": "0 4 * * *" }` |
 | `src/features/orders/admin-queries.ts` | select `piiPurgedAt` in the list and detail queries; `AdminOrderDetail` gains `piiPurgedAt: Date \| null` (the list row spreads the order); `email: string \| null` on both; the detail query throws on a null email when `piiPurgedAt` is null |
 | `src/features/orders/components/admin-orders-list.tsx`, `admin-order-detail.tsx` | the "Personal data removed" cells and rows, checked on `piiPurgedAt` first; "Email missing" on the list for the broken case (AC-8, AC-9) |
+| `src/features/orders/components/` (shared component) | the email and "Personal data removed" rendering used by both the list and the detail, with a render unit test |
 | `src/features/checkout/queries.ts` | `checkoutPrefill`: a null email returns null and logs `order.email_missing`; `getCompletion`: throw on a null email before `maskEmail` on the paid path (AC-9) |
 | `tests/db/fixtures.ts` | `createOrder` sets `expiredAt` when `status` is `expired`, and accepts `expiredAt` and `piiPurgedAt` overrides |
 
@@ -83,25 +85,27 @@ One migration on `orders`, no new table (so no new RLS step).
 
 Columns set to null by a purge: `email`, `customer_name`, `phone`, `ship_full_name`, `ship_line1`, `ship_line2`, `ship_city`, `ship_postal_code`, `ship_country_code`, `cart_id`, `customer_id`. The existing `orders_email_idx` stays (Postgres indexes nulls; purged rows simply hold null).
 
-The purge statement, for reference. The `::int` casts matter: through `@prisma/adapter-pg` a JS number is not guaranteed to bind as an integer, and `make_interval` accepts only one.
+The purge statement, for reference. The `::int` casts matter: through `@prisma/adapter-pg` a JS number is not guaranteed to bind as an integer, and `make_interval` accepts only one. The batch is a `MATERIALIZED` CTE because `id IN (subquery)` is planned as a nested loop that rescans the locking subquery per row and ignores the `LIMIT`.
 
 ```sql
+WITH due AS MATERIALIZED (
+  SELECT id FROM orders
+  WHERE status = 'expired' AND pii_purged_at IS NULL
+    AND expired_at < now() - make_interval(days => ${EXPIRED_ORDER_PII_RETENTION_DAYS}::int)
+  ORDER BY expired_at
+  LIMIT ${batch}::int
+  FOR UPDATE SKIP LOCKED
+)
 UPDATE orders
 SET email = NULL, customer_name = NULL, phone = NULL,
     ship_full_name = NULL, ship_line1 = NULL, ship_line2 = NULL, ship_city = NULL,
     ship_postal_code = NULL, ship_country_code = NULL,
     cart_id = NULL, customer_id = NULL,
     pii_purged_at = now(), updated_at = now()
-WHERE status = 'expired' AND pii_purged_at IS NULL
-  AND expired_at < now() - make_interval(days => ${EXPIRED_ORDER_PII_RETENTION_DAYS}::int)
-  AND id IN (
-    SELECT id FROM orders
-    WHERE status = 'expired' AND pii_purged_at IS NULL
-      AND expired_at < now() - make_interval(days => ${EXPIRED_ORDER_PII_RETENTION_DAYS}::int)
-    ORDER BY expired_at
-    LIMIT ${batch}::int
-    FOR UPDATE SKIP LOCKED
-  )
+FROM due
+WHERE orders.id = due.id
+  AND orders.status = 'expired' AND orders.pii_purged_at IS NULL
+  AND orders.expired_at < now() - make_interval(days => ${EXPIRED_ORDER_PII_RETENTION_DAYS}::int)
 ```
 
 ### State transitions
@@ -119,7 +123,7 @@ This is the one order write not guarded by `status = 'pending_payment'`; it is g
 | Surface | Kind | Key inputs | Key outputs | Auth | Key errors |
 |---|---|---|---|---|---|
 | `/api/cron/purge-expired-orders` | route handler, GET | `Authorization` header | `200 { purged: number }` | `Bearer ${CRON_SECRET}` via `isCronRequest` | 401 `{ error: "unauthorized" }`; 500 `{ error: "purge_failed", purged }` after a failed batch |
-| `purgeExpiredOrders(opts?)` | server function | `batch: number` (opt, default 1000), `runBatch` (opt, default `purgeBatch`), `budgetMs` (opt, default 50000) | `{ purged, error }` | server only | never throws; `error` is the caught database error, the request wrapper logs it and answers 500 |
+| `purgeExpiredOrders()` | server function | none | `{ ok: true, purged } \| { ok: false, purged, error }` | server only | never throws; `error` (on `ok: false`) is the caught database error, the request wrapper logs it and answers 500 |
 | `/admin/orders`, `/admin/orders/[number]` | pages | as spec 0006 | adds the "Personal data removed" text | `requireAdmin()` + proxy gate | as spec 0006 |
 
 ### Value sourcing
@@ -163,10 +167,10 @@ None new. `CRON_SECRET` already exists (spec 0005).
 - Happy path: seed expired orders 31 days and 29 days old plus a paid and a cancelled order; call the route with the secret; only the 31 day order has every listed column null and `pii_purged_at` set, its lines and totals unchanged, response `{ purged: 1 }`, verifies **AC-1**, **AC-2**, **AC-4**
 - Flagged order: an expired order with `needs_attention = true` and 31 days old is purged and keeps the flag, verifies **AC-2**
 - Database guard: a raw `UPDATE` setting `pii_purged_at` on a paid order fails with a check violation; a raw `UPDATE` setting `email = NULL` on a pending order fails, verifies **AC-3**
-- Loop and repeat: five due orders with `batch = 2` all get purged in one call; a second call returns 0, verifies **AC-4**, **AC-5**
+- Loop and repeat: `PURGE_BATCH + 1` due orders all get purged in one call (three statements); a second call returns 0, verifies **AC-4**, **AC-5**
 - Overlap: two `purgeExpiredOrders()` calls in parallel on the same due rows return totals that sum to the number of due rows, no error (one may return 0 early while the other finishes the rows it locked), verifies **AC-5**
-- Failure: a `runBatch` that calls `purgeBatch` once and then throws a Postgres error leaves the first batch purged and returns `{ purged: 2, error }`; through the request wrapper it logs `cron.purge_expired_orders_failed` with `pgCode` and answers `500 { error: "purge_failed", purged: 2 }`, verifies **AC-6**
-- Time budget: `budgetMs: 0` stops after the first batch and returns the partial count with no error, verifies **AC-4**
+- Failure: with `@/lib/db` mocked so the first batch reports 2 rows and the second throws a Postgres error, the call returns `{ ok: false, purged: 2, error }`; through the request wrapper it logs `cron.purge_expired_orders_failed` with `pgCode` and answers `500 { error: "purge_failed", purged: 2 }`, verifies **AC-6**
+- Time budget: with `performance.now` spied past `PURGE_TIME_BUDGET_MS` after the first batch, the loop stops and returns `{ ok: true, purged }` with the partial count, verifies **AC-4**
 - Auth/permission: no header and a wrong bearer each answer 401 and purge nothing, verifies **AC-4**
 - Logs: the captured pino lines for a run hold only the event name and counts, verifies **AC-7**
 - Admin UI (Playwright): a seeded purged order shows "Personal data removed" in the list (with `?view=all`) and "Personal data removed on <date>" on its page; axe passes, verifies **AC-8**
