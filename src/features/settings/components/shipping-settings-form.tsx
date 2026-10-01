@@ -16,6 +16,7 @@ import { fractionDigits } from "@/lib/money";
 import { updateShippingSettings } from "../actions/update-shipping-settings";
 import {
   type ShippingSettingsField,
+  shippingSettingsFields,
   shippingSettingsSchema,
   type ShippingSettingsValues,
 } from "../schemas";
@@ -60,7 +61,7 @@ export function ShippingSettingsForm({
         setSaved(true);
         return;
       }
-      const invalid = (Object.keys(fieldIds) as ShippingSettingsField[]).filter(
+      const invalid = shippingSettingsFields.filter(
         (field) => result.error.fields[field] !== undefined,
       );
       invalid.forEach((field, index) => {

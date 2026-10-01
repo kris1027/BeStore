@@ -6,7 +6,12 @@ import { fractionDigits, parseMoney } from "@/lib/money";
 // schema (spec 0007, AC-10). Money is typed like the catalog price field: a dot as the decimal
 // mark, converted by parseMoney without floating point math.
 
-export type ShippingSettingsField = "deliveryFee" | "freeDeliveryFrom";
+export const shippingSettingsFields = [
+  "deliveryFee",
+  "freeDeliveryFrom",
+] as const satisfies readonly (keyof ShippingSettingsValues)[];
+
+export type ShippingSettingsField = (typeof shippingSettingsFields)[number];
 
 export type ShippingSettingsFieldErrors = Partial<Record<ShippingSettingsField, string>>;
 
@@ -85,11 +90,12 @@ export function shippingSettingsSchema(currency: string) {
 
 export type ShippingSettingsValues = z.input<ReturnType<typeof shippingSettingsSchema>>;
 
+// The first message per field, in the shape the form maps onto setError.
 export function shippingSettingsFieldErrors(error: z.ZodError): ShippingSettingsFieldErrors {
   const fields: ShippingSettingsFieldErrors = {};
   for (const issue of error.issues) {
-    const [field] = issue.path;
-    if (field === "deliveryFee" || field === "freeDeliveryFrom") fields[field] ??= issue.message;
+    const field = shippingSettingsFields.find((name) => name === issue.path[0]);
+    if (field !== undefined) fields[field] ??= issue.message;
   }
   return fields;
 }
