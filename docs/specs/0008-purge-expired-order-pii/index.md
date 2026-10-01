@@ -1,7 +1,7 @@
 # 0008. Purge personal data from expired orders
 
 **Date**: 2026-10-01
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 

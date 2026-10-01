@@ -2,7 +2,7 @@
 
 ## Overview
 
-Everything after the customer presses Pay: the signed Stripe webhook that marks an order paid, the daily reconcile cron that replays lost Stripe events, and the admin order list and order page. The checkout side (the email and address form, `startCheckout`, `/checkout/complete`) lives in `src/features/checkout/`. Order writes that both features need live in `src/lib/orders/`. Governing specs: [0006 Card payment and paid orders](../../../docs/specs/0006-card-payment-paid-orders/index.md), [0007 Shipping address and flat rate](../../../docs/specs/0007-shipping-address-flat-rate/index.md) (address, phone and delivery on the admin pages).
+Everything after the customer presses Pay: the signed Stripe webhook that marks an order paid, the daily reconcile cron that replays lost Stripe events, and the admin order list and order page. The checkout side (the email and address form, `startCheckout`, `/checkout/complete`) lives in `src/features/checkout/`. Order writes that both features need live in `src/lib/orders/`. Governing specs: [0006 Card payment and paid orders](../../../docs/specs/0006-card-payment-paid-orders/index.md), [0007 Shipping address and flat rate](../../../docs/specs/0007-shipping-address-flat-rate/index.md) (address, phone and delivery on the admin pages), [0008 Purge PII from expired orders](../../../docs/specs/0008-purge-expired-order-pii/index.md).
 
 ## Files
 
@@ -10,6 +10,8 @@ Everything after the customer presses Pay: the signed Stripe webhook that marks 
 - `stripe-events.ts`: `handleStripeEvent`, the one path from a Stripe event to an order change, shared by the webhook and the cron. Also `expireCatalogTags`.
 - `event-decision.ts`: pure. The four handled `checkout.session.*` types and what each one decides.
 - `reconcile.ts`: `GET /api/cron/reconcile-orders` (daily in `vercel.json`). Replays the decisive Stripe event for pending orders older than 90 minutes. Each order's failure is caught, logged and counted as skipped, and flagged (`needs_attention`) orders are read last, so no single order can stall the batch.
+- `purge-expired.ts`: `GET /api/cron/purge-expired-orders` (daily in `vercel.json`, after reconcile). Blanks the personal data columns and the cart and customer links on orders expired more than `EXPIRED_ORDER_PII_RETENTION_DAYS` (30) ago, in `SKIP LOCKED` batches under a 50 second budget, and stamps `pii_purged_at`.
+- `email-display.ts`: pure `emailDisplay`, what an admin page shows for an order's email (the email, "Personal data removed", or "Email missing").
 - `admin-queries.ts`, `components/`: `/admin/orders` (keyset paging with `?before=<number>`, `?view=all` adds pending and expired) and `/admin/orders/[number]`.
 - `src/lib/orders/transitions.ts`: `markPaid` and `markExpired`, the only code that changes `orders.status`.
 - `src/lib/orders/snapshot.ts`, `order-image.ts`, `minimum-charge.ts`: pure order line snapshot, line image pick, per currency Stripe minimum.
@@ -26,8 +28,10 @@ Everything after the customer presses Pay: the signed Stripe webhook that marks 
 - Stock is taken on paid with a locked `LEAST` update, so it never goes below 0. A shortfall or an amount or currency mismatch still marks the order paid, sets `needs_attention` and writes an event explaining why.
 - After a paid commit, expire `catalog` and each affected `product:<slug>` tag with `revalidateTag(tag, { expire: 0 })` (route handler context).
 - Read an order's address only through `withDeliveryAddress` with `deliveryAddressColumns` (`src/lib/shipping/address.ts`); an order made before spec 0007 has none and shows "No address recorded". The phone is shown on admin pages only, inside the address block.
+- `orders.email` is nullable only because of the purge. Decide what to show on `piiPurgedAt` (through `emailDisplay`), never on a null email: a null email on an order not purged is a bug, logged as `order.email_missing` where a page must keep working and thrown where the page is about one order. CHECKs in the migration SQL (invisible to Prisma drift detection) keep the email until the purge and allow the purge only on `expired` orders.
+- The 30 day retention is the privacy policy's number (feature 16). Change `EXPIRED_ORDER_PII_RETENTION_DAYS` and the policy together; no env or setting overrides it.
 - Both admin pages call `requireAdmin()`. Dates show in `STORE_TIMEZONE`.
-- Logs carry order ids, numbers and amounts, never an email or a card detail: `order.paid`, `order.expired`, `order.stock_shortfall`, `order.amount_mismatch`, `stripe.event.processed`, `stripe.event.failed`, `stripe.webhook.invalid_signature`, `cron.reconcile_orders`, `order.reconcile_unresolved`, `cron.reconcile_stripe_failed`, `cron.reconcile_order_failed`, `cache.tag_expiry_failed`.
+- Logs carry order ids, numbers and amounts, never an email or a card detail: `order.paid`, `order.expired`, `order.stock_shortfall`, `order.amount_mismatch`, `stripe.event.processed`, `stripe.event.failed`, `stripe.webhook.invalid_signature`, `cron.reconcile_orders`, `order.reconcile_unresolved`, `cron.reconcile_stripe_failed`, `cron.reconcile_order_failed`, `cache.tag_expiry_failed`, `cron.purge_expired_orders`, `cron.purge_expired_orders_failed`, `order.email_missing`. A failed query logs its SQLSTATE through `pgErrorCode` (`src/lib/db-errors.ts`), never the Postgres message, which can quote the row.
 
 ## Tests
 

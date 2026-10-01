@@ -21,7 +21,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 20 | One Stripe session state | Slice 1 follow up | done |
 | 21 | Report Stripe skill doc bugs upstream | Slice 1 follow up | done |
 | 8 | Shipping address & flat rate | Slice 2 | done |
-| 22 | Purge PII from expired orders | Slice 2 follow up | in-progress |
+| 22 | Purge PII from expired orders | Slice 2 follow up | done |
 | 9 | Admin catalog management | Slice 3 | planned |
 | 10 | Admin order management | Slice 4 | planned |
 | 11 | Order emails | Slice 5 | planned |
@@ -165,7 +165,7 @@ spec [0007](../specs/0007-shipping-address-flat-rate/index.md) · code in `src/l
 
 ## Slice 2 follow ups (from spec 0007)
 
-### 22. Purge PII from expired orders · in-progress
+### 22. Purge PII from expired orders · done
 Orders that expire without payment keep the customer's name, address, phone and email. A daily cron blanks them once an order has been expired for a set number of days, in line with the privacy policy from feature 16. from spec 0007
 **Done when:** orders expired longer than the retention period hold no name, address, phone or email, paid orders are never touched, and the cron refuses calls without `CRON_SECRET`.
 spec [0008](../specs/0008-purge-expired-order-pii/index.md) · code in `src/features/orders/`
