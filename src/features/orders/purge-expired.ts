@@ -23,14 +23,14 @@ export const PURGE_TIME_BUDGET_MS = 50_000;
 // The batch is a MATERIALIZED CTE, not `id IN (subquery)`: Postgres plans the IN as a nested loop
 // that rescans the locking subquery per row, skips the rows this statement already updated, and
 // so ignores the LIMIT.
-export async function purgeBatch(batch: number): Promise<number> {
+async function purgeBatch(): Promise<number> {
   return db.$executeRaw`
     WITH due AS MATERIALIZED (
       SELECT id FROM orders
       WHERE status = 'expired' AND pii_purged_at IS NULL
         AND expired_at < now() - make_interval(days => ${EXPIRED_ORDER_PII_RETENTION_DAYS}::int)
       ORDER BY expired_at
-      LIMIT ${batch}::int
+      LIMIT ${PURGE_BATCH}::int
       FOR UPDATE SKIP LOCKED
     )
     UPDATE orders
@@ -45,50 +45,40 @@ export async function purgeBatch(batch: number): Promise<number> {
       AND orders.expired_at < now() - make_interval(days => ${EXPIRED_ORDER_PII_RETENTION_DAYS}::int)`;
 }
 
-export type PurgeResult = { readonly purged: number; readonly error: unknown };
+export type PurgeResult =
+  | { readonly ok: true; readonly purged: number }
+  | { readonly ok: false; readonly purged: number; readonly error: unknown };
 
-// Never throws: a failed batch comes back as `error` beside the count already committed, which
-// stays purged (each batch commits on its own). The next daily run picks up the rest.
-export type PurgeOptions = {
-  readonly batch?: number;
-  readonly runBatch?: (batch: number) => Promise<number>;
-  readonly budgetMs?: number;
-};
-
-export async function purgeExpiredOrders({
-  batch = PURGE_BATCH,
-  runBatch = purgeBatch,
-  budgetMs = PURGE_TIME_BUDGET_MS,
-}: PurgeOptions = {}): Promise<PurgeResult> {
+// Never throws: a failed batch comes back as `ok: false` with the error and the count already
+// committed, which stays purged (each batch commits on its own). The next daily run picks up the
+// rest. At least one batch always runs, so the time budget can only cut a run short between batches.
+export async function purgeExpiredOrders(): Promise<PurgeResult> {
   const start = performance.now();
   let purged = 0;
   for (;;) {
     try {
-      const count = await runBatch(batch);
+      const count = await purgeBatch();
       purged += count;
-      if (count === 0) return { purged, error: null };
+      if (count === 0) return { ok: true, purged };
     } catch (error) {
-      return { purged, error };
+      return { ok: false, purged, error };
     }
-    if (performance.now() - start >= budgetMs) return { purged, error: null };
+    if (performance.now() - start >= PURGE_TIME_BUDGET_MS) return { ok: true, purged };
   }
 }
 
-// spec 0008, AC-4: GET /api/cron/purge-expired-orders, run daily by Vercel Cron. The route
-// passes no options; tests pass them to drive the failure path.
-export async function purgeExpiredOrdersRequest(
-  request: Request,
-  options: PurgeOptions = {},
-): Promise<Response> {
+// spec 0008, AC-4: GET /api/cron/purge-expired-orders, run daily by Vercel Cron.
+export async function purgeExpiredOrdersRequest(request: Request): Promise<Response> {
   if (!isCronRequest(request)) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
-  const { purged, error } = await purgeExpiredOrders(options);
-  if (error !== null) {
+  const result = await purgeExpiredOrders();
+  if (!result.ok) {
+    const { purged, error } = result;
     const errorName = error instanceof Error ? error.name : typeof error;
     logPurgeExpiredOrdersFailed(purged, errorName, pgErrorCode(error));
     return Response.json({ error: "purge_failed", purged }, { status: 500 });
   }
-  logPurgeExpiredOrders(purged);
-  return Response.json({ purged });
+  logPurgeExpiredOrders(result.purged);
+  return Response.json({ purged: result.purged });
 }

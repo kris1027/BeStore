@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectViolation, resetDatabaseBeforeEach, SQLSTATE, testDb } from "./client";
 import { createCustomer, createOrder } from "./fixtures";
@@ -18,7 +18,8 @@ vi.mock("@/lib/logger", () => ({
 
 const {
   EXPIRED_ORDER_PII_RETENTION_DAYS,
-  purgeBatch,
+  PURGE_BATCH,
+  PURGE_TIME_BUDGET_MS,
   purgeExpiredOrders,
   purgeExpiredOrdersRequest,
 } = await import("@/features/orders/purge-expired");
@@ -26,6 +27,7 @@ const {
 resetDatabaseBeforeEach();
 
 beforeEach(() => vi.clearAllMocks());
+afterEach(() => vi.restoreAllMocks());
 
 function request(authorization?: string) {
   return new Request("http://localhost/api/cron/purge-expired-orders", {
@@ -87,6 +89,15 @@ const due = () =>
 
 async function seedDue(count: number) {
   for (let i = 0; i < count; i += 1) await due();
+}
+
+// More due orders than one batch takes, in one statement: the loop tests run the real batch size.
+async function seedManyDue(count: number) {
+  await testDb.$executeRaw`
+    INSERT INTO orders (id, status, email, currency, subtotal_cents, total_cents, expired_at)
+    SELECT gen_random_uuid(), 'expired', 'ada@example.com', 'EUR', 5000, 5000,
+      now() - make_interval(days => ${EXPIRED_ORDER_PII_RETENTION_DAYS + 1}::int)
+    FROM generate_series(1, ${count}::int)`;
 }
 
 const personalData = {
@@ -237,57 +248,59 @@ describe("GET /api/cron/purge-expired-orders", () => {
 
 describe("the purge loop", () => {
   it("purges every due order in batches, and a second run purges nothing (AC-4, AC-5)", async () => {
-    await seedDue(5);
-    const runBatch = vi.fn(purgeBatch);
+    await seedManyDue(PURGE_BATCH + 1);
+    const executeRaw = vi.spyOn(testDb, "$executeRaw");
 
-    expect(await purgeExpiredOrders({ batch: 2, runBatch })).toEqual({ purged: 5, error: null });
-    // 2 + 2 + 1, then an empty batch ends the run.
-    expect(runBatch).toHaveBeenCalledTimes(4);
-    expect(await purgeExpiredOrders()).toEqual({ purged: 0, error: null });
+    expect(await purgeExpiredOrders()).toEqual({ ok: true, purged: PURGE_BATCH + 1 });
+    // A full batch, then the one left, then an empty batch ends the run.
+    expect(executeRaw).toHaveBeenCalledTimes(3);
+    expect(await purgeExpiredOrders()).toEqual({ ok: true, purged: 0 });
   });
 
   it("stops on the time budget and leaves the rest for the next run (AC-4)", async () => {
-    await seedDue(3);
+    await seedManyDue(PURGE_BATCH + 1);
+    const now = vi
+      .spyOn(performance, "now")
+      .mockReturnValueOnce(0)
+      .mockReturnValue(PURGE_TIME_BUDGET_MS);
 
-    expect(await purgeExpiredOrders({ batch: 2, budgetMs: 0 })).toEqual({
-      purged: 2,
-      error: null,
-    });
-    expect(await purgedCount()).toBe(2);
+    expect(await purgeExpiredOrders()).toEqual({ ok: true, purged: PURGE_BATCH });
+    expect(await purgedCount()).toBe(PURGE_BATCH);
+
+    now.mockRestore();
+    expect(await purgeExpiredOrders()).toEqual({ ok: true, purged: 1 });
   });
 
+  // Over two batches' worth, so each run keeps finding rows the other holds locked and skips them.
   it("purges each due order exactly once when two runs overlap (AC-5)", async () => {
-    await seedDue(6);
+    const total = 2 * PURGE_BATCH + 500;
+    await seedManyDue(total);
 
-    const results = await Promise.all([
-      purgeExpiredOrders({ batch: 2 }),
-      purgeExpiredOrders({ batch: 2 }),
-    ]);
+    const results = await Promise.all([purgeExpiredOrders(), purgeExpiredOrders()]);
 
-    expect(results.map((result) => result.error)).toEqual([null, null]);
-    expect(results.reduce((sum, result) => sum + result.purged, 0)).toBe(6);
-    expect(await purgedCount()).toBe(6);
+    expect(results.map((result) => result.ok)).toEqual([true, true]);
+    expect(results.reduce((sum, result) => sum + result.purged, 0)).toBe(total);
+    expect(await purgedCount()).toBe(total);
   });
 
   it("keeps committed batches when a later batch fails, and answers 500 (AC-6)", async () => {
-    await seedDue(4);
-    let calls = 0;
-    const runBatch = async (batch: number) => {
-      calls += 1;
-      if (calls === 1) return purgeBatch(batch);
-      // A real Postgres error (division_by_zero), so the SQLSTATE travels as in production.
-      return testDb.$executeRaw`SELECT 1 / 0`;
-    };
+    await seedManyDue(PURGE_BATCH + 1);
+    const original = testDb.$executeRaw.bind(testDb);
+    // The first batch runs for real; the second hits a real Postgres error (division_by_zero), so
+    // the SQLSTATE travels as in production.
+    vi.spyOn(testDb, "$executeRaw")
+      .mockImplementationOnce(original)
+      .mockImplementationOnce(() => original`SELECT 1 / 0`);
 
-    const response = await purgeExpiredOrdersRequest(authorized(), { batch: 2, runBatch });
+    const response = await purgeExpiredOrdersRequest(authorized());
 
     expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ error: "purge_failed", purged: 2 });
-    expect(await purgedCount()).toBe(2);
+    expect(await response.json()).toEqual({ error: "purge_failed", purged: PURGE_BATCH });
+    expect(await purgedCount()).toBe(PURGE_BATCH);
     expect(mocks.error).toHaveBeenCalledExactlyOnceWith(
       {
         event: "cron.purge_expired_orders_failed",
-        purged: 2,
+        purged: PURGE_BATCH,
         errorName: expect.any(String),
         pgCode: "22012",
       },
@@ -295,7 +308,7 @@ describe("the purge loop", () => {
     );
     expect(mocks.info).not.toHaveBeenCalled();
     // The next run finishes the job.
-    expect(await purgeExpiredOrders()).toEqual({ purged: 2, error: null });
+    expect(await purgeExpiredOrders()).toEqual({ ok: true, purged: 1 });
   });
 });
 
