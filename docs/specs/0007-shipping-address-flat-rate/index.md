@@ -24,7 +24,7 @@ Checkout now asks where to deliver and charges one flat delivery fee, which drop
 - **AC-5**: On Pay, `startCheckout` reads `store_settings` inside the same transaction that locks the cart (never from the cache, never from the browser), computes delivery with the AC-3 rule, and creates the pending order with `ship_full_name`, `ship_line1`, `ship_line2`, `ship_city`, `ship_postal_code`, `ship_country_code` (= `STORE_COUNTRY`), `phone`, `shipping_cents`, and `total_cents = subtotal_cents - discount_cents + shipping_cents`. The Stripe minimum charge check uses that total, delivery included.
 - **AC-6**: The Stripe Checkout Session carries exactly one shipping option: `shipping_rate_data` of type `fixed_amount` with `amount = shipping_cents`, the store currency, and display name "Standard delivery" (or "Free delivery" when 0). It also carries `payment_intent_data.shipping` with the name, address (line1, line2, city, postal code, country) and phone. The session's `amount_total` equals the order's `total_cents`, so spec 0006's amount check stays quiet on every normal order.
 - **AC-7**: If an admin changes the fee or threshold while a customer is on `/checkout`, Pay charges the settings in effect at Pay; Stripe's page shows that total before anyone pays. No error is raised.
-- **AC-8**: `/cart` shows Subtotal, the delivery row (AC-4 labels, from the current settings) and Total, replacing "Shipping is added at checkout". When a threshold is set and not yet met, it also shows "Add <amount> more for free delivery" (threshold minus `subtotal - discount`).
+- **AC-8**: `/cart` shows Subtotal, the delivery row (AC-4 labels, from the current settings) and Total, replacing "Shipping is added at checkout". When a threshold is set and not yet met, it also shows "Add <amount> more for free delivery" (threshold minus `subtotal - discount`), except with a flat fee of 0, where delivery is already free (AC-3).
 - **AC-9**: Returning to `/checkout` (after cancelling on Stripe, or a reload) prefills email, address and phone from the newest order (`created_at desc, id desc`) of the cart in the signed cart cookie, whatever its status. A null column prefills as an empty field. A cart with no order shows empty fields.
 - **AC-10**: The admin nav has a "Settings" entry. `/admin/settings` shows a Shipping section with "Delivery fee" (money, required, 0.00 to 1,000.00) and "Free delivery from" (a checkbox; when checked, a money field from 0.01 to 100,000.00; unchecked stores null and ignores whatever the field holds). Money fields accept the same format as the catalog price field (`parseMoney`: a dot as the decimal mark; "9,99" shows "Enter an amount like 9.99."), and show the current values as plain decimals (e.g. `12.00`). Saving writes `store_settings`, shows the status "Shipping settings saved.", and the cart and checkout pages show the new values on their next load. The page and the action each call `requireAdmin()`.
 - **AC-11**: `/admin/orders/[number]` shows a "Delivery address" block (full name, line 1, line 2 when set, postal code and city, country name, phone when set) and labels the shipping row "Standard delivery" or "Free delivery". An order with no address (made before this feature) shows "No address recorded".
@@ -64,9 +64,10 @@ Reasoning and options: see [rationale.md](rationale.md).
 
 | Path | What |
 |---|---|
-| `src/lib/shipping/rule.ts` | pure `shippingCents({ subtotalCents, discountCents }, settings)`, `freeDeliveryGapCents(...)`, `deliveryLabel(cents)` |
-| `src/lib/shipping/address.ts` | Zod `shippingAddressSchema` (fields, limits, messages), `normalizePostalCode(country, text)`, the per country postal rule map |
-| `src/lib/shipping/settings.ts` | `import "server-only"`; `getShippingSettings()` (`'use cache'`, `cacheTag(storeSettingsTag)`), `readShippingSettings(tx)` (uncached, for Pay) |
+| `src/lib/shipping/rule.ts` | pure `shippingCents({ subtotalCents, discountCents }, settings)`, `orderCharges(...)` (fee and total), `freeDeliveryGapCents(...)`, `deliveryLabel(cents)` |
+| `src/lib/shipping/address.ts` | Zod `shippingAddressSchema` (fields, limits, messages), `normalizePostalCode(country, text)`, the per country postal rule map; `ShipTo` and `deliveryColumns` (address to order columns), `withDeliveryAddress` (order columns to address) |
+| `src/lib/shipping/settings.ts` | `import "server-only"`; `getShippingSettings()` (`'use cache'`, `cacheTag(storeSettingsTag)`), `readShippingSettings(client = db)` (uncached, for Pay and the admin form) |
+| `src/components/delivery-row.tsx`, `delivery-address.tsx` | the delivery summary row and the address block, shared by the storefront and admin |
 | `src/lib/cache-tags.ts` | add `storeSettingsTag = "store-settings"` |
 | `src/lib/orders/snapshot.ts` | `snapshotOrder(sources, settings)` computes `shippingCents` with the rule |
 | `src/lib/env.ts`, `.env.example` | `STORE_COUNTRY` |
@@ -123,7 +124,7 @@ Shared by client and server. "Empty" means empty after trimming.
 | postalCode | "Enter a postal code like 00-950." | same | same |
 | phone | allowed (null) | same (over 30 characters) | "Enter a phone number with 7 to 15 digits, or leave it empty." |
 
-Settings: "Enter an amount like 9.99." (empty or bad format) · "Delivery fee can be at most 1,000.00." · "Enter an amount above 0." (threshold of 0) · "Free delivery threshold can be at most 100,000.00." Maximums are formatted with the store currency's decimals.
+Settings: "Enter an amount like 9.99." (empty or bad format) · "Delivery fee can be at most 1,000.00." · "Enter an amount above 0." (threshold of 0) · "Free delivery threshold can be at most 100,000.00." Maximums are formatted with the store currency's decimals. A missing or non boolean `freeDelivery` (crafted requests only) gets "Choose whether to offer free delivery."
 
 A field that is missing or not a string (only a crafted request can send one) gets its own message from these tables: the Empty message, or the Format message where Empty is allowed or n/a (line 2 uses its Too long message).
 
