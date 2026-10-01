@@ -1,6 +1,7 @@
 import { ArrowLeftIcon, ExternalLinkIcon, SearchXIcon, TriangleAlertIcon } from "lucide-react";
 import Link from "next/link";
 
+import { DeliveryAddressBlock } from "@/components/delivery-address";
 import { Price } from "@/components/price";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { buttonVariants } from "@/components/ui/button";
@@ -261,17 +262,7 @@ function DetailRow({
 // spec 0007, AC-11.
 function DeliveryAddress({ address }: { readonly address: Detail["address"] }) {
   if (address === null) return <span className="text-muted-foreground">No address recorded</span>;
-  return (
-    <address className="flex flex-col not-italic">
-      <span className="font-medium">{address.fullName}</span>
-      <span>{address.line1}</span>
-      {address.line2 ? <span>{address.line2}</span> : null}
-      <span>
-        {address.postalCode} {address.city}
-      </span>
-      <span>{address.countryName}</span>
-    </address>
-  );
+  return <DeliveryAddressBlock address={address} />;
 }
 
 function StripeLink({ id, href }: { readonly id: string | null; readonly href: string | null }) {

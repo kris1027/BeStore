@@ -1,6 +1,7 @@
 import { CircleCheckIcon } from "lucide-react";
 import Link from "next/link";
 
+import { DeliveryAddressBlock } from "@/components/delivery-address";
 import { DeliveryRow } from "@/components/delivery-row";
 import { Price } from "@/components/price";
 import { ProductImage } from "@/components/product-image";
@@ -146,15 +147,7 @@ function PaidOrder({ order }: { readonly order: CompletedOrder }) {
             <h2 id="delivering-heading" className="font-heading text-2xl">
               Delivering to
             </h2>
-            <address className="flex flex-col not-italic">
-              <span className="font-medium">{order.address.fullName}</span>
-              <span>{order.address.line1}</span>
-              {order.address.line2 ? <span>{order.address.line2}</span> : null}
-              <span>
-                {order.address.postalCode} {order.address.city}
-              </span>
-              <span>{order.address.countryName}</span>
-            </address>
+            <DeliveryAddressBlock address={order.address} />
           </section>
         ) : null}
       </div>
