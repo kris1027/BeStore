@@ -7,7 +7,7 @@ import { createProductWithOptions, createSimpleProduct, inThirtyDays } from "./f
 import { eventsOf, seedPendingOrder } from "./stripe-support";
 
 // startCheckout against a real Postgres; Stripe is stubbed at src/lib/stripe.ts
-// (spec 0006, AC-1, AC-2, AC-9 and AC-17).
+// (spec 0006, AC-1, AC-2, AC-9 and AC-17; spec 0007, AC-2, AC-5, AC-6, AC-7 and AC-14).
 
 const secret = "c".repeat(32);
 
@@ -27,6 +27,8 @@ vi.mock("@/lib/env", () => ({
   env: {
     CART_COOKIE_SECRET: "c".repeat(32),
     STORE_CURRENCY: "EUR",
+    STORE_COUNTRY: "PL",
+    STORE_LOCALE: "en",
     NEXT_PUBLIC_SITE_URL: "http://localhost:3000",
     NEXT_PUBLIC_SUPABASE_URL: "https://project.supabase.co",
   },
@@ -67,6 +69,27 @@ beforeEach(() => {
   mocks.expire.mockResolvedValue({ status: "expired" });
 });
 
+const address = {
+  fullName: "Anna Kowalska",
+  line1: "ul. Marszałkowska 1",
+  line2: "",
+  postalCode: "00950",
+  city: "Warsaw",
+  phone: "",
+};
+
+// What the checkout form sends: the email plus a valid delivery address.
+function checkout(email = "a@example.com", overrides: Record<string, unknown> = {}) {
+  return { email, ...address, ...overrides };
+}
+
+async function setShipping(flatShippingCents: number, freeShippingThresholdCents: number | null) {
+  await testDb.storeSettings.update({
+    where: { id: 1 },
+    data: { flatShippingCents, freeShippingThresholdCents },
+  });
+}
+
 function selectCart(cartId: string) {
   mocks.jar.set("bestore_cart", signCartId(cartId, secret));
 }
@@ -104,7 +127,7 @@ describe("the happy path", () => {
       { variantId: simple.variant.id, quantity: 1 },
     ]);
 
-    const result = await startCheckout({ email: "  Ada@Example.COM " });
+    const result = await startCheckout(checkout("  Ada@Example.COM "));
 
     expect(result).toEqual({
       ok: true,
@@ -156,9 +179,190 @@ describe("the happy path", () => {
     const { variant } = await createSimpleProduct("a", 5);
     await cartWith([{ variantId: variant.id, quantity: 1 }]);
 
-    await startCheckout({ email: "a@example.com", totalCents: 1, priceCents: 1 });
+    await startCheckout(
+      checkout("a@example.com", { totalCents: 1, priceCents: 1, shippingCents: 0 }),
+    );
 
     expect((await testDb.order.findFirstOrThrow()).totalCents).toBe(2500);
+  });
+});
+
+async function stickerCart(priceCents: number) {
+  const product = await testDb.product.create({
+    data: { name: "Sticker", slug: "sticker", status: "active" },
+  });
+  const variant = await testDb.productVariant.create({
+    data: {
+      productId: product.id,
+      sku: "STK",
+      priceCents,
+      stockQuantity: 9,
+      position: 0,
+      optionKey: "",
+    },
+  });
+  return cartWith([{ variantId: variant.id, quantity: 1 }]);
+}
+
+function sessionParams() {
+  const [params] = mocks.create.mock.calls[0]!;
+  return params as {
+    line_items: { quantity: number; price_data: { unit_amount: number } }[];
+    shipping_options: {
+      shipping_rate_data: { fixed_amount: { amount: number }; display_name: string };
+    }[];
+    payment_intent_data: { shipping: unknown };
+  };
+}
+
+describe("delivery (spec 0007)", () => {
+  it("saves the address, the fee and a total that includes it, and sends both to Stripe", async () => {
+    await setShipping(1500, 20_000);
+    const { variant } = await createSimpleProduct("a", 5);
+    await cartWith([{ variantId: variant.id, quantity: 2 }]);
+
+    const result = await startCheckout(
+      checkout("a@example.com", { line2: " m. 4 ", phone: " +48 600 100 200 " }),
+    );
+
+    expect(result.ok).toBe(true);
+    const order = await testDb.order.findFirstOrThrow();
+    expect(order).toMatchObject({
+      shipFullName: "Anna Kowalska",
+      shipLine1: "ul. Marszałkowska 1",
+      shipLine2: "m. 4",
+      shipCity: "Warsaw",
+      shipPostalCode: "00-950",
+      shipCountryCode: "PL",
+      phone: "+48 600 100 200",
+      customerName: null,
+      subtotalCents: 5000,
+      shippingCents: 1500,
+      totalCents: 6500,
+    });
+
+    const params = sessionParams();
+    expect(params.shipping_options).toEqual([
+      {
+        shipping_rate_data: {
+          type: "fixed_amount",
+          fixed_amount: { amount: 1500, currency: "eur" },
+          display_name: "Standard delivery",
+        },
+      },
+    ]);
+    expect(params.payment_intent_data.shipping).toEqual({
+      name: "Anna Kowalska",
+      address: {
+        line1: "ul. Marszałkowska 1",
+        line2: "m. 4",
+        city: "Warsaw",
+        postal_code: "00-950",
+        country: "PL",
+      },
+      phone: "+48 600 100 200",
+    });
+    // Stripe's amount_total: the lines plus the one shipping rate.
+    const lines = params.line_items
+      .map((item) => item.quantity * item.price_data.unit_amount)
+      .reduce((sum, cents) => sum + cents, 0);
+    const shipping = params.shipping_options[0]!.shipping_rate_data.fixed_amount.amount;
+    expect(lines + shipping).toBe(order.totalCents);
+  });
+
+  it("stores an empty line 2 and phone as null and leaves them out at Stripe", async () => {
+    const { variant } = await createSimpleProduct("a", 5);
+    await cartWith([{ variantId: variant.id, quantity: 1 }]);
+
+    await startCheckout(checkout());
+
+    expect(await testDb.order.findFirstOrThrow()).toMatchObject({ shipLine2: null, phone: null });
+    expect(sessionParams().payment_intent_data.shipping).toEqual({
+      name: "Anna Kowalska",
+      address: {
+        line1: "ul. Marszałkowska 1",
+        city: "Warsaw",
+        postal_code: "00-950",
+        country: "PL",
+      },
+    });
+  });
+
+  it("delivers free once the subtotal reaches the threshold", async () => {
+    await setShipping(1500, 5000);
+    const { variant } = await createSimpleProduct("a", 5);
+    await cartWith([{ variantId: variant.id, quantity: 2 }]);
+
+    await startCheckout(checkout());
+
+    expect(await testDb.order.findFirstOrThrow()).toMatchObject({
+      subtotalCents: 5000,
+      shippingCents: 0,
+      totalCents: 5000,
+    });
+    expect(sessionParams().shipping_options[0]!.shipping_rate_data).toMatchObject({
+      fixed_amount: { amount: 0 },
+      display_name: "Free delivery",
+    });
+  });
+
+  it("charges the settings in effect at Pay, even when they changed after the page loaded", async () => {
+    await setShipping(500, null);
+    const { variant } = await createSimpleProduct("a", 5);
+    await cartWith([{ variantId: variant.id, quantity: 1 }]);
+    // The customer saw 5.00 on /checkout; an admin raises it before they press Pay.
+    await setShipping(900, null);
+
+    expect((await startCheckout(checkout())).ok).toBe(true);
+
+    expect(await testDb.order.findFirstOrThrow()).toMatchObject({
+      shippingCents: 900,
+      totalCents: 3400,
+    });
+    expect(sessionParams().shipping_options[0]!.shipping_rate_data.fixed_amount.amount).toBe(900);
+  });
+
+  it("counts delivery toward Stripe's minimum charge", async () => {
+    await setShipping(100, null);
+    await stickerCart(30);
+
+    expect((await startCheckout(checkout())).ok).toBe(true);
+    expect((await testDb.order.findFirstOrThrow()).totalCents).toBe(130);
+  });
+
+  it("refuses a request without a city or with a bad postal code, naming each field", async () => {
+    const { variant } = await createSimpleProduct("a", 5);
+    await cartWith([{ variantId: variant.id, quantity: 1 }]);
+
+    const result = await startCheckout({
+      email: "a@example.com",
+      ...address,
+      city: undefined,
+      postalCode: "00 950",
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: "validation",
+        fields: { postalCode: "Enter a postal code like 00-950.", city: expect.any(String) },
+      },
+    });
+    expect(await testDb.order.count()).toBe(0);
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("ignores a fee or country sent by the browser", async () => {
+    await setShipping(1500, null);
+    const { variant } = await createSimpleProduct("a", 5);
+    await cartWith([{ variantId: variant.id, quantity: 1 }]);
+
+    await startCheckout(checkout("a@example.com", { shippingCents: 0, countryCode: "DE" }));
+
+    expect(await testDb.order.findFirstOrThrow()).toMatchObject({
+      shippingCents: 1500,
+      shipCountryCode: "PL",
+    });
   });
 });
 
@@ -167,15 +371,18 @@ describe("refusals create nothing", () => {
     const { variant } = await createSimpleProduct("a", 5);
     await cartWith([{ variantId: variant.id, quantity: 1 }]);
 
-    const result = await startCheckout({ email: "not-an-email" });
+    const result = await startCheckout(checkout("not-an-email"));
 
-    expect(result).toEqual({ ok: false, error: { code: "validation", field: "email" } });
+    expect(result).toEqual({
+      ok: false,
+      error: { code: "validation", fields: { email: "Enter a valid email address." } },
+    });
     expect(await testDb.order.count()).toBe(0);
     expect(mocks.create).not.toHaveBeenCalled();
   });
 
   it("sends a missing cart back to the cart page", async () => {
-    expect(await startCheckout({ email: "a@example.com" })).toEqual({
+    expect(await startCheckout(checkout("a@example.com"))).toEqual({
       ok: false,
       error: { code: "cart_changed" },
     });
@@ -208,7 +415,7 @@ describe("refusals create nothing", () => {
   ])("sends %s back to the cart page", async (_, arrange) => {
     await arrange();
 
-    const result = await startCheckout({ email: "a@example.com" });
+    const result = await startCheckout(checkout("a@example.com"));
 
     expect(result).toEqual({ ok: false, error: { code: "cart_changed" } });
     expect(await testDb.order.count()).toBe(0);
@@ -230,7 +437,7 @@ describe("refusals create nothing", () => {
     });
     await cartWith([{ variantId: variant.id, quantity: 1 }]);
 
-    const result = await startCheckout({ email: "a@example.com" });
+    const result = await startCheckout(checkout("a@example.com"));
 
     expect(result).toEqual({ ok: false, error: { code: "below_minimum", minimumCents: 50 } });
     expect(await testDb.order.count()).toBe(0);
@@ -243,7 +450,7 @@ describe("when Stripe fails", () => {
     await cartWith([{ variantId: variant.id, quantity: 1 }]);
     mocks.create.mockRejectedValueOnce(Object.assign(new Error("down"), { code: "api_error" }));
 
-    const result = await startCheckout({ email: "a@example.com" });
+    const result = await startCheckout(checkout("a@example.com"));
 
     expect(result).toEqual({ ok: false, error: { code: "payment_unavailable" } });
     const order = await testDb.order.findFirstOrThrow();
@@ -267,7 +474,7 @@ describe("when Stripe fails", () => {
       Object.assign(new Error("small"), { code: "amount_too_small" }),
     );
 
-    expect(await startCheckout({ email: "a@example.com" })).toEqual({
+    expect(await startCheckout(checkout("a@example.com"))).toEqual({
       ok: false,
       error: { code: "below_minimum", minimumCents: 50 },
     });
@@ -284,7 +491,7 @@ describe("paying twice for one cart", () => {
       payment_status: "unpaid",
     });
 
-    const result = await startCheckout({ email: "a@example.com" });
+    const result = await startCheckout(checkout("a@example.com"));
 
     expect(result.ok).toBe(true);
     expect(mocks.expire).toHaveBeenCalledWith("cs_test_old");
@@ -305,7 +512,7 @@ describe("paying twice for one cart", () => {
       .mockResolvedValueOnce({ id: "cs_test_old", status: "complete", payment_status: "paid" });
     mocks.expire.mockRejectedValueOnce(new Error("session is complete"));
 
-    const result = await startCheckout({ email: "a@example.com" });
+    const result = await startCheckout(checkout("a@example.com"));
 
     // The webhook has not landed yet, so the order still reads pending.
     expect(result).toEqual({ ok: false, error: { code: "payment_processing" } });
@@ -321,7 +528,7 @@ describe("paying twice for one cart", () => {
       return { id: "cs_test_old", status: "complete", payment_status: "paid" };
     });
 
-    const result = await startCheckout({ email: "a@example.com" });
+    const result = await startCheckout(checkout("a@example.com"));
 
     expect(result).toEqual({
       ok: false,
@@ -340,7 +547,7 @@ describe("paying twice for one cart", () => {
       return { id: "cs_test_old", status: "complete", payment_status: "unpaid" };
     });
 
-    const result = await startCheckout({ email: "a@example.com" });
+    const result = await startCheckout(checkout("a@example.com"));
 
     expect(result.ok).toBe(true);
     expect(mocks.create).toHaveBeenCalledOnce();
@@ -358,7 +565,7 @@ describe("paying twice for one cart", () => {
       payment_status: "unpaid",
     });
 
-    const result = await startCheckout({ email: "a@example.com" });
+    const result = await startCheckout(checkout("a@example.com"));
 
     expect(result).toEqual({ ok: false, error: { code: "payment_processing" } });
     expect(mocks.expire).not.toHaveBeenCalled();
@@ -380,7 +587,7 @@ describe("paying twice for one cart", () => {
     selectCart(cart.id);
     mocks.retrieve.mockResolvedValueOnce({ id: "cs_test_old", ...session });
 
-    const result = await startCheckout({ email: "a@example.com" });
+    const result = await startCheckout(checkout("a@example.com"));
 
     expect(result).toEqual({ ok: false, error: { code: "payment_processing" } });
     expect(mocks.expire).not.toHaveBeenCalled();
@@ -398,7 +605,7 @@ describe("paying twice for one cart", () => {
       .mockResolvedValueOnce({ id: "cs_test_old", status: "archived", payment_status: "unpaid" });
     mocks.expire.mockRejectedValueOnce(new Error("cannot expire"));
 
-    const result = await startCheckout({ email: "a@example.com" });
+    const result = await startCheckout(checkout("a@example.com"));
 
     expect(result).toEqual({ ok: false, error: { code: "payment_processing" } });
     expect(mocks.create).not.toHaveBeenCalled();
@@ -411,7 +618,7 @@ describe("paying twice for one cart", () => {
     const { order, cart } = await seedPendingOrder({ sessionId: null });
     selectCart(cart.id);
 
-    const result = await startCheckout({ email: "a@example.com" });
+    const result = await startCheckout(checkout("a@example.com"));
 
     expect(result.ok).toBe(true);
     expect(mocks.retrieve).not.toHaveBeenCalled();
@@ -437,7 +644,7 @@ describe("paying twice for one cart", () => {
       return pending;
     }) as unknown as typeof findFirst);
 
-    const result = await startCheckout({ email: "a@example.com" });
+    const result = await startCheckout(checkout("a@example.com"));
     spy.mockRestore();
 
     expect(result).toEqual({ ok: false, error: { code: "checkout_in_progress" } });
@@ -453,7 +660,7 @@ describe("paying twice for one cart", () => {
     selectCart(cart.id);
     mocks.retrieve.mockRejectedValueOnce(new Error("network"));
 
-    expect(await startCheckout({ email: "a@example.com" })).toEqual({
+    expect(await startCheckout(checkout("a@example.com"))).toEqual({
       ok: false,
       error: { code: "payment_unavailable" },
     });
@@ -468,8 +675,8 @@ describe("paying twice for one cart", () => {
     const cart = await cartWith([{ variantId: variant.id, quantity: 1 }]);
 
     const results = await Promise.all([
-      startCheckout({ email: "a@example.com" }),
-      startCheckout({ email: "a@example.com" }),
+      startCheckout(checkout("a@example.com")),
+      startCheckout(checkout("a@example.com")),
     ]);
 
     expect(results.filter((r) => r.ok)).toHaveLength(1);
@@ -488,17 +695,46 @@ describe("logs", () => {
     const { variant } = await createSimpleProduct("a", 5);
     await cartWith([{ variantId: variant.id, quantity: 1 }]);
 
-    await startCheckout({ email: "secret.person@example.com" });
-    await startCheckout({ email: "bad" });
+    await startCheckout(checkout("secret.person@example.com"));
+    await startCheckout(checkout("bad"));
 
     expect(mocks.info).toHaveBeenCalledWith(
       expect.objectContaining({ event: "checkout.started", number: 1001, totalCents: 2500 }),
       "checkout.started",
     );
     expect(mocks.info).toHaveBeenCalledWith(
-      { event: "checkout.refused", reason: "validation" },
+      { event: "checkout.refused", reason: "validation", fields: ["email"] },
       "checkout.refused",
     );
     expect(JSON.stringify(mocks.info.mock.calls)).not.toContain("secret.person");
+  });
+
+  it("log the delivery fee and never a name, address line, postal code or phone", async () => {
+    await setShipping(1500, null);
+    const { variant } = await createSimpleProduct("a", 5);
+    await cartWith([{ variantId: variant.id, quantity: 1 }]);
+
+    await startCheckout(checkout("a@example.com", { line2: "Flat 4B", phone: "+48 600 100 200" }));
+    await startCheckout(checkout("a@example.com", { city: "", postalCode: "Warsaw 1" }));
+
+    expect(mocks.info).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "checkout.started", totalCents: 4000, shippingCents: 1500 }),
+      "checkout.started",
+    );
+    expect(mocks.info).toHaveBeenCalledWith(
+      { event: "checkout.refused", reason: "validation", fields: ["postalCode", "city"] },
+      "checkout.refused",
+    );
+    const logged = JSON.stringify([mocks.info.mock.calls, mocks.warn.mock.calls]);
+    for (const secretValue of [
+      "Kowalska",
+      "Marszałkowska",
+      "Flat 4B",
+      "00-950",
+      "600 100",
+      "Warsaw",
+    ]) {
+      expect(logged).not.toContain(secretValue);
+    }
   });
 });

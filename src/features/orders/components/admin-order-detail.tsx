@@ -1,6 +1,7 @@
 import { ArrowLeftIcon, ExternalLinkIcon, SearchXIcon, TriangleAlertIcon } from "lucide-react";
 import Link from "next/link";
 
+import { DeliveryAddressBlock } from "@/components/delivery-address";
 import { Price } from "@/components/price";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { buttonVariants } from "@/components/ui/button";
@@ -23,6 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { type DateFormat, formatDateTime } from "@/lib/dates";
+import { deliveryLabel } from "@/lib/shipping/rule";
 import { cn } from "@/lib/utils";
 
 import type { AdminOrderDetail as Detail } from "../admin-queries";
@@ -164,7 +166,7 @@ export function AdminOrderDetail({
                   </dd>
                 </>
               ) : null}
-              <dt>Shipping</dt>
+              <dt>{deliveryLabel(order.shippingCents)}</dt>
               <dd className="text-right">
                 <Price cents={order.shippingCents} currency={order.currency} />
               </dd>
@@ -186,6 +188,9 @@ export function AdminOrderDetail({
             <dl className="flex flex-col gap-3 text-sm">
               <DetailRow label="Email">
                 <span className="break-all">{order.email}</span>
+              </DetailRow>
+              <DetailRow label="Delivery address">
+                <DeliveryAddress address={order.address} phone={order.phone} />
               </DetailRow>
               <DetailRow label="Status">{orderStatusLabels[order.status]}</DetailRow>
               <DetailRow label="Created">{formatDateTime(order.createdAt, dateFormat)}</DetailRow>
@@ -245,6 +250,18 @@ function DetailRow({
       <dd>{children}</dd>
     </div>
   );
+}
+
+// spec 0007, AC-11: the phone sits inside the block, after the country.
+function DeliveryAddress({
+  address,
+  phone,
+}: {
+  readonly address: Detail["address"];
+  readonly phone: string | null;
+}) {
+  if (address === null) return <span className="text-muted-foreground">No address recorded</span>;
+  return <DeliveryAddressBlock address={address} phone={phone} />;
 }
 
 function StripeLink({ id, href }: { readonly id: string | null; readonly href: string | null }) {

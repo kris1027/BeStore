@@ -1,6 +1,8 @@
 import { CircleCheckIcon } from "lucide-react";
 import Link from "next/link";
 
+import { DeliveryAddressBlock } from "@/components/delivery-address";
+import { DeliveryRow } from "@/components/delivery-row";
 import { Price } from "@/components/price";
 import { ProductImage } from "@/components/product-image";
 import { buttonVariants } from "@/components/ui/button";
@@ -139,6 +141,15 @@ function PaidOrder({ order }: { readonly order: CompletedOrder }) {
             ))}
           </ul>
         </section>
+        {/* Orders made before spec 0007 have no address: the block is left out (AC-13). */}
+        {order.address ? (
+          <section aria-labelledby="delivering-heading" className="flex flex-col gap-2">
+            <h2 id="delivering-heading" className="font-heading text-2xl">
+              Delivering to
+            </h2>
+            <DeliveryAddressBlock address={order.address} />
+          </section>
+        ) : null}
       </div>
       <section
         aria-labelledby="paid-summary-heading"
@@ -151,12 +162,7 @@ function PaidOrder({ order }: { readonly order: CompletedOrder }) {
           <span>Subtotal</span>
           <Price cents={order.subtotalCents} currency={order.currency} />
         </div>
-        {order.shippingCents > 0 ? (
-          <div className="flex items-center justify-between">
-            <span>Shipping</span>
-            <Price cents={order.shippingCents} currency={order.currency} />
-          </div>
-        ) : null}
+        <DeliveryRow cents={order.shippingCents} currency={order.currency} />
         <Separator />
         <div className="flex items-center justify-between text-lg">
           <span className="font-medium">Total paid</span>

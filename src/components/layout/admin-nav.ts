@@ -1,4 +1,4 @@
-import { type LucideIcon, PackageIcon, ReceiptIcon } from "lucide-react";
+import { type LucideIcon, PackageIcon, ReceiptIcon, SettingsIcon } from "lucide-react";
 
 import type { NavItem } from "./nav";
 
@@ -10,4 +10,5 @@ export type AdminNavItem = NavItem & {
 export const adminNavItems: readonly AdminNavItem[] = [
   { href: "/admin/products", label: "Products", icon: PackageIcon },
   { href: "/admin/orders", label: "Orders", icon: ReceiptIcon },
+  { href: "/admin/settings", label: "Settings", icon: SettingsIcon },
 ];

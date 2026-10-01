@@ -20,7 +20,8 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 7 | Card payment & paid orders | Slice 1 | done |
 | 20 | One Stripe session state | Slice 1 follow up | done |
 | 21 | Report Stripe skill doc bugs upstream | Slice 1 follow up | done |
-| 8 | Shipping address & flat rate | Slice 2 | planned |
+| 8 | Shipping address & flat rate | Slice 2 | in-progress |
+| 22 | Purge PII from expired orders | Slice 2 follow up | planned |
 | 9 | Admin catalog management | Slice 3 | planned |
 | 10 | Admin order management | Slice 4 | planned |
 | 11 | Order emails | Slice 5 | planned |
@@ -147,10 +148,28 @@ issue [stripe/ai#554](https://github.com/stripe/ai/issues/554)
 
 ## Slice 2: Shipping
 
-### 8. Shipping address & flat rate
+### 8. Shipping address & flat rate · in-progress
 Checkout collects a delivery address and adds one flat shipping fee, free above an amount the admin sets.
 **Done when:** checkout requires a valid address, the total includes the right shipping fee (or free above the threshold), and admin sees the address on the order.
-- [ ] Build it: `/develop shipping address & flat rate`
+spec [0007](../specs/0007-shipping-address-flat-rate/index.md) · code in `src/lib/shipping/`, `src/features/checkout/`, `src/features/settings/`
+- [x] Design it (spec): `/architect shipping address & flat rate`
+- [x] Build it: `/develop shipping address & flat rate`
+  - [x] Thin thread: `STORE_COUNTRY`, the pure shipping rule and address schema, fee read in the order transaction, address saved on the order, Stripe shipping option and payment intent shipping, address fields on checkout and the address on the admin order page (AC-1, AC-2, AC-3, AC-5, AC-6, AC-11, AC-14, AC-15)
+  - [x] Delivery shown everywhere a total is: checkout summary and Pay button, cart delivery row and free delivery nudge (AC-4, AC-8)
+  - [x] Admin settings page: fee and free delivery threshold, cache tag expiry, change log (AC-10, AC-14)
+  - [x] Prefill after cancel, confirmation page delivery and address, admin list Ship to column (AC-9, AC-12, AC-13)
+  - [x] Safety net: DB tests for the order row and settings race, e2e for validation, threshold, settings and prefill, axe on every touched page (AC-2, AC-4, AC-7, AC-8, AC-10, AC-16)
+- [x] Verify it: `/check verify shipping address & flat rate`
+- [x] Test it: `/test shipping address & flat rate`
+- [x] Review it (fresh model): `/check review shipping address & flat rate`
+
+## Slice 2 follow ups (from spec 0007)
+
+### 22. Purge PII from expired orders
+Orders that expire without payment keep the customer's name, address, phone and email. A daily cron blanks them once an order has been expired for a set number of days, in line with the privacy policy from feature 16. from spec 0007
+**Done when:** orders expired longer than the retention period hold no name, address, phone or email, paid orders are never touched, and the cron refuses calls without `CRON_SECRET`.
+- [ ] Design it (spec): `/architect purge PII from expired orders`
+- [ ] Build it: `/develop purge PII from expired orders`
 
 ## Slice 3: Catalog
 

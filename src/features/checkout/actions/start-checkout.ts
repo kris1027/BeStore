@@ -15,16 +15,18 @@ import { type OrderSnapshot, snapshotOrder } from "@/lib/orders/snapshot";
 import { markExpired } from "@/lib/orders/transitions";
 import { productImageUrl } from "@/lib/product-image";
 import type { ActionResult } from "@/lib/result";
+import { deliveryColumns, type ShipTo } from "@/lib/shipping/address";
+import { readShippingSettings } from "@/lib/shipping/settings";
 import { stripe } from "@/lib/stripe";
 import { uuidv7 } from "@/lib/uuid";
 import { variantLabel } from "@/lib/variant-label";
 
 import { logCheckoutRefused, logCheckoutStarted, logStripeFailed, stripeErrorCode } from "../log";
-import { checkoutSchema } from "../schemas";
+import { type CheckoutFieldErrors, checkoutFieldErrors, checkoutSchema } from "../schemas";
 import { checkoutSessionParams } from "../stripe-session";
 
 export type StartCheckoutError =
-  | { readonly code: "validation"; readonly field: "email" }
+  | { readonly code: "validation"; readonly fields: CheckoutFieldErrors }
   | { readonly code: "cart_changed" }
   | { readonly code: "below_minimum"; readonly minimumCents: number }
   | { readonly code: "payment_processing" }
@@ -45,17 +47,20 @@ const expiryReasons = {
 // spec 0006, AC-1, AC-2 and AC-9: freezes the cart into a pending order and sends the browser to
 // Stripe's hosted page. Stripe and the database share no rollback, so each step leaves a safe
 // state if the next one fails, and an order is only set expired once Stripe can no longer take
-// money for it.
+// money for it. spec 0007 adds the delivery address and fee, both frozen onto the order here.
 export async function startCheckout(input: unknown): Promise<Result<{ readonly url: string }>> {
   const result = await run(input);
-  if (!result.ok) logCheckoutRefused(result.error.code);
+  if (!result.ok) logCheckoutRefused(result.error);
   return result;
 }
 
 async function run(input: unknown): Promise<Result<{ readonly url: string }>> {
-  const parsed = checkoutSchema.safeParse(input);
-  if (!parsed.success) return fail({ code: "validation", field: "email" });
-  const { email } = parsed.data;
+  const parsed = checkoutSchema(env.STORE_COUNTRY).safeParse(input);
+  if (!parsed.success) {
+    return fail({ code: "validation", fields: checkoutFieldErrors(parsed.error) });
+  }
+  const { email, ...address } = parsed.data;
+  const shipTo: ShipTo = { ...address, countryCode: env.STORE_COUNTRY };
 
   const cartId = await readCartId();
   if (cartId === null) return fail({ code: "cart_changed" });
@@ -63,7 +68,7 @@ async function run(input: unknown): Promise<Result<{ readonly url: string }>> {
   const cleared = await clearPendingOrder(cartId);
   if (!cleared.ok) return cleared;
 
-  const created = await createPendingOrder(cartId, email);
+  const created = await createPendingOrder(cartId, email, shipTo);
   if (!created.ok) return created;
   const order = created.data;
 
@@ -80,6 +85,8 @@ async function run(input: unknown): Promise<Result<{ readonly url: string }>> {
             ...line,
             imageUrl: line.imagePath === null ? null : productImageUrl(line.imagePath),
           })),
+          shippingCents: order.snapshot.shippingCents,
+          shipping: shipTo,
         },
         { siteUrl: env.NEXT_PUBLIC_SITE_URL, nowMs: Date.now() },
       ),
@@ -108,7 +115,12 @@ async function run(input: unknown): Promise<Result<{ readonly url: string }>> {
     return fail({ code: saved === "moved" ? "checkout_in_progress" : "payment_unavailable" });
   }
 
-  logCheckoutStarted({ orderId: order.id, number: order.number, totalCents: order.totalCents });
+  logCheckoutStarted({
+    orderId: order.id,
+    number: order.number,
+    totalCents: order.totalCents,
+    shippingCents: order.snapshot.shippingCents,
+  });
   return { ok: true, data: { url: session.url } };
 }
 
@@ -201,8 +213,12 @@ type CreatedOrder = {
 };
 
 // AC-1, step 3: under the cart lock, reread the cart live and freeze it into an order. Prices
-// come from the database here and nowhere else.
-async function createPendingOrder(cartId: string, email: string): Promise<Result<CreatedOrder>> {
+// and the delivery fee come from the database here and nowhere else (spec 0007, AC-5).
+async function createPendingOrder(
+  cartId: string,
+  email: string,
+  shipTo: ShipTo,
+): Promise<Result<CreatedOrder>> {
   try {
     return await db.$transaction(async (tx): Promise<Result<CreatedOrder>> => {
       const [cart] = await tx.$queryRaw<{ id: string }[]>`
@@ -221,7 +237,13 @@ async function createPendingOrder(cartId: string, email: string): Promise<Result
       });
       if (racing) return fail({ code: "checkout_in_progress" });
 
-      const snapshot = snapshotOrder(sources.map((source) => source.snapshot));
+      // Read here, never from the cache: an admin change made while the customer sat on
+      // /checkout applies to this Pay (AC-7), and Stripe's page shows that total.
+      const settings = await readShippingSettings(tx);
+      const snapshot = snapshotOrder(
+        sources.map((source) => source.snapshot),
+        settings,
+      );
       const minimumCents = minimumChargeCents(env.STORE_CURRENCY);
       if (snapshot.totalCents < minimumCents) return fail({ code: "below_minimum", minimumCents });
 
@@ -230,6 +252,7 @@ async function createPendingOrder(cartId: string, email: string): Promise<Result
           id: uuidv7(),
           cartId,
           email,
+          ...deliveryColumns(shipTo),
           currency: env.STORE_CURRENCY,
           subtotalCents: snapshot.subtotalCents,
           discountCents: snapshot.discountCents,

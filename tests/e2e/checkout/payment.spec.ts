@@ -6,7 +6,9 @@ import { seedProduct } from "../catalog/support";
 import {
   addToCart,
   cartIdOf,
+  fillCheckout,
   hasRealStripeKey,
+  payButton,
   postPaidEvent,
   seedPendingOrder,
   stockOf,
@@ -19,8 +21,8 @@ test("an invalid email shows a field error and nothing leaves the page", async (
   await addToCart(page, socks);
   await page.goto("/checkout");
 
-  await page.getByLabel("Email").fill("not-an-email");
-  await page.getByRole("button", { name: "Pay €12.50" }).click();
+  await fillCheckout(page, "not-an-email");
+  await payButton(page).click();
 
   await expect(page.getByText("Enter a valid email address.")).toBeVisible();
   await expect(page.getByLabel("Email")).toHaveAttribute("aria-invalid", "true");
@@ -47,8 +49,8 @@ test("Pay sends the customer to Stripe's hosted page", async ({ page }) => {
   await addToCart(page, socks);
   await page.goto("/checkout");
 
-  await page.getByLabel("Email").fill("e2e.customer@example.com");
-  await page.getByRole("button", { name: "Pay €12.50" }).click();
+  await fillCheckout(page);
+  await payButton(page).click();
 
   await page.waitForURL(/^https:\/\/checkout\.stripe\.com\//, { timeout: 30_000 });
 });
@@ -137,7 +139,7 @@ test("the checkout form works by keyboard alone", async ({ page }) => {
   const socks = await seedProduct({ stock: 5, priceCents: 1250 });
   await addToCart(page, socks);
   await page.goto("/checkout");
-  await expect(page.getByRole("button", { name: "Pay €12.50" })).toBeEnabled();
+  await expect(payButton(page)).toBeEnabled();
 
   await page.getByLabel("Email").focus();
   await page.keyboard.type("bad");

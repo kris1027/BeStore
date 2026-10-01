@@ -2,20 +2,30 @@ import { InfoIcon } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { DeliveryRow } from "@/components/delivery-row";
 import { Price } from "@/components/price";
 import { ProductImage } from "@/components/product-image";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { loadCart } from "@/lib/cart/load-cart";
+import { env } from "@/lib/env";
+import { NO_DISCOUNT_CENTS } from "@/lib/orders/snapshot";
+import { countryDisplayName } from "@/lib/shipping/address";
+import { orderCharges } from "@/lib/shipping/rule";
+import { getShippingSettings } from "@/lib/shipping/settings";
 
+import { checkoutPrefill } from "../queries";
+import { emptyPrefill } from "../schemas";
 import { CheckoutForm } from "./checkout-form";
 
 const cartPath = "/cart";
 
 // spec 0005, AC-13: reread on the server, never trusted from the cart page. No cart, an empty
 // one, or any flagged line goes back to the cart, where the reason shows. spec 0006 adds the
-// email form and Pay button, and the notice after coming back from Stripe without paying.
+// email form and Pay button, and the notice after coming back from Stripe without paying. spec
+// 0007 adds the address fields, prefilled from the cart's last order, and the delivery row. The
+// fee shown here is for display; Pay computes it again from the live settings row (AC-5).
 export async function CheckoutSummary({
   searchParams,
 }: {
@@ -24,6 +34,11 @@ export async function CheckoutSummary({
   const [cart, params] = await Promise.all([loadCart(), searchParams]);
   if (!cart || !cart.canCheckout) redirect(cartPath);
   const cancelled = params.cancelled === "1";
+  const [settings, prefill] = await Promise.all([getShippingSettings(), checkoutPrefill(cart.id)]);
+  const { shippingCents: shipping, totalCents } = orderCharges(
+    { subtotalCents: cart.subtotalCents, discountCents: NO_DISCOUNT_CENTS },
+    settings,
+  );
 
   return (
     <div className="flex flex-col gap-8">
@@ -86,14 +101,20 @@ export async function CheckoutSummary({
               <Price cents={cart.subtotalCents} />
             </span>
           </div>
+          <DeliveryRow cents={shipping} />
           <Separator />
           <div className="flex items-center justify-between text-lg">
             <span className="font-medium">Total</span>
             <span className="font-semibold">
-              <Price cents={cart.subtotalCents} />
+              <Price cents={totalCents} />
             </span>
           </div>
-          <CheckoutForm totalCents={cart.subtotalCents} />
+          <CheckoutForm
+            totalCents={totalCents}
+            country={env.STORE_COUNTRY}
+            countryName={countryDisplayName(env.STORE_COUNTRY, env.STORE_LOCALE)}
+            prefill={prefill ?? emptyPrefill}
+          />
         </section>
       </div>
     </div>

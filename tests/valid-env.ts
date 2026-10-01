@@ -13,6 +13,7 @@ export const validEnv = {
   STRIPE_SECRET_KEY: "sk_test_valid123",
   STRIPE_WEBHOOK_SECRET: "whsec_valid123",
   STORE_CURRENCY: "EUR",
+  STORE_COUNTRY: "PL",
   STORE_TIMEZONE: "Europe/Warsaw",
   STORE_LOCALE: "en",
 } as const;

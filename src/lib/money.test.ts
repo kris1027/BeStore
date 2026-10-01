@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatMoney, parseMoney } from "./money";
+import { centsToInput, formatMoney, parseMoney } from "./money";
 
 // Intl separates the amount and the symbol with a narrow no break space in some locales.
 const normalize = (value: string) => value.replace(/[  ]/g, " ");
@@ -59,5 +59,28 @@ describe("parseMoney", () => {
   it("refuses an amount that does not fit an integer column", () => {
     expect(parseMoney("21474836.48", "EUR")).toEqual({ ok: false, error: "too_large" });
     expect(parseMoney("99999999999999999999", "EUR")).toEqual({ ok: false, error: "too_large" });
+  });
+});
+
+// spec 0007, AC-10: the settings form shows the current values as plain decimals.
+describe("centsToInput", () => {
+  it.each([
+    [1200, "EUR", "12.00"],
+    [0, "EUR", "0.00"],
+    [5, "EUR", "0.05"],
+    [99, "PLN", "0.99"],
+    [10_000_000, "EUR", "100000.00"],
+    [500, "JPY", "500"],
+    [1234, "KWD", "1.234"],
+  ])("shows %i %s as %j", (cents, currency, text) => {
+    expect(centsToInput(cents, currency)).toBe(text);
+  });
+
+  it.each([0, 1, 999, 1200, 123_456])("round trips %i through parseMoney", (cents) => {
+    expect(parseMoney(centsToInput(cents, "EUR"), "EUR")).toEqual({ ok: true, cents });
+  });
+
+  it.each([-1, 1.5])("throws on %d, which is not a stored amount", (cents) => {
+    expect(() => centsToInput(cents, "EUR")).toThrow();
   });
 });

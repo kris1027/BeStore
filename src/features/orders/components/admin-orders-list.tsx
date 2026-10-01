@@ -99,6 +99,7 @@ export function AdminOrdersList({
                   <TableHead>Order</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Email</TableHead>
+                  <TableHead>Ship to</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Items</TableHead>
                   <TableHead className="text-right">Total</TableHead>
@@ -117,6 +118,9 @@ export function AdminOrdersList({
                     </TableCell>
                     <TableCell>{formatDate(order.createdAt, dateFormat)}</TableCell>
                     <TableCell className="max-w-64 truncate">{order.email}</TableCell>
+                    <TableCell className="max-w-64 truncate">
+                      {order.shipTo ?? <span className="text-muted-foreground">Not recorded</span>}
+                    </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         <OrderStatusBadge status={order.status} />

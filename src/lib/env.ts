@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { storeCountries } from "./shipping/address";
+
 // Validated once at server start (see instrumentation.ts), so a missing variable fails fast.
 // Variables owned by later features join this schema when that feature lands:
 // RESEND_API_KEY, EMAIL_FROM (11).
@@ -22,6 +24,9 @@ const envSchema = z.object({
     .string()
     .regex(/^whsec_\w+$/, "Stripe webhook signing secret, e.g. whsec_..."),
   STORE_CURRENCY: z.string().regex(/^[A-Z]{3}$/, "ISO 4217 code, e.g. EUR"),
+  // The one country the store ships to (spec 0007). Only countries with a postal code rule in
+  // src/lib/shipping/address.ts are accepted, so a new one fails here instead of taking any code.
+  STORE_COUNTRY: z.enum(storeCountries, "ISO 3166 alpha 2 code of a supported country, e.g. PL"),
   STORE_TIMEZONE: z.string().refine(isIanaTimezone, "IANA timezone, e.g. Europe/Warsaw"),
   // Language and number, price and date formats; also <html lang>.
   STORE_LOCALE: z.preprocess(

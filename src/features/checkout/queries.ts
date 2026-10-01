@@ -3,12 +3,47 @@ import "server-only";
 import type Stripe from "stripe";
 
 import { db } from "@/lib/db";
+import { env } from "@/lib/env";
 import { sessionState } from "@/lib/orders/session-state";
 import { PLACEHOLDER_IMAGE, productImageUrl } from "@/lib/product-image";
+import {
+  type DeliveryAddress,
+  deliveryAddressColumns,
+  withDeliveryAddress,
+} from "@/lib/shipping/address";
 import { stripe } from "@/lib/stripe";
 
 import { maskEmail } from "./mask-email";
-import { sessionIdSchema } from "./schemas";
+import { type CheckoutPrefill, sessionIdSchema } from "./schemas";
+
+// spec 0007, AC-9: what the customer typed last for this cart, from its newest order whatever its
+// status. Only the cart in the visitor's own signed cookie is ever asked for, and a paid order's
+// cart is deleted, so this never reaches a paid order. A null column prefills as an empty field.
+export async function checkoutPrefill(cartId: string): Promise<CheckoutPrefill | null> {
+  const order = await db.order.findFirst({
+    where: { cartId },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: {
+      email: true,
+      shipFullName: true,
+      shipLine1: true,
+      shipLine2: true,
+      shipPostalCode: true,
+      shipCity: true,
+      phone: true,
+    },
+  });
+  if (!order) return null;
+  return {
+    email: order.email,
+    fullName: order.shipFullName ?? "",
+    line1: order.shipLine1 ?? "",
+    line2: order.shipLine2 ?? "",
+    postalCode: order.shipPostalCode ?? "",
+    city: order.shipCity ?? "",
+    phone: order.phone ?? "",
+  };
+}
 
 export type CompletedOrder = {
   readonly number: number;
@@ -18,6 +53,8 @@ export type CompletedOrder = {
   readonly subtotalCents: number;
   readonly shippingCents: number;
   readonly totalCents: number;
+  // null for an order made before spec 0007: the page then hides the block (AC-13).
+  readonly address: DeliveryAddress | null;
   readonly lines: readonly {
     readonly id: string;
     readonly productName: string;
@@ -51,6 +88,7 @@ export async function getCompletion(sessionIdParam: unknown): Promise<Completion
       subtotalCents: true,
       shippingCents: true,
       totalCents: true,
+      ...deliveryAddressColumns,
       lines: {
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         select: {
@@ -89,7 +127,7 @@ export async function getCompletion(sessionIdParam: unknown): Promise<Completion
     }
   }
 
-  const { email, lines, ...rest } = order;
+  const { email, lines, ...rest } = withDeliveryAddress(order, env.STORE_LOCALE);
   return {
     state: "paid",
     order: {

@@ -45,3 +45,15 @@ export function fractionDigits(currency: string): number {
       .maximumFractionDigits ?? 2
   );
 }
+
+// Integer minor units to the plain decimal a money field shows ("12.00" for 1200 EUR, "500" for
+// 500 JPY), by string arithmetic, the inverse of parseMoney.
+export function centsToInput(cents: number, currency: string): string {
+  if (!Number.isInteger(cents) || cents < 0) {
+    throw new Error(`centsToInput expects non negative integer minor units, got ${cents}`);
+  }
+  const digits = fractionDigits(currency);
+  if (digits === 0) return String(cents);
+  const text = String(cents).padStart(digits + 1, "0");
+  return `${text.slice(0, -digits)}.${text.slice(-digits)}`;
+}
