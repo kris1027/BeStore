@@ -20,7 +20,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 7 | Card payment & paid orders | Slice 1 | done |
 | 20 | One Stripe session state | Slice 1 follow up | done |
 | 21 | Report Stripe skill doc bugs upstream | Slice 1 follow up | done |
-| 8 | Shipping address & flat rate | Slice 2 | in-progress |
+| 8 | Shipping address & flat rate | Slice 2 | done |
 | 22 | Purge PII from expired orders | Slice 2 follow up | planned |
 | 9 | Admin catalog management | Slice 3 | planned |
 | 10 | Admin order management | Slice 4 | planned |
@@ -148,7 +148,7 @@ issue [stripe/ai#554](https://github.com/stripe/ai/issues/554)
 
 ## Slice 2: Shipping
 
-### 8. Shipping address & flat rate · in-progress
+### 8. Shipping address & flat rate · done
 Checkout collects a delivery address and adds one flat shipping fee, free above an amount the admin sets.
 **Done when:** checkout requires a valid address, the total includes the right shipping fee (or free above the threshold), and admin sees the address on the order.
 spec [0007](../specs/0007-shipping-address-flat-rate/index.md) · code in `src/lib/shipping/`, `src/features/checkout/`, `src/features/settings/`
