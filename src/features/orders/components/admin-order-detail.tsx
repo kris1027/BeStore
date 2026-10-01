@@ -23,14 +23,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { type DateFormat, formatDate, formatDateTime } from "@/lib/dates";
+import { type DateFormat, formatDateTime } from "@/lib/dates";
 import { deliveryLabel } from "@/lib/shipping/rule";
 import { cn } from "@/lib/utils";
 
 import type { AdminOrderDetail as Detail } from "../admin-queries";
-import { emailDisplay } from "../email-display";
 import { adminOrdersPath } from "./admin-orders-list";
 import { NeedsAttentionBadge, orderStatusLabels, OrderStatusBadge } from "./order-status-badge";
+import { OrderEmail, PersonalDataField } from "./personal-data";
 
 type Event = Detail["events"][number];
 
@@ -188,14 +188,16 @@ export function AdminOrderDetail({
           <CardContent>
             <dl className="flex flex-col gap-3 text-sm">
               <DetailRow label="Email">
-                <EmailValue order={order} dateFormat={dateFormat} />
+                <OrderEmail order={order} placement="detail" dateFormat={dateFormat} />
               </DetailRow>
               <DetailRow label="Delivery address">
-                {order.piiPurgedAt !== null ? (
-                  <PersonalDataRemoved purgedAt={order.piiPurgedAt} dateFormat={dateFormat} />
-                ) : (
+                <PersonalDataField
+                  purgedAt={order.piiPurgedAt}
+                  placement="detail"
+                  dateFormat={dateFormat}
+                >
                   <DeliveryAddress address={order.address} phone={order.phone} />
-                )}
+                </PersonalDataField>
               </DetailRow>
               <DetailRow label="Status">{orderStatusLabels[order.status]}</DetailRow>
               <DetailRow label="Created">{formatDateTime(order.createdAt, dateFormat)}</DetailRow>
@@ -258,40 +260,6 @@ function DetailRow({
 }
 
 // spec 0007, AC-11: the phone sits inside the block, after the country.
-// spec 0008, AC-8: checked before the email and the "No address recorded" branch.
-function EmailValue({
-  order,
-  dateFormat,
-}: {
-  readonly order: Detail;
-  readonly dateFormat: DateFormat;
-}) {
-  const display = emailDisplay(order);
-  switch (display.kind) {
-    case "email":
-      return <span className="break-all">{display.email}</span>;
-    case "purged":
-      return <PersonalDataRemoved purgedAt={display.purgedAt} dateFormat={dateFormat} />;
-    // The query throws before this; kept so a null email can never render as empty.
-    case "missing":
-      return <span className="text-destructive">Email missing</span>;
-  }
-}
-
-function PersonalDataRemoved({
-  purgedAt,
-  dateFormat,
-}: {
-  readonly purgedAt: Date;
-  readonly dateFormat: DateFormat;
-}) {
-  return (
-    <span className="text-muted-foreground">
-      Personal data removed on {formatDate(purgedAt, dateFormat)}
-    </span>
-  );
-}
-
 function DeliveryAddress({
   address,
   phone,
