@@ -1,5 +1,6 @@
 import type Stripe from "stripe";
 
+import type { ShipTo } from "@/lib/shipping/address";
 import { deliveryLabel } from "@/lib/shipping/rule";
 
 // Pure: an order to the Stripe Checkout Session that charges exactly its lines and its delivery
@@ -19,15 +20,7 @@ export type SessionOrder = {
     readonly imageUrl: string | null;
   }[];
   readonly shippingCents: number;
-  readonly shipping: {
-    readonly fullName: string;
-    readonly line1: string;
-    readonly line2: string | null;
-    readonly city: string;
-    readonly postalCode: string;
-    readonly countryCode: string;
-    readonly phone: string | null;
-  };
+  readonly shipping: ShipTo;
 };
 
 // Stripe's shortest allowed lifetime is 30 minutes from when it receives the request, so the

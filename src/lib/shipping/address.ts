@@ -101,6 +101,22 @@ export function shippingAddressSchema(country: StoreCountry) {
 
 export type ShippingAddress = z.output<ReturnType<typeof shippingAddressSchema>>;
 
+// A parsed address and the country it ships to: what Pay saves on the order and sends to Stripe.
+export type ShipTo = ShippingAddress & { readonly countryCode: StoreCountry };
+
+// The order columns a ShipTo is saved in (spec 0007, AC-5).
+export function deliveryColumns(shipTo: ShipTo) {
+  return {
+    shipFullName: shipTo.fullName,
+    shipLine1: shipTo.line1,
+    shipLine2: shipTo.line2,
+    shipPostalCode: shipTo.postalCode,
+    shipCity: shipTo.city,
+    shipCountryCode: shipTo.countryCode,
+    phone: shipTo.phone,
+  };
+}
+
 // "Poland" for PL in English, "Polska" in Polish; the code itself if Intl has no name for it.
 export function countryDisplayName(code: string, locale: string): string {
   return new Intl.DisplayNames([locale], { type: "region" }).of(code) ?? code;

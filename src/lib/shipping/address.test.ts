@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizePostalCode, withDeliveryAddress, shippingAddressSchema } from "./address";
+import {
+  deliveryColumns,
+  normalizePostalCode,
+  withDeliveryAddress,
+  shippingAddressSchema,
+} from "./address";
 
 // spec 0007, AC-2 and Validation messages.
 
@@ -201,4 +206,28 @@ describe("withDeliveryAddress", () => {
       });
     },
   );
+});
+
+describe("deliveryColumns", () => {
+  it("names the order column each address field is saved in", () => {
+    expect(
+      deliveryColumns({
+        fullName: "Anna Kowalska",
+        line1: "ul. Marszałkowska 1",
+        line2: null,
+        postalCode: "00-950",
+        city: "Warsaw",
+        countryCode: "PL",
+        phone: null,
+      }),
+    ).toEqual({
+      shipFullName: "Anna Kowalska",
+      shipLine1: "ul. Marszałkowska 1",
+      shipLine2: null,
+      shipPostalCode: "00-950",
+      shipCity: "Warsaw",
+      shipCountryCode: "PL",
+      phone: null,
+    });
+  });
 });

@@ -15,18 +15,14 @@ import { type OrderSnapshot, snapshotOrder } from "@/lib/orders/snapshot";
 import { markExpired } from "@/lib/orders/transitions";
 import { productImageUrl } from "@/lib/product-image";
 import type { ActionResult } from "@/lib/result";
+import { deliveryColumns, type ShipTo } from "@/lib/shipping/address";
 import { readShippingSettings } from "@/lib/shipping/settings";
 import { stripe } from "@/lib/stripe";
 import { uuidv7 } from "@/lib/uuid";
 import { variantLabel } from "@/lib/variant-label";
 
 import { logCheckoutRefused, logCheckoutStarted, logStripeFailed, stripeErrorCode } from "../log";
-import {
-  type CheckoutFieldErrors,
-  type CheckoutInput,
-  checkoutFieldErrors,
-  checkoutSchema,
-} from "../schemas";
+import { type CheckoutFieldErrors, checkoutFieldErrors, checkoutSchema } from "../schemas";
 import { checkoutSessionParams } from "../stripe-session";
 
 export type StartCheckoutError =
@@ -63,8 +59,8 @@ async function run(input: unknown): Promise<Result<{ readonly url: string }>> {
   if (!parsed.success) {
     return fail({ code: "validation", fields: checkoutFieldErrors(parsed.error) });
   }
-  const checkout = parsed.data;
-  const { email } = checkout;
+  const { email, ...address } = parsed.data;
+  const shipTo: ShipTo = { ...address, countryCode: env.STORE_COUNTRY };
 
   const cartId = await readCartId();
   if (cartId === null) return fail({ code: "cart_changed" });
@@ -72,7 +68,7 @@ async function run(input: unknown): Promise<Result<{ readonly url: string }>> {
   const cleared = await clearPendingOrder(cartId);
   if (!cleared.ok) return cleared;
 
-  const created = await createPendingOrder(cartId, checkout);
+  const created = await createPendingOrder(cartId, email, shipTo);
   if (!created.ok) return created;
   const order = created.data;
 
@@ -90,15 +86,7 @@ async function run(input: unknown): Promise<Result<{ readonly url: string }>> {
             imageUrl: line.imagePath === null ? null : productImageUrl(line.imagePath),
           })),
           shippingCents: order.snapshot.shippingCents,
-          shipping: {
-            fullName: checkout.fullName,
-            line1: checkout.line1,
-            line2: checkout.line2,
-            city: checkout.city,
-            postalCode: checkout.postalCode,
-            countryCode: env.STORE_COUNTRY,
-            phone: checkout.phone,
-          },
+          shipping: shipTo,
         },
         { siteUrl: env.NEXT_PUBLIC_SITE_URL, nowMs: Date.now() },
       ),
@@ -228,7 +216,8 @@ type CreatedOrder = {
 // and the delivery fee come from the database here and nowhere else (spec 0007, AC-5).
 async function createPendingOrder(
   cartId: string,
-  checkout: CheckoutInput,
+  email: string,
+  shipTo: ShipTo,
 ): Promise<Result<CreatedOrder>> {
   try {
     return await db.$transaction(async (tx): Promise<Result<CreatedOrder>> => {
@@ -262,14 +251,8 @@ async function createPendingOrder(
         data: {
           id: uuidv7(),
           cartId,
-          email: checkout.email,
-          phone: checkout.phone,
-          shipFullName: checkout.fullName,
-          shipLine1: checkout.line1,
-          shipLine2: checkout.line2,
-          shipCity: checkout.city,
-          shipPostalCode: checkout.postalCode,
-          shipCountryCode: env.STORE_COUNTRY,
+          email,
+          ...deliveryColumns(shipTo),
           currency: env.STORE_CURRENCY,
           subtotalCents: snapshot.subtotalCents,
           discountCents: snapshot.discountCents,
