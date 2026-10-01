@@ -175,6 +175,42 @@ describe("GET /api/cron/purge-expired-orders", () => {
     }
   });
 
+  // The due rule reads the database clock, so the expiry is stamped by it too, a minute either
+  // side of the cutoff (exactly 30 days drifts past it between the two statements).
+  it("purges at 30 days and a minute by the database clock, not at a minute short of 30 days (AC-1)", async () => {
+    const [justDue, notYet] = await Promise.all([due(), due()]);
+    const stamp = (id: string, offset: string) =>
+      testDb.$executeRaw`
+        UPDATE orders
+        SET expired_at = now() - make_interval(days => ${EXPIRED_ORDER_PII_RETENTION_DAYS}::int)
+          + ${offset}::interval
+        WHERE id = ${id}::uuid`;
+    await stamp(justDue.id, "-1 minute");
+    await stamp(notYet.id, "1 minute");
+
+    const response = await purgeExpiredOrdersRequest(authorized());
+
+    expect(await response.json()).toEqual({ purged: 1 });
+    expect((await reload(justDue.id)).piiPurgedAt).toBeInstanceOf(Date);
+    expect(await reload(notYet.id)).toMatchObject({
+      email: "ada@example.com",
+      piiPurgedAt: null,
+    });
+  });
+
+  it("leaves an order purged by an earlier run exactly as that run left it (AC-5)", async () => {
+    const order = await due();
+    await purgeExpiredOrdersRequest(authorized());
+    const first = await reload(order.id);
+
+    const response = await purgeExpiredOrdersRequest(authorized());
+
+    expect(await response.json()).toEqual({ purged: 0 });
+    const second = await reload(order.id);
+    expect(second.piiPurgedAt).toEqual(first.piiPurgedAt);
+    expect(second.updatedAt).toEqual(first.updatedAt);
+  });
+
   it("purges a flagged expired order and keeps the flag (AC-2)", async () => {
     const flagged = await seedOrder("expired", {
       expiredAt: daysAgo(EXPIRED_ORDER_PII_RETENTION_DAYS + 1),
