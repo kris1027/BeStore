@@ -18,8 +18,8 @@ export async function getShippingSettings(): Promise<ShippingSettings> {
   return db.storeSettings.findUniqueOrThrow({ where: { id: 1 }, select });
 }
 
-// For Pay (spec 0007, AC-5 and AC-7): inside the order transaction and never cached, so the fee
-// charged is the one in effect at that moment.
-export async function readShippingSettings(tx: Tx): Promise<ShippingSettings> {
-  return tx.storeSettings.findUniqueOrThrow({ where: { id: 1 }, select });
+// The live row, never cached. Pay passes its order transaction (spec 0007, AC-5 and AC-7), so the
+// fee charged is the one in effect at that moment; the admin settings page reads it as is.
+export async function readShippingSettings(client: Tx = db): Promise<ShippingSettings> {
+  return client.storeSettings.findUniqueOrThrow({ where: { id: 1 }, select });
 }
