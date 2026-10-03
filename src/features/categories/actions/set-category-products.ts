@@ -24,7 +24,12 @@ export async function setCategoryProducts(
 
   const outcome = await db.$transaction(
     async (tx): Promise<{ added: number; removed: number } | SetCategoryProductsError> => {
-      // Locked so two adds to one category take different positions.
+      // Locked so two adds to one category take different positions. Not redundant with the
+      // lock linkAtEnd takes again (a no-op in this transaction): this one must come first, so
+      // the not_found check holds under the lock (a delete committing later would otherwise
+      // surface as a 23503 throw from linkAtEnd), the linked read below is serialized, and a
+      // remove-only call still locks. Category row before product key share is the order the
+      // updateProductCategories deadlock test relies on.
       const [category] = await tx.$queryRaw<{ id: string }[]>`
         SELECT id FROM categories WHERE id = ${categoryId}::uuid FOR UPDATE`;
       if (!category) return { code: "not_found" };
