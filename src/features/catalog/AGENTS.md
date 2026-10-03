@@ -36,4 +36,6 @@ Products, option types, variants, ordered image galleries (up to 8, each optiona
 
 Pure rules have `*.test.ts` beside them; actions and queries run against a real database in `tests/db/catalog-*.db.test.ts` (`pnpm test:db`); flows in `tests/e2e/catalog/` and admin denials in `tests/e2e/admin/catalog-denials.spec.ts`.
 
+A db test that loads `log.ts` mocks `@/lib/logger` through `tests/db/logger-mock.ts`: a bare `{ logger }` mock has no `createAdminEventLogger`, so the file fails to load. One that reaches `src/lib/product-image.ts` (through `admin-queries.ts`, for instance) also mocks `@/lib/env`; it passes locally only because `.env.local` fills the app env, and CI has none.
+
 _Drafted by /sync from the introducing change, worth a quick human pass._

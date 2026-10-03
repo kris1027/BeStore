@@ -22,7 +22,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 21 | Report Stripe skill doc bugs upstream | Slice 1 follow up | done |
 | 8 | Shipping address & flat rate | Slice 2 | done |
 | 22 | Purge PII from expired orders | Slice 2 follow up | done |
-| 9 | Admin catalog management | Slice 3 | in-progress |
+| 9 | Admin catalog management | Slice 3 | done |
 | 10 | Admin order management | Slice 4 | planned |
 | 11 | Order emails | Slice 5 | planned |
 | 12 | Customer accounts | Slice 6 | planned |
@@ -180,7 +180,7 @@ spec [0008](../specs/0008-purge-expired-order-pii/index.md) · code in `src/feat
 
 ## Slice 3: Catalog
 
-### 9. Admin catalog management · in-progress
+### 9. Admin catalog management · done
 Thicken the admin product editor: edit and hide products, manage categories, several images per product, stock per variant.
 **Done when:** an admin can create, edit, hide, and reorder products and categories, upload and order several images, and change stock per variant; hidden products vanish from the storefront.
 spec [0009](../specs/0009-admin-catalog-management/index.md) · code in `src/features/catalog/`, `src/features/categories/`

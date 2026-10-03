@@ -23,6 +23,6 @@ Admin only category management: `/admin/categories` (ordered list with product c
 
 ## Tests
 
-`schemas.test.ts` beside the schema; actions and reads against a real database in `tests/db/categories.db.test.ts` (`pnpm test:db`); flows in `tests/e2e/catalog/categories-arrange.spec.ts`.
+`schemas.test.ts` beside the schema; actions and reads against a real database in `tests/db/categories.db.test.ts` (`pnpm test:db`); flows in `tests/e2e/catalog/categories-arrange.spec.ts`. The db test mocks `@/lib/logger` through `tests/db/logger-mock.ts`, so `log.ts` gets a `createAdminEventLogger` bound to the mock.
 
 _Drafted from the introducing change (spec 0009), worth a quick human pass._
