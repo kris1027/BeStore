@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { SLUG_MAX_LENGTH, SLUG_PATTERN } from "@/lib/slug";
+import { slugField } from "@/lib/slug";
 
 // Pure: the category form (zodResolver) and the category actions parse with the same rules
 // (spec 0009, AC-17).
@@ -9,12 +9,7 @@ export const CATEGORY_DESCRIPTION_MAX_LENGTH = 2000;
 
 export const categoryFieldsSchema = z.object({
   name: z.string().trim().min(1, "Enter a name.").max(100, "Keep it under 100 characters."),
-  slug: z
-    .string()
-    .trim()
-    .min(1, "Enter a URL name.")
-    .max(SLUG_MAX_LENGTH, `Keep it under ${SLUG_MAX_LENGTH} characters.`)
-    .regex(SLUG_PATTERN, "Use lowercase letters and digits, joined by single hyphens."),
+  slug: slugField,
   // Plain text; empty means none.
   description: z
     .string()

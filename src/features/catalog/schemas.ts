@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { parseMoney, type ParseMoneyError } from "@/lib/money";
 import { PRODUCT_IMAGE_PATH } from "@/lib/product-image-rules";
-import { SLUG_MAX_LENGTH, SLUG_PATTERN } from "@/lib/slug";
+import { slugField } from "@/lib/slug";
 
 import {
   combinationCount,
@@ -166,13 +166,6 @@ export const nameField = z
   .trim()
   .min(1, "Enter a name.")
   .max(200, "Keep it under 200 characters.");
-
-export const slugField = z
-  .string()
-  .trim()
-  .min(1, "Enter a URL name.")
-  .max(SLUG_MAX_LENGTH, `Keep it under ${SLUG_MAX_LENGTH} characters.`)
-  .regex(SLUG_PATTERN, "Use lowercase letters and digits, joined by single hyphens.");
 
 export const DESCRIPTION_MAX_LENGTH = 5000;
 

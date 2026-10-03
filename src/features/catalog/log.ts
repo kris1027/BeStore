@@ -1,4 +1,4 @@
-import { logger } from "@/lib/logger";
+import { createAdminEventLogger } from "@/lib/logger";
 
 import type { ProductStatus } from "./status";
 
@@ -25,11 +25,4 @@ type CatalogEvents = {
   "catalog.products.reordered": { readonly count: number };
 };
 
-export function logCatalogEvent<E extends keyof CatalogEvents>(
-  event: E,
-  fields: { readonly adminId: string } & CatalogEvents[E],
-) {
-  // Widened to a plain record: pino's message overloads cannot resolve a generic object type.
-  const entry: Record<string, unknown> = { event, ...fields };
-  logger.info(entry, event);
-}
+export const logCatalogEvent = createAdminEventLogger<CatalogEvents>();
