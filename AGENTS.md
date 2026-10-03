@@ -96,7 +96,8 @@ MCP servers: Supabase (connected), Stripe (connected), Vercel (connected), Playw
 ## Context files
 
 - [emails/AGENTS.md](emails/AGENTS.md): React Email templates sent through Resend
-- [src/features/catalog/AGENTS.md](src/features/catalog/AGENTS.md): products, variants, the admin create form, cached storefront reads
+- [src/features/catalog/AGENTS.md](src/features/catalog/AGENTS.md): products, variants, images, stock history, the admin create, edit and arrange pages, cached storefront reads
+- [src/features/categories/AGENTS.md](src/features/categories/AGENTS.md): admin category pages, product links, category reordering
 - [src/features/cart/AGENTS.md](src/features/cart/AGENTS.md): the signed cart cookie, cart actions and caps, the expired cart cron
 - [src/features/checkout/AGENTS.md](src/features/checkout/AGENTS.md): the checkout form, `startCheckout` and the Stripe session, the confirmation page
 - [src/features/orders/AGENTS.md](src/features/orders/AGENTS.md): the Stripe webhook, order transitions, the reconcile cron, the expired order PII purge cron, admin orders
