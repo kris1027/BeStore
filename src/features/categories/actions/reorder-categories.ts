@@ -16,6 +16,7 @@ export async function reorderCategories(
   const admin = await requireAdmin();
 
   const parsed = reorderCategoriesSchema.safeParse(input);
+  // Only the arrange list calls this, so a malformed request is treated as a stale order.
   if (!parsed.success) return { ok: false, error: { code: "stale" } };
   const { orderedIds } = parsed.data;
 

@@ -27,6 +27,7 @@ export async function updateProductCategories(
   const admin = await requireAdmin();
 
   const parsed = productCategoriesSchema.safeParse(input);
+  // Only the categories section calls this, so a malformed request is treated as a stale save.
   if (!parsed.success) return { ok: false, error: { code: "stale" } };
   const { productId, loadedCategoryIds, categoryIds } = parsed.data;
 

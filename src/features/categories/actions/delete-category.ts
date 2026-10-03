@@ -15,6 +15,7 @@ export async function deleteCategory(
   const admin = await requireAdmin();
 
   const parsed = deleteCategorySchema.safeParse(input);
+  // Only the delete button calls this, so a malformed request is treated as a missing category.
   if (!parsed.success) return { ok: false, error: { code: "not_found" } };
   const { categoryId } = parsed.data;
 

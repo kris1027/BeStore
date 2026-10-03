@@ -19,6 +19,7 @@ export async function setCategoryProducts(
   const admin = await requireAdmin();
 
   const parsed = setCategoryProductsSchema.safeParse(input);
+  // Only the category products editor calls this, so a malformed request is treated as a missing category.
   if (!parsed.success) return { ok: false, error: { code: "not_found" } };
   const { categoryId, add, remove } = parsed.data;
 
