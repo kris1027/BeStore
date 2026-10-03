@@ -32,3 +32,11 @@ export const sortableAnnouncements: AnnouncementText = {
   cancel: (name, position, total) =>
     `Moving ${name} was cancelled. It stays at position ${position} of ${total}.`,
 };
+
+// spec 0009, AC-20: an arrange save names every current item exactly once, or the list changed
+// since the page loaded (an item added, removed, published or hidden) and nothing moves.
+export function sameIdSet(ordered: readonly string[], current: readonly string[]): boolean {
+  if (ordered.length !== current.length) return false;
+  const known = new Set(current);
+  return new Set(ordered).size === ordered.length && ordered.every((id) => known.has(id));
+}

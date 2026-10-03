@@ -4,6 +4,7 @@ import { adminMetadata, requireAdmin } from "@/features/admin-auth/require-admin
 import {
   catalogIsEmpty,
   getAdminProducts,
+  getCategoryOptions,
   parseAdminProductsParams,
 } from "@/features/catalog/admin-queries";
 import { AdminProductsList } from "@/features/catalog/components/admin-products-list";
@@ -19,12 +20,18 @@ export function generateMetadata(): Promise<Metadata> {
 
 export default async function AdminProductsPage({ searchParams }: PageProps<"/admin/products">) {
   await requireAdmin();
-  const params = parseAdminProductsParams(await searchParams);
-  const [products, catalogEmpty] = await Promise.all([getAdminProducts(params), catalogIsEmpty()]);
+  const parsed = parseAdminProductsParams(await searchParams);
+  const categories = await getCategoryOptions();
+  // spec 0009, AC-1: an unknown category falls back to every category.
+  const params = categories.some((category) => category.id === parsed.categoryId)
+    ? parsed
+    : { ...parsed, categoryId: null };
+  const [page, catalogEmpty] = await Promise.all([getAdminProducts(params), catalogIsEmpty()]);
   return (
     <AdminProductsList
-      products={products}
+      page={page}
       params={params}
+      categories={categories}
       catalogEmpty={catalogEmpty}
       dateFormat={{ locale: env.STORE_LOCALE, timeZone: env.STORE_TIMEZONE }}
     />

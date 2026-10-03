@@ -49,7 +49,7 @@ test("options build a variant grid that keeps typed rows, and the picker follows
 
   await page.getByRole("button", { name: "Publish" }).click();
   await expect(page).toHaveURL(adminProductUrl);
-  await page.goto("/admin/products");
+  await page.goto(`/admin/products?q=${encodeURIComponent(name)}`);
   await expect(page.getByRole("row", { name: new RegExp(name) })).toContainText("€49.00 to €55.50");
 
   await page.goto(`/products/${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`);

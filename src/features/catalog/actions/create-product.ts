@@ -7,6 +7,7 @@ import { catalogTag, productTag } from "@/lib/cache-tags";
 import { db } from "@/lib/db";
 import { uniqueViolation } from "@/lib/db-errors";
 import { env } from "@/lib/env";
+import { linkAtEnd } from "@/lib/product-categories";
 import {
   imageDuplicateMessage,
   imageMissingMessage,
@@ -40,7 +41,7 @@ const takenMessages = {
 async function takenErrors(
   product: ProductFormValues,
 ): Promise<Record<string, readonly string[]> | null> {
-  const [slugTaken, skuRows, imageRows] = await Promise.all([
+  const [slugTaken, skuRows, imageRows, knownCategories] = await Promise.all([
     db.product.findUnique({ where: { slug: product.slug }, select: { id: true } }),
     db.productVariant.findMany({
       where: { sku: { in: product.variants.map((variant) => variant.sku) } },
@@ -50,6 +51,7 @@ async function takenErrors(
       where: { storagePath: { in: product.images.map((image) => image.path) } },
       select: { storagePath: true },
     }),
+    db.category.count({ where: { id: { in: product.categoryIds } } }),
   ]);
   const usedPaths = new Set(imageRows.map((row) => row.storagePath));
   const takenSkus = new Set(skuRows.map((row) => row.sku));
@@ -61,6 +63,9 @@ async function takenErrors(
   product.images.forEach((image, index) => {
     if (usedPaths.has(image.path)) fields[`images.${index}`] = [imageDuplicateMessage];
   });
+  if (knownCategories !== product.categoryIds.length) {
+    fields.categoryIds = ["A category was deleted meanwhile. Reload and choose again."];
+  }
   return Object.keys(fields).length > 0 ? fields : null;
 }
 
@@ -143,6 +148,11 @@ async function insertProduct(
         })),
       });
     }
+
+    await linkAtEnd(
+      tx,
+      product.categoryIds.map((categoryId) => ({ productId: created.id, categoryId })),
+    );
 
     return created;
   });

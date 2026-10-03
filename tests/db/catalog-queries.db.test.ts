@@ -15,7 +15,8 @@ vi.mock("next/cache", () => ({ cacheTag: mocks.cacheTag, cacheLife: mocks.cacheL
 
 const { getActiveProducts, getPrerenderedSlugs, getProductBySlug, HOME_PRODUCT_LIMIT } =
   await import("@/features/catalog/queries");
-const { ADMIN_PRODUCT_LIMIT, getAdminProducts } = await import("@/features/catalog/admin-queries");
+const { getAdminProducts, parseAdminProductsParams } =
+  await import("@/features/catalog/admin-queries");
 
 resetDatabaseBeforeEach();
 
@@ -211,7 +212,7 @@ describe("getPrerenderedSlugs", () => {
 });
 
 describe("getAdminProducts", () => {
-  it("lists every status, newest first, with variant count, total stock and price range", async () => {
+  it("lists newest first, with variant count, total stock and price range", async () => {
     const old = await product("old", { status: "draft", createdAt: at(1) });
     await createVariant(old.id, { sku: "O", priceCents: 900, stockQuantity: 2 });
     const tee = await product("tee", { createdAt: at(2) });
@@ -225,7 +226,7 @@ describe("getAdminProducts", () => {
     });
     await testDb.productVariant.update({ where: { id: archived.id }, data: { archived: true } });
 
-    const rows = await getAdminProducts({ tab: "all" });
+    const { rows } = await getAdminProducts(parseAdminProductsParams({}));
 
     expect(rows.map((row) => [row.slug, row.status])).toEqual([
       ["tee", "active"],
@@ -240,17 +241,11 @@ describe("getAdminProducts", () => {
     });
   });
 
-  it(`stops at ${200} products`, async () => {
-    await testDb.product.createMany({
-      data: Array.from({ length: 201 }, (_, i) => ({ name: `P${i}`, slug: `p-${i}` })),
-    });
-
-    expect(ADMIN_PRODUCT_LIMIT).toBe(200);
-    expect(await getAdminProducts({ tab: "all" })).toHaveLength(200);
-  });
-
   it("is empty on an empty catalog", async () => {
-    expect(await getAdminProducts({ tab: "all" })).toEqual([]);
+    expect(await getAdminProducts(parseAdminProductsParams({}))).toEqual({
+      rows: [],
+      nextBefore: null,
+    });
   });
 });
 

@@ -14,9 +14,11 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DateFormat } from "@/lib/dates";
 
-import type { ProductForEdit, StockHistoryRow } from "../../admin-queries";
+import type { CategoryOption, ProductForEdit, StockHistoryRow } from "../../admin-queries";
 import { adminProductsPath, productPath } from "../../paths";
 import type { StorageTarget } from "../image-upload";
+import { CategoriesSection } from "./categories-section";
+import { DeleteProductButton } from "./delete-product-button";
 import { DetailsForm } from "./details-form";
 import { ImagesSection } from "./images-section";
 import { StatusCard } from "./status-card";
@@ -44,8 +46,10 @@ export function ProductEditor({
   stockHistory,
   dateFormat,
   storage,
+  categories,
 }: {
   readonly product: ProductForEdit;
+  readonly categories: readonly CategoryOption[];
   readonly storage: StorageTarget;
   readonly stockHistory: readonly StockHistoryRow[];
   readonly dateFormat: DateFormat;
@@ -171,7 +175,32 @@ export function ProductEditor({
         </div>
         {/* On phones the status comes first: it decides whether anything here is live. */}
         <div className="order-first flex min-w-0 flex-col gap-6 lg:sticky lg:top-20 lg:order-none">
-          <StatusCard key={product.status} productId={product.id} status={product.status} />
+          <StatusCard
+            key={product.status}
+            productId={product.id}
+            status={product.status}
+            deleteSlot={
+              product.deletable ? (
+                <DeleteProductButton productId={product.id} name={product.name} />
+              ) : null
+            }
+          />
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <h2>Categories</h2>
+              </CardTitle>
+              <CardDescription>A product can sit in several categories.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CategoriesSection
+                key={JSON.stringify([product.categoryIds, categories])}
+                productId={product.id}
+                categories={categories}
+                categoryIds={product.categoryIds}
+              />
+            </CardContent>
+          </Card>
         </div>
       </div>
     </>

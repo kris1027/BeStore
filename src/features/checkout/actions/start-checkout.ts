@@ -225,6 +225,14 @@ async function createPendingOrder(
         SELECT id FROM carts WHERE id = ${cartId}::uuid AND expires_at > now() FOR UPDATE`;
       if (!cart) return fail({ code: "cart_changed" });
 
+      // spec 0009, Key invariants: a product delete locks its variants before checking for
+      // order lines, so holding these until commit means it either waits and then sees this
+      // order, or already deleted them and this cart no longer reads them.
+      await tx.$queryRaw`
+        SELECT v.id FROM product_variants v
+        JOIN cart_items ci ON ci.variant_id = v.id
+        WHERE ci.cart_id = ${cartId}::uuid
+        ORDER BY v.id FOR KEY SHARE OF v`;
       const sources = await loadLockedCart(tx, cartId);
       if (!canCheckout(sources.map((source) => source.facts))) {
         return fail({ code: "cart_changed" });

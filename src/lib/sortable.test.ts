@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { moveId, sortableAnnouncements } from "./sortable";
+import { moveId, sameIdSet, sortableAnnouncements } from "./sortable";
 
 // spec 0009, AC-13 and AC-20.
 
@@ -33,5 +33,19 @@ describe("sortableAnnouncements", () => {
     expect(sortableAnnouncements.cancel("Red tee photo", 1, 3)).toBe(
       "Moving Red tee photo was cancelled. It stays at position 1 of 3.",
     );
+  });
+});
+
+describe("sameIdSet", () => {
+  it("accepts every current id once, in any order", () => {
+    expect(sameIdSet(["b", "a"], ["a", "b"])).toBe(true);
+    expect(sameIdSet([], [])).toBe(true);
+  });
+
+  it("refuses a missing, extra, unknown or repeated id", () => {
+    expect(sameIdSet(["a"], ["a", "b"])).toBe(false);
+    expect(sameIdSet(["a", "b", "c"], ["a", "b"])).toBe(false);
+    expect(sameIdSet(["a", "x"], ["a", "b"])).toBe(false);
+    expect(sameIdSet(["a", "a"], ["a", "b"])).toBe(false);
   });
 });

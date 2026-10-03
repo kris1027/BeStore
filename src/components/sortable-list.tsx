@@ -17,7 +17,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVerticalIcon } from "lucide-react";
-import { useRef } from "react";
+import { useId, useRef } from "react";
 import { moveId, sortableAnnouncements, sortableInstructions } from "@/lib/sortable";
 import { cn } from "@/lib/utils";
 
@@ -51,6 +51,7 @@ export function SortableList<T extends SortableItem>({
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+  const contextId = useId();
   const ids = items.map((item) => item.id);
   // Where the lifted item is now. The drop announcement reads it here: by then the parent may
   // already have reordered the items, so a position looked up afresh would be the new one.
@@ -67,6 +68,9 @@ export function SortableList<T extends SortableItem>({
 
   return (
     <DndContext
+      // A stable id: dnd-kit otherwise numbers its hidden instructions per render, and the
+      // server and browser numbers differ (a hydration mismatch on aria-describedby).
+      id={contextId}
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragEnd={onDragEnd}

@@ -4,7 +4,8 @@ import { z } from "zod";
 
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { productImageUrl } from "@/lib/product-image";
+import { escapeLike } from "@/lib/like";
+import { PLACEHOLDER_IMAGE, productImageUrl } from "@/lib/product-image";
 import { variantLabel } from "@/lib/variant-label";
 
 import { type ProductSummary, summarizeVariants } from "./product-summary";
@@ -12,23 +13,53 @@ import type { ProductStatus } from "./status";
 
 // Not cached: the admin always sees the live tables. Callers run requireAdmin() first.
 
-// The admin list stops here until feature 9 adds paging (spec 0005, AC-1).
-export const ADMIN_PRODUCT_LIMIT = 200;
+export const ADMIN_PRODUCTS_PAGE_SIZE = 50;
+export const SEARCH_MAX_LENGTH = 100;
 
-// spec 0009, AC-1: "All" is what the store still sells or may sell (draft and active).
+// spec 0009, AC-1: "All" is what the store still sells or may sell (draft and active);
+// Featured is the featured ones among those.
 export const productListTabs = ["all", "active", "draft", "archived", "featured"] as const;
 export type ProductListTab = (typeof productListTabs)[number];
 
 const listParamsSchema = z.object({
-  status: z.enum(productListTabs).catch("all"),
+  status: z.enum(["active", "draft", "archived"]).optional().catch(undefined),
+  featured: z.literal("1").optional().catch(undefined),
+  q: z
+    .string()
+    .optional()
+    .catch(undefined)
+    .transform((text) => text?.trim().slice(0, SEARCH_MAX_LENGTH) ?? ""),
+  category: z.uuid().optional().catch(undefined),
+  before: z.uuid().optional().catch(undefined),
 });
 
-export type AdminProductsParams = { readonly tab: ProductListTab };
+export type AdminProductsParams = {
+  readonly tab: ProductListTab;
+  // Trimmed, up to 100 characters; "" for no search.
+  readonly q: string;
+  readonly categoryId: string | null;
+  // The id the page starts below (keyset paging, newest first), or null on the first page.
+  readonly before: string | null;
+};
 
-// An unknown value falls back to its default, never an error (AC-1).
+const firstValue = (value: unknown) => (Array.isArray(value) ? value[0] : value);
+
+// Every filter lives in the URL; an unknown or malformed value falls back to its default,
+// never an error (AC-1). An unknown category id is dropped by the page once it has the list.
 export function parseAdminProductsParams(params: Record<string, unknown>): AdminProductsParams {
-  const parsed = listParamsSchema.parse({ status: params.status ?? "all" });
-  return { tab: parsed.status };
+  const parsed = listParamsSchema.parse({
+    status: firstValue(params.status),
+    featured: firstValue(params.featured),
+    q: firstValue(params.q),
+    category: firstValue(params.category),
+    before: firstValue(params.before),
+  });
+  return {
+    tab: parsed.featured ? "featured" : (parsed.status ?? "all"),
+    q: parsed.q,
+    categoryId: parsed.category ?? null,
+    before: parsed.before ?? null,
+  };
 }
 
 function tabWhere(tab: ProductListTab): Prisma.ProductWhereInput {
@@ -42,26 +73,55 @@ function tabWhere(tab: ProductListTab): Prisma.ProductWhereInput {
   }
 }
 
+// Name or any variant SKU, case insensitive, contains (AC-1).
+function searchWhere(q: string): Prisma.ProductWhereInput {
+  if (q === "") return {};
+  const contains = escapeLike(q);
+  return {
+    OR: [
+      { name: { contains, mode: "insensitive" } },
+      { variants: { some: { sku: { contains, mode: "insensitive" } } } },
+    ],
+  };
+}
+
 export type AdminProductRow = {
   readonly id: string;
   readonly name: string;
   readonly slug: string;
   readonly status: ProductStatus;
+  readonly featured: boolean;
   readonly createdAt: Date;
 } & ProductSummary;
 
-export async function getAdminProducts(
-  params: AdminProductsParams,
-): Promise<readonly AdminProductRow[]> {
+export type AdminProductsPage = {
+  readonly rows: readonly AdminProductRow[];
+  // The `before` value of the next page, or null on the last page.
+  readonly nextBefore: string | null;
+};
+
+// spec 0009, AC-1: 50 at a time, newest first. Keyset paging on the UUID v7 id (time ordered),
+// so a page stays stable while products are added.
+export async function getAdminProducts(params: AdminProductsParams): Promise<AdminProductsPage> {
   const products = await db.product.findMany({
-    where: tabWhere(params.tab),
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: ADMIN_PRODUCT_LIMIT,
+    where: {
+      AND: [
+        tabWhere(params.tab),
+        searchWhere(params.q),
+        params.categoryId === null
+          ? {}
+          : { categories: { some: { categoryId: params.categoryId } } },
+        params.before === null ? {} : { id: { lt: params.before } },
+      ],
+    },
+    orderBy: { id: "desc" },
+    take: ADMIN_PRODUCTS_PAGE_SIZE + 1,
     select: {
       id: true,
       name: true,
       slug: true,
       status: true,
+      featured: true,
       createdAt: true,
       variants: {
         where: { archived: false },
@@ -69,10 +129,42 @@ export async function getAdminProducts(
       },
     },
   });
-  return products.map(({ variants, ...product }) => ({
-    ...product,
-    ...summarizeVariants(variants),
-  }));
+  const page = products.slice(0, ADMIN_PRODUCTS_PAGE_SIZE);
+  const last = page.at(-1);
+  return {
+    rows: page.map(({ variants, ...product }) => ({ ...product, ...summarizeVariants(variants) })),
+    nextBefore: products.length > ADMIN_PRODUCTS_PAGE_SIZE && last ? last.id : null,
+  };
+}
+
+export type CategoryOption = { readonly id: string; readonly name: string };
+
+// The category select of the list and the Categories section's checkboxes, by position.
+export async function getCategoryOptions(): Promise<readonly CategoryOption[]> {
+  return db.category.findMany({
+    orderBy: [{ position: "asc" }, { id: "asc" }],
+    select: { id: true, name: true },
+  });
+}
+
+export const PICKER_LIMIT = 20;
+
+export type PickerProduct = {
+  readonly id: string;
+  readonly name: string;
+  readonly status: ProductStatus;
+};
+
+// spec 0009, AC-18: the "Add products" search of a category page: name or SKU, any status.
+export async function searchProductsForPicker(q: string): Promise<readonly PickerProduct[]> {
+  const text = q.trim().slice(0, SEARCH_MAX_LENGTH);
+  if (text === "") return [];
+  return db.product.findMany({
+    where: searchWhere(text),
+    orderBy: { id: "desc" },
+    take: PICKER_LIMIT,
+    select: { id: true, name: true, status: true },
+  });
 }
 
 export type EditOptionType = {
@@ -118,6 +210,9 @@ export type ProductForEdit = {
   // Every variant, archived ones included, by position.
   readonly variants: readonly EditVariant[];
   readonly images: readonly EditImage[];
+  readonly categoryIds: readonly string[];
+  // Not active and on no order line, by product or variant (AC-4).
+  readonly deletable: boolean;
 };
 
 const productIdSchema = z.uuid();
@@ -148,6 +243,8 @@ export async function getProductForEdit(idParam: unknown): Promise<ProductForEdi
           values: { orderBy: { position: "asc" }, select: { id: true, value: true } },
         },
       },
+      categories: { select: { categoryId: true } },
+      _count: { select: { orderLines: true } },
       images: {
         orderBy: [{ position: "asc" }, { id: "asc" }],
         select: {
@@ -176,7 +273,11 @@ export async function getProductForEdit(idParam: unknown): Promise<ProductForEdi
   });
   if (!product) return null;
 
-  const { optionTypes, variants, images, ...rest } = product;
+  const { optionTypes, variants, images, categories, _count, ...rest } = product;
+  const variantOrders =
+    rest.status === "active" || _count.orderLines > 0
+      ? 0
+      : await db.orderLine.count({ where: { variantId: { in: variants.map((v) => v.id) } } });
   const valueAt = new Map(
     optionTypes.flatMap((type, t) =>
       type.values.map((value) => [value.id, { value: value.value, typePosition: t }] as const),
@@ -185,6 +286,8 @@ export async function getProductForEdit(idParam: unknown): Promise<ProductForEdi
   return {
     ...rest,
     optionTypes,
+    categoryIds: categories.map((link) => link.categoryId),
+    deletable: rest.status !== "active" && _count.orderLines === 0 && variantOrders === 0,
     images: images.map(({ storagePath, ...image }) => ({
       ...image,
       src: productImageUrl(storagePath),
@@ -267,4 +370,29 @@ export async function getStockHistory(productId: string): Promise<readonly Stock
 // The first run state of the list: no product in any status.
 export async function catalogIsEmpty(): Promise<boolean> {
   return (await db.product.findFirst({ select: { id: true } })) === null;
+}
+
+export type ArrangeItem = {
+  readonly id: string;
+  readonly name: string;
+  // The card image, or the placeholder.
+  readonly src: string;
+};
+
+// spec 0009, AC-20: every active product in home grid order.
+export async function getArrangeList(): Promise<readonly ArrangeItem[]> {
+  const products = await db.product.findMany({
+    where: { status: "active" },
+    orderBy: [{ position: "asc" }, { createdAt: "desc" }, { id: "desc" }],
+    select: {
+      id: true,
+      name: true,
+      images: { orderBy: { position: "asc" }, take: 1, select: { storagePath: true } },
+    },
+  });
+  return products.map((product) => ({
+    id: product.id,
+    name: product.name,
+    src: product.images[0] ? productImageUrl(product.images[0].storagePath) : PLACEHOLDER_IMAGE,
+  }));
 }

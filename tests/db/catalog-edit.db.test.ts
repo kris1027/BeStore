@@ -20,8 +20,7 @@ vi.mock("@/lib/logger", () => ({ logger: { info: mocks.info, warn: vi.fn() } }))
 
 const { updateProductDetails } = await import("@/features/catalog/actions/update-details");
 const { changeProductStatus } = await import("@/features/catalog/actions/change-status");
-const { getAdminProducts, getProductForEdit, parseAdminProductsParams } =
-  await import("@/features/catalog/admin-queries");
+const { getProductForEdit } = await import("@/features/catalog/admin-queries");
 
 resetDatabaseBeforeEach();
 
@@ -246,24 +245,5 @@ describe("admin reads", () => {
     });
     expect(await getProductForEdit("01890000-0000-7000-8000-000000000000")).toBeNull();
     expect(await getProductForEdit("not-a-uuid")).toBeNull();
-  });
-
-  it("filters the list by status tab; All leaves out archived products", async () => {
-    await testDb.product.createMany({
-      data: [
-        { name: "A", slug: "a", status: "active", featured: true },
-        { name: "D", slug: "d", status: "draft" },
-        { name: "X", slug: "x", status: "archived", featured: true },
-      ],
-    });
-    const slugs = async (status: unknown) =>
-      (await getAdminProducts(parseAdminProductsParams({ status }))).map((row) => row.slug).sort();
-
-    expect(await slugs(undefined)).toEqual(["a", "d"]);
-    expect(await slugs("active")).toEqual(["a"]);
-    expect(await slugs("draft")).toEqual(["d"]);
-    expect(await slugs("archived")).toEqual(["x"]);
-    expect(await slugs("featured")).toEqual(["a"]);
-    expect(await slugs("bogus")).toEqual(["a", "d"]);
   });
 });

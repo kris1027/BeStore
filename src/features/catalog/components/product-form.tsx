@@ -64,6 +64,8 @@ import {
   MAX_OPTION_VALUES,
   suggestSku,
 } from "../variant-grid";
+import type { CategoryOption } from "../admin-queries";
+import { CategoryCheckboxes } from "./category-checkboxes";
 import { DescriptionField } from "./description-field";
 import type { StorageTarget } from "./image-upload";
 import { type ImageDraft, ImagesEditor, type OptionChoice } from "./images-editor";
@@ -161,7 +163,13 @@ function imageOptionValue(
   return { typeIndex: 0, value: "" };
 }
 
-export function ProductForm({ storage }: { readonly storage: StorageTarget }) {
+export function ProductForm({
+  storage,
+  categories,
+}: {
+  readonly storage: StorageTarget;
+  readonly categories: readonly CategoryOption[];
+}) {
   const router = useRouter();
   const { currency } = useStoreFormat();
   const [pending, startTransition] = useTransition();
@@ -169,6 +177,8 @@ export function ProductForm({ storage }: { readonly storage: StorageTarget }) {
   const [submitting, setSubmitting] = useState<NewProductStatus | null>(null);
   const [images, setImages] = useState<readonly ImageDraft[]>([]);
   const [imageErrors, setImageErrors] = useState<Readonly<Record<string, string>>>({});
+  const [categoryIds, setCategoryIds] = useState<readonly string[]>([]);
+  const [categoriesError, setCategoriesError] = useState<string | null>(null);
   // Suggestions follow the name and values until the admin types their own.
   const slugEdited = useRef(false);
   const editedSkus = useRef(new Set<string>());
@@ -234,6 +244,10 @@ export function ProductForm({ storage }: { readonly storage: StorageTarget }) {
       const message = messages[0];
       if (!message) continue;
       // Image errors show inside the images editor, which owns its fields.
+      if (path === "categoryIds" || path.startsWith("categoryIds.")) {
+        setCategoriesError(message);
+        continue;
+      }
       if (path === "images" || path.startsWith("images.")) {
         onImages[path] = message;
         if (first) {
@@ -262,6 +276,7 @@ export function ProductForm({ storage }: { readonly storage: StorageTarget }) {
     setFormError(null);
     clearErrors();
     setImageErrors({});
+    setCategoriesError(null);
     const state = getValues();
     const labels = variantRows(state.optionTypes).rows ?? [];
     const payload = {
@@ -281,6 +296,7 @@ export function ProductForm({ storage }: { readonly storage: StorageTarget }) {
       })),
       featured: state.featured,
       weightGrams: state.weightGrams,
+      categoryIds,
       images: images.map((image) => ({
         path: image.path ?? "",
         altText: image.altText,
@@ -542,6 +558,28 @@ export function ProductForm({ storage }: { readonly storage: StorageTarget }) {
         </div>
 
         <div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-20">
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <h2>Categories</h2>
+              </CardTitle>
+              <CardDescription>Optional. A product can sit in several.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <CategoryCheckboxes
+                idPrefix="new-product-category"
+                categories={categories}
+                value={categoryIds}
+                onChange={setCategoryIds}
+                disabled={pending}
+              />
+              {categoriesError ? (
+                <p role="alert" className="text-sm text-destructive">
+                  {categoriesError}
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader>
               <CardTitle>

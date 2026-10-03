@@ -13,7 +13,8 @@ async function signInAsAdmin(page: Page) {
 }
 
 async function openEditor(page: Page, product: { readonly id: string; readonly name: string }) {
-  await page.goto("/admin/products");
+  // Searched, so a page of newer products from tests running alongside never hides it.
+  await page.goto(`/admin/products?q=${encodeURIComponent(product.name)}`);
   await page.getByRole("link", { name: product.name }).click();
   await expect(page).toHaveURL(`/admin/products/${product.id}`);
   await waitForEditor(page, product.name);

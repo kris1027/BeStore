@@ -200,6 +200,11 @@ export const weightField = z
     return grams;
   });
 
+const categoryIdsField = z
+  .array(z.uuid())
+  .max(500)
+  .transform((ids) => [...new Set(ids)]);
+
 export function productFormSchema(currency: string) {
   return z
     .object({
@@ -213,6 +218,7 @@ export function productFormSchema(currency: string) {
       featured: z.boolean().default(false),
       weightGrams: weightField.default(null),
       images: z.array(createImageSchema).max(MAX_IMAGES, tooManyImages).default([]),
+      categoryIds: categoryIdsField.default([]),
     })
     .superRefine((product, ctx) => {
       const typeNames = new Set<string>();
@@ -540,3 +546,17 @@ export const imagesSchema = z
 
 export type ImagesInput = z.input<typeof imagesSchema>;
 export type ImagesValues = z.output<typeof imagesSchema>;
+
+// spec 0009, AC-18 and AC-21: the product's categories, with the set the page loaded.
+export const productCategoriesSchema = z.object({
+  productId,
+  loadedCategoryIds: categoryIdsField,
+  categoryIds: categoryIdsField,
+});
+
+export const deleteProductSchema = z.object({ productId });
+
+// spec 0009, AC-20: the full ordered list of active products.
+export const reorderProductsSchema = z.object({
+  orderedIds: z.array(z.uuid()).max(10_000),
+});
