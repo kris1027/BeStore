@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 
 import { adminMetadata, requireAdmin } from "@/features/admin-auth/require-admin";
-import { SEARCH_MAX_LENGTH, searchProductsForPicker } from "@/features/catalog/admin-queries";
+import { searchProductsForPicker } from "@/features/catalog/admin-queries";
 import { getCategoryForEdit } from "@/features/categories/admin-queries";
 import { CategoryEditor, CategoryNotFound } from "@/features/categories/components/category-editor";
+import { SEARCH_MAX_LENGTH, parseSearchQuery } from "@/lib/admin-search";
 
 // Reads the session and search params at the top level; allowed to block until converted to
 // Suspense (spec 0005, Caching model).
@@ -22,8 +23,7 @@ export default async function AdminCategoryPage({
   await requireAdmin();
   const category = await getCategoryForEdit((await params).id);
   if (!category) return <CategoryNotFound />;
-  const raw = (await searchParams).q;
-  const q = (typeof raw === "string" ? raw : "").trim().slice(0, SEARCH_MAX_LENGTH);
+  const q = parseSearchQuery(await searchParams);
   const results = q === "" ? null : await searchProductsForPicker(q);
   return (
     <CategoryEditor

@@ -3,6 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import type { Prisma } from "@/generated/prisma/client";
+import { SEARCH_MAX_LENGTH, firstValue, searchQuerySchema } from "@/lib/admin-search";
 import { db } from "@/lib/db";
 import { escapeLike } from "@/lib/like";
 import { PLACEHOLDER_IMAGE, productImageUrl } from "@/lib/product-image";
@@ -14,7 +15,7 @@ import type { ProductStatus } from "./status";
 // Not cached: the admin always sees the live tables. Callers run requireAdmin() first.
 
 export const ADMIN_PRODUCTS_PAGE_SIZE = 50;
-export const SEARCH_MAX_LENGTH = 100;
+export { SEARCH_MAX_LENGTH };
 
 // spec 0009, AC-1: "All" is what the store still sells or may sell (draft and active);
 // Featured is the featured ones among those.
@@ -24,11 +25,7 @@ export type ProductListTab = (typeof productListTabs)[number];
 const listParamsSchema = z.object({
   status: z.enum(["active", "draft", "archived"]).optional().catch(undefined),
   featured: z.literal("1").optional().catch(undefined),
-  q: z
-    .string()
-    .optional()
-    .catch(undefined)
-    .transform((text) => text?.trim().slice(0, SEARCH_MAX_LENGTH) ?? ""),
+  q: searchQuerySchema,
   category: z.uuid().optional().catch(undefined),
   before: z.uuid().optional().catch(undefined),
 });
@@ -41,8 +38,6 @@ export type AdminProductsParams = {
   // The id the page starts below (keyset paging, newest first), or null on the first page.
   readonly before: string | null;
 };
-
-const firstValue = (value: unknown) => (Array.isArray(value) ? value[0] : value);
 
 // Every filter lives in the URL; an unknown or malformed value falls back to its default,
 // never an error (AC-1). An unknown category id is dropped by the page once it has the list.
