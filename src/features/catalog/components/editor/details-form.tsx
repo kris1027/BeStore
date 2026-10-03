@@ -22,13 +22,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { useHydrated } from "@/hooks/use-hydrated";
 
 import { updateProductDetails } from "../../actions/update-details";
 import { detailsSchema, MAX_WEIGHT_GRAMS } from "../../schemas";
 import type { ProductStatus } from "../../status";
+import { DescriptionField } from "../description-field";
 import { notFoundMessage, staleMessage } from "./messages";
 
 const formSchema = detailsSchema.pick({
@@ -75,6 +75,7 @@ export function DetailsForm({
   });
   const { errors } = form.formState;
   const slug = useWatch({ control: form.control, name: "slug" });
+  const description = useWatch({ control: form.control, name: "description" });
   const slugChanged = product.status === "active" && slug.trim() !== product.slug;
 
   // The server parses the raw strings itself, so the form sends what was typed.
@@ -181,17 +182,12 @@ export function DetailsForm({
               ) : null}
               <FieldError id="details-slug-error" errors={[errors.slug]} />
             </Field>
-            <Field data-invalid={errors.description ? true : undefined}>
-              <FieldLabel htmlFor="details-description">Description</FieldLabel>
-              <Textarea
-                id="details-description"
-                rows={8}
-                aria-invalid={errors.description ? true : undefined}
-                aria-describedby={errors.description ? "details-description-error" : undefined}
-                {...form.register("description")}
-              />
-              <FieldError id="details-description-error" errors={[errors.description]} />
-            </Field>
+            <DescriptionField
+              id="details-description"
+              value={description}
+              error={errors.description?.message}
+              textarea={form.register("description")}
+            />
             <Field data-invalid={errors.weightGrams ? true : undefined}>
               <FieldLabel htmlFor="details-weight">Weight in grams</FieldLabel>
               <Input

@@ -54,7 +54,8 @@ export async function createProductWithOptions(suffix = "opt") {
         ],
       },
     },
-    include: { values: true },
+    // Ordered: the values of a nested create come back in no fixed order otherwise.
+    include: { values: { orderBy: { position: "asc" } } },
   });
   const color = await testDb.productOptionType.create({
     data: {
@@ -68,7 +69,8 @@ export async function createProductWithOptions(suffix = "opt") {
         ],
       },
     },
-    include: { values: true },
+    // Ordered: the values of a nested create come back in no fixed order otherwise.
+    include: { values: { orderBy: { position: "asc" } } },
   });
   const variants = [];
   for (const s of size.values) {

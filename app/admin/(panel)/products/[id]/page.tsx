@@ -26,6 +26,8 @@ export default async function EditProductPage({ params }: PageProps<"/admin/prod
       product={product}
       stockHistory={stockHistory}
       dateFormat={{ locale: env.STORE_LOCALE, timeZone: env.STORE_TIMEZONE }}
+      // Public values: the browser uploads images straight to Storage with a signed token.
+      storage={{ url: env.NEXT_PUBLIC_SUPABASE_URL, anonKey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
     />
   );
 }

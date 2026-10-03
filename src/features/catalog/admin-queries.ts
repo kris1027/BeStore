@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { productImageUrl } from "@/lib/product-image";
 import { variantLabel } from "@/lib/variant-label";
 
 import { type ProductSummary, summarizeVariants } from "./product-summary";
@@ -93,6 +94,16 @@ export type EditVariant = {
   readonly label: string;
 };
 
+export type EditImage = {
+  readonly id: string;
+  readonly src: string;
+  readonly width: number | null;
+  readonly height: number | null;
+  readonly altText: string;
+  readonly position: number;
+  readonly optionValueId: string | null;
+};
+
 export type ProductForEdit = {
   readonly id: string;
   readonly name: string;
@@ -106,6 +117,7 @@ export type ProductForEdit = {
   readonly optionTypes: readonly EditOptionType[];
   // Every variant, archived ones included, by position.
   readonly variants: readonly EditVariant[];
+  readonly images: readonly EditImage[];
 };
 
 const productIdSchema = z.uuid();
@@ -136,6 +148,18 @@ export async function getProductForEdit(idParam: unknown): Promise<ProductForEdi
           values: { orderBy: { position: "asc" }, select: { id: true, value: true } },
         },
       },
+      images: {
+        orderBy: [{ position: "asc" }, { id: "asc" }],
+        select: {
+          id: true,
+          storagePath: true,
+          width: true,
+          height: true,
+          altText: true,
+          position: true,
+          optionValueId: true,
+        },
+      },
       variants: {
         orderBy: [{ position: "asc" }, { id: "asc" }],
         select: {
@@ -152,7 +176,7 @@ export async function getProductForEdit(idParam: unknown): Promise<ProductForEdi
   });
   if (!product) return null;
 
-  const { optionTypes, variants, ...rest } = product;
+  const { optionTypes, variants, images, ...rest } = product;
   const valueAt = new Map(
     optionTypes.flatMap((type, t) =>
       type.values.map((value) => [value.id, { value: value.value, typePosition: t }] as const),
@@ -161,6 +185,10 @@ export async function getProductForEdit(idParam: unknown): Promise<ProductForEdi
   return {
     ...rest,
     optionTypes,
+    images: images.map(({ storagePath, ...image }) => ({
+      ...image,
+      src: productImageUrl(storagePath),
+    })),
     variants: variants.map(({ optionValues, ...variant }) => {
       const values = optionValues.flatMap((link) => {
         const value = valueAt.get(link.optionValueId);

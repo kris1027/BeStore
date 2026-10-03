@@ -6,7 +6,8 @@ import { expect, test } from "@playwright/test";
 import { createTestUser, signInFully } from "../admin/support";
 import { adminProductUrl } from "./support";
 
-// Spec 0005, AC-5 and AC-6: one optional image, uploaded straight to Storage, with alt text.
+// Spec 0005, AC-5 and AC-6 (spec 0009 makes it up to 8): images go straight to Storage, each
+// with alt text.
 
 const fixture = path.resolve("tests/e2e/fixtures/product.png");
 
@@ -22,15 +23,15 @@ test("an admin uploads a product image that the storefront shows with its alt te
   await page.getByLabel("Name", { exact: true }).fill(name);
   await page.getByLabel("Price for the product", { exact: true }).fill("24");
   await page.getByLabel("Stock for the product").fill("7");
-  await page.getByLabel("Photo").setInputFiles(fixture);
-  await expect(page.getByLabel("Alt text")).toBeVisible();
+  await page.getByLabel("Add an image").setInputFiles(fixture);
+  await expect(page.getByLabel("Alt text for image 1")).toBeVisible();
 
   // Alt text is required once an image is attached.
   await page.getByRole("button", { name: "Publish" }).click();
   await expect(page.getByText("Describe the image for people who cannot see it.")).toBeVisible();
-  await expect(page.getByLabel("Alt text")).toBeFocused();
+  await expect(page.getByLabel("Alt text for image 1")).toBeFocused();
 
-  await page.getByLabel("Alt text").fill("A sand colored mug on a wooden table");
+  await page.getByLabel("Alt text for image 1").fill("A sand colored mug on a wooden table");
   await page.getByRole("button", { name: "Publish" }).click();
   await expect(page).toHaveURL(adminProductUrl);
 
@@ -57,7 +58,7 @@ test("a file that is not an image is refused before any upload", async ({ page }
   await signInFully(page, admin);
   await page.goto("/admin/products/new");
 
-  await page.getByLabel("Photo").setInputFiles({
+  await page.getByLabel("Add an image").setInputFiles({
     name: "notes.txt",
     mimeType: "text/plain",
     buffer: Buffer.from("not an image"),

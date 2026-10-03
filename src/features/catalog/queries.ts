@@ -113,12 +113,20 @@ export type ProductOptionTypeView = {
   readonly values: readonly { readonly id: string; readonly value: string }[];
 };
 
+// Every image of the product page; the gallery picks per variant (spec 0009, AC-15).
+export type GalleryImage = ProductImage & {
+  readonly id: string;
+  readonly position: number;
+  readonly optionValueId: string | null;
+};
+
 export type ProductView = {
   readonly id: string;
   readonly name: string;
   readonly slug: string;
+  // Markdown, rendered by ProductDescription (spec 0009, AC-6).
   readonly description: string;
-  readonly image: ProductImage;
+  readonly images: readonly GalleryImage[];
   readonly optionTypes: readonly ProductOptionTypeView[];
   readonly variants: readonly ProductVariantView[];
 };
@@ -137,7 +145,18 @@ export async function getProductBySlug(slug: string): Promise<ProductView | null
       name: true,
       slug: true,
       description: true,
-      images: imageSelect,
+      images: {
+        orderBy: [{ position: "asc" }, { id: "asc" }],
+        select: {
+          id: true,
+          storagePath: true,
+          altText: true,
+          width: true,
+          height: true,
+          position: true,
+          optionValueId: true,
+        },
+      },
       optionTypes: {
         orderBy: { position: "asc" },
         select: {
@@ -170,7 +189,12 @@ export async function getProductBySlug(slug: string): Promise<ProductView | null
     name: product.name,
     slug: product.slug,
     description: product.description,
-    image: toImage(product.images[0]),
+    images: product.images.map((image) => ({
+      ...toImage(image),
+      id: image.id,
+      position: image.position,
+      optionValueId: image.optionValueId,
+    })),
     optionTypes: product.optionTypes,
     variants: product.variants.map((variant) => ({
       id: variant.id,

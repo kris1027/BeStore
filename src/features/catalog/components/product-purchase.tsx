@@ -13,7 +13,7 @@ import { toast } from "@/components/ui/toast";
 import { addToCart } from "@/features/cart/actions";
 import { type Availability, quantityLimit } from "@/lib/availability";
 
-import { initialVariant, isValueAvailable, type Selection, variantFor, withValue } from "../picker";
+import { isValueAvailable, type Selection, variantFor, withValue } from "../picker";
 import type { ProductOptionTypeView, ProductVariantView } from "../queries";
 
 const cartPath = "/cart";
@@ -40,15 +40,17 @@ const addErrors = {
 export function ProductPurchase({
   optionTypes,
   variants,
+  selection,
+  onSelectionChange,
 }: {
   readonly optionTypes: readonly ProductOptionTypeView[];
   readonly variants: readonly ProductVariantView[];
+  // Owned by the page, since the gallery follows it too (spec 0009, AC-15).
+  readonly selection: Selection;
+  readonly onSelectionChange: (selection: Selection) => void;
 }) {
   const router = useRouter();
   const id = useId();
-  const [selection, setSelection] = useState<Selection>(
-    () => initialVariant(variants)?.optionValueIds ?? [],
-  );
   const [quantity, setQuantity] = useState("1");
   const [pending, startTransition] = useTransition();
 
@@ -113,8 +115,7 @@ export function ProductPurchase({
           <RadioGroup
             value={selection[t] ?? null}
             onValueChange={(value) => {
-              if (typeof value === "string")
-                setSelection((current) => withValue(current, t, value));
+              if (typeof value === "string") onSelectionChange(withValue(selection, t, value));
             }}
             className="flex flex-wrap gap-x-6 gap-y-3"
           >

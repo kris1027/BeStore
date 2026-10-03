@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   type Control,
+  Controller,
   get,
   type FieldErrors,
   type Path,
@@ -26,6 +27,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
   FieldDescription,
@@ -46,14 +48,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { fractionDigits } from "@/lib/money";
 import { slugify } from "@/lib/slug";
 
 import { createProduct } from "../actions/create-product";
 import { adminProductPath, adminProductsPath } from "../paths";
-import { type NewProductStatus, pathErrors, productFormSchema } from "../schemas";
+import { MAX_WEIGHT_GRAMS, type NewProductStatus, pathErrors, productFormSchema } from "../schemas";
 import {
   combinationCount,
   combinationKey,
@@ -63,7 +64,9 @@ import {
   MAX_OPTION_VALUES,
   suggestSku,
 } from "../variant-grid";
-import { ImageField, type StorageTarget, type UploadedImage } from "./image-field";
+import { DescriptionField } from "./description-field";
+import type { StorageTarget } from "./image-upload";
+import { type ImageDraft, ImagesEditor, type OptionChoice } from "./images-editor";
 
 // Each option value carries a client id, so a variant row is keyed by which values it combines,
 // not by their text: renaming a value keeps the price and stock typed in its rows.
@@ -83,7 +86,8 @@ type FormState = {
   description: string;
   optionTypes: OptionTypeField[];
   variants: VariantField[];
-  imageAlt: string;
+  featured: boolean;
+  weightGrams: string;
 };
 
 const newId = () => crypto.randomUUID();
@@ -102,8 +106,6 @@ const fieldId = (path: string) => path.replace(/\./g, "-");
 // Schema paths name an option value by index ("optionTypes.0.values.1"); the form stores it as
 // an object, so its input lives one level down.
 function formPath(path: string): string {
-  if (path === "image.altText") return "imageAlt";
-  if (path === "image" || path.startsWith("image.")) return "root.image";
   if (/^optionTypes\.\d+\.values\.\d+$/.test(path)) return `${path}.value`;
   if (/^(root|optionTypes|variants|optionTypes\.\d+\.values)$/.test(path)) {
     return `root.${fieldId(path)}`;
@@ -133,13 +135,40 @@ function variantRows(optionTypes: readonly OptionTypeField[]) {
   return { count, rows };
 }
 
+// An image's option link, keyed by the option value's client id so a rename keeps it.
+function imageChoices(optionTypes: readonly OptionTypeField[]): readonly OptionChoice[] {
+  return optionTypes.flatMap((type, t) =>
+    type.values
+      .filter((value) => value.value.trim() !== "")
+      .map((value) => ({
+        key: value.id,
+        label: `${type.name.trim() || `Option ${t + 1}`} / ${value.value.trim()}`,
+      })),
+  );
+}
+
+// The create action names a value by its option type's index and its text (no ids exist yet).
+// A link to a value since removed sends an empty value, which the schema refuses on its field.
+function imageOptionValue(
+  optionTypes: readonly OptionTypeField[],
+  key: string,
+): { readonly typeIndex: number; readonly value: string } | null {
+  if (key === "") return null;
+  for (const [typeIndex, type] of optionTypes.entries()) {
+    const value = type.values.find((entry) => entry.id === key);
+    if (value) return { typeIndex, value: value.value };
+  }
+  return { typeIndex: 0, value: "" };
+}
+
 export function ProductForm({ storage }: { readonly storage: StorageTarget }) {
   const router = useRouter();
   const { currency } = useStoreFormat();
   const [pending, startTransition] = useTransition();
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<NewProductStatus | null>(null);
-  const [image, setImage] = useState<UploadedImage | null>(null);
+  const [images, setImages] = useState<readonly ImageDraft[]>([]);
+  const [imageErrors, setImageErrors] = useState<Readonly<Record<string, string>>>({});
   // Suggestions follow the name and values until the admin types their own.
   const slugEdited = useRef(false);
   const editedSkus = useRef(new Set<string>());
@@ -151,7 +180,8 @@ export function ProductForm({ storage }: { readonly storage: StorageTarget }) {
       description: "",
       optionTypes: [],
       variants: [defaultVariant("")],
-      imageAlt: "",
+      featured: false,
+      weightGrams: "",
     },
   });
   const { control, register, setValue, getValues, setError, clearErrors, formState } = form;
@@ -162,6 +192,7 @@ export function ProductForm({ storage }: { readonly storage: StorageTarget }) {
 
   const name = useWatch({ control, name: "name" });
   const slug = useWatch({ control, name: "slug" });
+  const description = useWatch({ control, name: "description" });
   const optionTypes = useWatch({ control, name: "optionTypes" });
   const grid = useMemo(() => variantRows(optionTypes), [optionTypes]);
 
@@ -198,9 +229,23 @@ export function ProductForm({ storage }: { readonly storage: StorageTarget }) {
 
   function showErrors(fields: Record<string, readonly string[]>) {
     let first = true;
+    const onImages: Record<string, string> = {};
     for (const [path, messages] of Object.entries(fields)) {
       const message = messages[0];
       if (!message) continue;
+      // Image errors show inside the images editor, which owns its fields.
+      if (path === "images" || path.startsWith("images.")) {
+        onImages[path] = message;
+        if (first) {
+          const index = /^images\.(\d+)/.exec(path)?.[1];
+          const field = path.endsWith(".optionValue") ? "option" : "alt";
+          document
+            .getElementById(index === undefined ? "images-add" : `images-${index}-${field}`)
+            ?.focus();
+          first = false;
+        }
+        continue;
+      }
       const target = formPath(path);
       setError(target as Path<FormState>, { type: "validate", message });
       if (first) {
@@ -210,11 +255,13 @@ export function ProductForm({ storage }: { readonly storage: StorageTarget }) {
         first = false;
       }
     }
+    setImageErrors(onImages);
   }
 
   function submit(status: NewProductStatus) {
     setFormError(null);
     clearErrors();
+    setImageErrors({});
     const state = getValues();
     const labels = variantRows(state.optionTypes).rows ?? [];
     const payload = {
@@ -232,9 +279,15 @@ export function ProductForm({ storage }: { readonly storage: StorageTarget }) {
         stock: variant.stock,
         sku: variant.sku,
       })),
-      image: image
-        ? { path: image.path, altText: state.imageAlt, width: image.width, height: image.height }
-        : null,
+      featured: state.featured,
+      weightGrams: state.weightGrams,
+      images: images.map((image) => ({
+        path: image.path ?? "",
+        altText: image.altText,
+        width: image.width ?? 0,
+        height: image.height ?? 0,
+        optionValue: imageOptionValue(state.optionTypes, image.optionKey),
+      })),
     };
 
     const parsed = productFormSchema(currency).safeParse(payload);
@@ -319,18 +372,83 @@ export function ProductForm({ storage }: { readonly storage: StorageTarget }) {
                     slugEdited.current = true;
                   }}
                 />
-                <Field data-invalid={errors.description ? true : undefined}>
-                  <FieldLabel htmlFor="description">Description</FieldLabel>
-                  <Textarea
-                    id="description"
-                    rows={5}
-                    aria-invalid={errors.description ? true : undefined}
-                    aria-describedby={errors.description ? "description-error" : undefined}
-                    {...register("description")}
+                <DescriptionField
+                  id="description"
+                  value={description}
+                  error={errorAt(errors, "description")}
+                  textarea={register("description")}
+                />
+                <Field data-invalid={errors.weightGrams ? true : undefined}>
+                  <FieldLabel htmlFor="weightGrams">Weight in grams</FieldLabel>
+                  <Input
+                    id="weightGrams"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    className="max-w-48"
+                    aria-invalid={errors.weightGrams ? true : undefined}
+                    aria-describedby={
+                      errors.weightGrams ? "weightGrams-error" : "weightGrams-description"
+                    }
+                    {...register("weightGrams")}
                   />
-                  <FieldError id="description-error" errors={[errors.description]} />
+                  {errors.weightGrams ? (
+                    <FieldError id="weightGrams-error" errors={[errors.weightGrams]} />
+                  ) : (
+                    <FieldDescription id="weightGrams-description">
+                      Optional, from 1 to {MAX_WEIGHT_GRAMS}.
+                    </FieldDescription>
+                  )}
+                </Field>
+                <Field orientation="horizontal">
+                  <Controller
+                    control={control}
+                    name="featured"
+                    render={({ field }) => (
+                      <Checkbox
+                        id="featured"
+                        name={field.name}
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        onBlur={field.onBlur}
+                        inputRef={field.ref}
+                        aria-describedby="featured-description"
+                      />
+                    )}
+                  />
+                  <div className="flex flex-col gap-1">
+                    <FieldLabel htmlFor="featured">Featured</FieldLabel>
+                    <FieldDescription id="featured-description">
+                      Marks the product for the Featured tab.
+                    </FieldDescription>
+                  </div>
                 </Field>
               </FieldGroup>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <h2>Images</h2>
+              </CardTitle>
+              <CardDescription>
+                Optional. Drag to reorder, or use a handle with the keyboard; the first image is the
+                card image. An image can belong to one option value, like the red photos of a tee.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ImagesEditor
+                idPrefix="images"
+                storage={storage}
+                images={images}
+                onChange={(next) => {
+                  setImages(next);
+                  setImageErrors({});
+                }}
+                choices={imageChoices(optionTypes)}
+                errors={imageErrors}
+                disabled={pending}
+              />
             </CardContent>
           </Card>
 
@@ -424,19 +542,6 @@ export function ProductForm({ storage }: { readonly storage: StorageTarget }) {
         </div>
 
         <div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-20">
-          <ImageField
-            storage={storage}
-            image={image}
-            onImageChange={(next) => {
-              setImage(next);
-              clearErrors("imageAlt");
-              clearErrors("root.image");
-            }}
-            altInput={register("imageAlt")}
-            altError={errorAt(errors, "imageAlt")}
-            imageError={errorAt(errors, "root.image")}
-            disabled={pending}
-          />
           <Card>
             <CardHeader>
               <CardTitle>

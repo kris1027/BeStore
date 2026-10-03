@@ -47,19 +47,46 @@ const optionTypeSchema = z.object({
 
 const dimension = z.number().int().min(1).max(10_000);
 
-// Optional: at most one image, and alt text whenever there is one (AC-5).
-const imageSchema = z
-  .object({
-    path: z.string().regex(PRODUCT_IMAGE_PATH, "Choose the image again."),
-    altText: z
-      .string()
-      .trim()
-      .min(1, "Describe the image for people who cannot see it.")
-      .max(300, "Keep it under 300 characters."),
-    width: dimension,
-    height: dimension,
-  })
-  .nullable();
+// spec 0009, AC-13: up to 8 images, each with alt text.
+export const MAX_IMAGES = 8;
+
+export const altTextField = z
+  .string()
+  .trim()
+  .min(1, "Describe the image for people who cannot see it.")
+  .max(300, "Keep it under 300 characters.");
+
+const imagePathField = z.string().regex(PRODUCT_IMAGE_PATH, "Choose the image again.");
+
+const tooManyImages = `Up to ${MAX_IMAGES} images.`;
+
+// The create form names an option value by its option type's index and its text: neither has
+// an id until the product is saved.
+const createImageSchema = z.object({
+  path: imagePathField,
+  altText: altTextField,
+  width: dimension,
+  height: dimension,
+  optionValue: z
+    .object({ typeIndex: z.number().int().min(0), value: z.string().trim() })
+    .nullable()
+    .default(null),
+});
+
+function checkUniquePaths(
+  images: readonly { readonly path?: string | undefined }[],
+  ctx: z.RefinementCtx,
+  at: string,
+) {
+  const seen = new Set<string>();
+  images.forEach((image, index) => {
+    if (image.path === undefined) return;
+    if (seen.has(image.path)) {
+      ctx.addIssue({ code: "custom", path: [at, index], message: "This image is already here." });
+    }
+    seen.add(image.path);
+  });
+}
 
 export function priceField(currency: string) {
   return z.string().transform((text, ctx) => {
@@ -183,7 +210,9 @@ export function productFormSchema(currency: string) {
         .array(optionTypeSchema)
         .max(MAX_OPTION_TYPES, `Up to ${MAX_OPTION_TYPES} options.`),
       variants: z.array(variantSchema(currency)).min(1).max(MAX_COMBINATIONS),
-      image: imageSchema.default(null),
+      featured: z.boolean().default(false),
+      weightGrams: weightField.default(null),
+      images: z.array(createImageSchema).max(MAX_IMAGES, tooManyImages).default([]),
     })
     .superRefine((product, ctx) => {
       const typeNames = new Set<string>();
@@ -240,6 +269,20 @@ export function productFormSchema(currency: string) {
           message: "The variants do not match the options. Reload the page and try again.",
         });
       }
+
+      checkUniquePaths(product.images, ctx, "images");
+      product.images.forEach((image, index) => {
+        if (image.optionValue === null) return;
+        const { typeIndex, value } = image.optionValue;
+        const type = product.optionTypes[typeIndex];
+        if (!type?.values.some((entry) => entry.toLowerCase() === value.toLowerCase())) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["images", index, "optionValue"],
+            message: "Choose a value this product has.",
+          });
+        }
+      });
 
       const skus = new Map<string, number>();
       product.variants.forEach((variant, v) => {
@@ -449,3 +492,51 @@ export function addOptionValueSchema(currency: string) {
 
 export type AddOptionValueInput = z.input<ReturnType<typeof addOptionValueSchema>>;
 export type AddOptionValueValues = z.output<ReturnType<typeof addOptionValueSchema>>;
+
+// spec 0009, AC-13 and AC-21: the images in their new order, each either a stored one (by id)
+// or a fresh upload (by path), with what the page loaded so the action can refuse a save over
+// someone else's change.
+export const imagesSchema = z
+  .object({
+    productId,
+    loaded: z
+      .array(
+        z.object({
+          id: z.uuid(),
+          altText: z.string(),
+          position: z.number().int().min(0),
+          optionValueId: z.uuid().nullable(),
+        }),
+      )
+      .max(MAX_IMAGES * 4),
+    images: z
+      .array(
+        z
+          .object({
+            id: z.uuid().optional(),
+            path: imagePathField.optional(),
+            altText: altTextField,
+            width: dimension.optional(),
+            height: dimension.optional(),
+            optionValueId: z.uuid().nullable(),
+          })
+          .superRefine((image, ctx) => {
+            const isNew = image.path !== undefined;
+            const shaped =
+              (image.id === undefined) === isNew &&
+              (!isNew || (image.width !== undefined && image.height !== undefined));
+            if (!shaped) ctx.addIssue({ code: "custom", message: "Choose the image again." });
+          }),
+      )
+      .max(MAX_IMAGES, tooManyImages),
+  })
+  .superRefine((input, ctx) => {
+    checkUniquePaths(input.images, ctx, "images");
+    const ids = input.images.flatMap((image) => (image.id === undefined ? [] : [image.id]));
+    if (new Set(ids).size !== ids.length) {
+      ctx.addIssue({ code: "custom", path: ["images"], message: "Each image once." });
+    }
+  });
+
+export type ImagesInput = z.input<typeof imagesSchema>;
+export type ImagesValues = z.output<typeof imagesSchema>;

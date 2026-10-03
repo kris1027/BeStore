@@ -16,7 +16,9 @@ import type { DateFormat } from "@/lib/dates";
 
 import type { ProductForEdit, StockHistoryRow } from "../../admin-queries";
 import { adminProductsPath, productPath } from "../../paths";
+import type { StorageTarget } from "../image-upload";
 import { DetailsForm } from "./details-form";
+import { ImagesSection } from "./images-section";
 import { StatusCard } from "./status-card";
 import { StockForm } from "./stock-form";
 import { StockHistory } from "./stock-history";
@@ -41,8 +43,10 @@ export function ProductEditor({
   product,
   stockHistory,
   dateFormat,
+  storage,
 }: {
   readonly product: ProductForEdit;
+  readonly storage: StorageTarget;
   readonly stockHistory: readonly StockHistoryRow[];
   readonly dateFormat: DateFormat;
 }) {
@@ -66,6 +70,7 @@ export function ProductEditor({
       stock: variant.stockQuantity,
     }));
   const stockKey = JSON.stringify(stockRows);
+  const imagesKey = JSON.stringify([product.images, product.optionTypes]);
   return (
     <>
       <div className="flex flex-col gap-3">
@@ -94,6 +99,27 @@ export function ProductEditor({
       <div className="grid items-start gap-6 lg:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
           <DetailsForm key={loadedAt} product={{ ...product, updatedAt: loadedAt }} />
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <h2>Images</h2>
+              </CardTitle>
+              <CardDescription>
+                Drag to reorder, or use a handle with the keyboard. An image can belong to one
+                value, like the red photos of a tee; the product page shows those when that value is
+                picked.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ImagesSection
+                key={imagesKey}
+                productId={product.id}
+                storage={storage}
+                images={product.images}
+                optionTypes={product.optionTypes}
+              />
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader>
               <CardTitle>

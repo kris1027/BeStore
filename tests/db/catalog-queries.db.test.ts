@@ -293,3 +293,33 @@ describe("sale prices", () => {
     ]);
   });
 });
+
+// covers: spec 0009 AC-15
+describe("product page images", () => {
+  it("returns every image by position with its option link", async () => {
+    const { product: tee, color } = await createProductWithOptions("g");
+    const red = color.values.find((value) => value.value === "Red")!;
+    await testDb.productImage.createMany({
+      data: [
+        {
+          productId: tee.id,
+          storagePath: "products/b.png",
+          altText: "Red",
+          position: 1,
+          optionValueId: red.id,
+        },
+        { productId: tee.id, storagePath: "products/a.png", altText: "Any", position: 0 },
+      ],
+    });
+
+    const view = await getProductBySlug(tee.slug);
+
+    expect(view?.images.map((image) => [image.alt, image.position, image.optionValueId])).toEqual([
+      ["Any", 0, null],
+      ["Red", 1, red.id],
+    ]);
+    expect(view?.images[0]?.src).toBe(
+      "http://127.0.0.1:55321/storage/v1/object/public/product-images/products/a.png",
+    );
+  });
+});
