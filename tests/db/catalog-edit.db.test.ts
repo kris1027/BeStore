@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", async () => ({ db: (await import("./client")).testDb }));
+vi.mock("@/lib/env", () => ({ env: { NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:55321" } }));
 vi.mock("next/cache", () => ({ updateTag: mocks.updateTag }));
 vi.mock("@/features/admin-auth/require-admin", () => ({ requireAdmin: mocks.requireAdmin }));
 vi.mock("@/lib/logger", async (importOriginal) =>
