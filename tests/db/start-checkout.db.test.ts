@@ -185,6 +185,21 @@ describe("the happy path", () => {
 
     expect((await testDb.order.findFirstOrThrow()).totalCents).toBe(2500);
   });
+
+  // covers: spec 0009 AC-16
+  it("charges the price, never the compare at price", async () => {
+    const { variant } = await createSimpleProduct("a", 5);
+    await testDb.productVariant.update({
+      where: { id: variant.id },
+      data: { compareAtPriceCents: 9900 },
+    });
+    await cartWith([{ variantId: variant.id, quantity: 1 }]);
+
+    await startCheckout(checkout("a@example.com"));
+
+    expect((await testDb.orderLine.findFirstOrThrow()).unitPriceCents).toBe(2500);
+    expect(sessionParams().line_items[0]?.price_data.unit_amount).toBe(2500);
+  });
 });
 
 async function stickerCart(priceCents: number) {

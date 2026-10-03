@@ -183,14 +183,14 @@ spec [0008](../specs/0008-purge-expired-order-pii/index.md) · code in `src/feat
 ### 9. Admin catalog management · in-progress
 Thicken the admin product editor: edit and hide products, manage categories, several images per product, stock per variant.
 **Done when:** an admin can create, edit, hide, and reorder products and categories, upload and order several images, and change stock per variant; hidden products vanish from the storefront.
-spec [0009](../specs/0009-admin-catalog-management/index.md)
+spec [0009](../specs/0009-admin-catalog-management/index.md) · code in `src/features/catalog/`, `src/features/categories/`
 - [x] Design it (spec): `/architect admin catalog management`
-- [ ] Build it: `/develop admin catalog management`
+- [x] Build it: `/develop admin catalog management`
   - [x] Thin thread: edit page Details section, publish, hide, archive and restore with cache expiry and list status tabs (AC-2, AC-3, AC-5, AC-21, AC-22, AC-23, AC-24)
   - [x] Variants, stock and history: `stock_movements` migration and backfill, sale rows from `takeStock`, Stock section with compare and set, Variants section, add option value, sale price on the storefront (AC-7, AC-8, AC-9, AC-10, AC-11, AC-12, AC-16)
   - [x] Images and Markdown: shared keyboard sortable list, up to 8 images with option links, gallery and order photo rule, file cleanup, Markdown with preview (AC-6, AC-13, AC-14, AC-15)
   - [x] Categories, arranging, list and delete: category pages and actions, assignment from both sides, arrange products and categories, list search, filters and paging, delete with checkout lock (AC-1, AC-4, AC-17, AC-18, AC-19, AC-20)
-  - [ ] Safety net: DB tests for every conflict and guard, e2e with axe and keyboard on every touched page (AC-1 to AC-25)
+  - [x] Safety net: DB tests for every conflict and guard, e2e with axe and keyboard on every touched page (AC-1 to AC-25)
 - [ ] Verify it: `/check verify admin catalog management`
 - [ ] Test it: `/test admin catalog management`
 
