@@ -193,6 +193,7 @@ spec [0009](../specs/0009-admin-catalog-management/index.md) · code in `src/fea
   - [x] Safety net: DB tests for every conflict and guard, e2e with axe and keyboard on every touched page (AC-1 to AC-25)
 - [x] Verify it: `/check verify admin catalog management`
 - [x] Test it: `/test admin catalog management`
+- [x] Review it (fresh model): `/check review admin catalog management`
 
 ## Slice 4: Orders
 
