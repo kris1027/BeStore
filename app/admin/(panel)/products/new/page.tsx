@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { adminMetadata, requireAdmin } from "@/features/admin-auth/require-admin";
+import { getCategoryOptions } from "@/features/catalog/admin-queries";
 import { ProductForm } from "@/features/catalog/components/product-form";
 import { env } from "@/lib/env";
 
@@ -14,10 +15,12 @@ export function generateMetadata(): Promise<Metadata> {
 
 export default async function NewProductPage() {
   await requireAdmin();
+  const categories = await getCategoryOptions();
   // Public values: the browser uploads the image straight to Storage with a signed token.
   return (
     <ProductForm
       storage={{ url: env.NEXT_PUBLIC_SUPABASE_URL, anonKey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      categories={categories}
     />
   );
 }

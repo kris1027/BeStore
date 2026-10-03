@@ -35,7 +35,22 @@ const sizeAndColor = {
 describe("productFormSchema", () => {
   it("parses prices to cents, stock to a number and SKUs to upper case", () => {
     const parsed = schema.parse(product());
-    expect(parsed.variants).toEqual([{ values: [], price: 1999, stock: 3, sku: "LINEN-SHIRT" }]);
+    expect(parsed.variants).toEqual([
+      { values: [], price: 1999, compareAt: null, stock: 3, sku: "LINEN-SHIRT" },
+    ]);
+  });
+
+  // covers: spec 0009 AC-7
+  it("takes an optional compare at price, only above the selling price", () => {
+    const at = (compareAt: string) =>
+      product({ variants: [{ values: [], price: "20", compareAt, stock: "1", sku: "A" }] });
+
+    expect(schema.parse(at("25")).variants[0]?.compareAt).toBe(2500);
+    expect(schema.parse(at(" ")).variants[0]?.compareAt).toBeNull();
+    expect(errorsOf(at("20"))).toEqual({
+      "variants.0.compareAt": ["Enter a price above the selling price."],
+    });
+    expect(errorsOf(at("abc"))).toEqual({ "variants.0.compareAt": ["Enter a price like 19.99."] });
   });
 
   it("accepts one variant per combination of the options", () => {

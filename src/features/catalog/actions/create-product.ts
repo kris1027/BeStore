@@ -7,9 +7,10 @@ import { catalogTag, productTag } from "@/lib/cache-tags";
 import { db } from "@/lib/db";
 import { uniqueViolation } from "@/lib/db-errors";
 import { env } from "@/lib/env";
-import { PRODUCT_IMAGE_BUCKET } from "@/lib/product-image";
+import { linkAtEnd, lockCategories } from "@/lib/product-categories";
+import { imageDuplicateMessage, imageMissingMessage, missingUploads } from "../image-files";
 import type { ActionResult } from "@/lib/result";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { type MovementRow, recordMovements } from "@/lib/stock-movements";
 
 import { logCatalogEvent } from "../log";
 import {
@@ -31,39 +32,62 @@ const takenMessages = {
   slug: "Another product already uses this URL name.",
   sku: "Another product already uses this SKU.",
 } as const;
+const categoryGoneMessage = "A category was deleted meanwhile. Reload and choose again.";
 
-// The field errors for a slug or SKUs that already exist, or null when all are free.
+// The field errors for a slug, SKUs or image paths already in use, or null when all are free.
 async function takenErrors(
   product: ProductFormValues,
 ): Promise<Record<string, readonly string[]> | null> {
-  const [slugTaken, skuRows] = await Promise.all([
+  const [slugTaken, skuRows, imageRows, knownCategories] = await Promise.all([
     db.product.findUnique({ where: { slug: product.slug }, select: { id: true } }),
     db.productVariant.findMany({
       where: { sku: { in: product.variants.map((variant) => variant.sku) } },
       select: { sku: true },
     }),
+    db.productImage.findMany({
+      where: { storagePath: { in: product.images.map((image) => image.path) } },
+      select: { storagePath: true },
+    }),
+    db.category.count({ where: { id: { in: product.categoryIds } } }),
   ]);
+  const usedPaths = new Set(imageRows.map((row) => row.storagePath));
   const takenSkus = new Set(skuRows.map((row) => row.sku));
   const fields: Record<string, readonly string[]> = {};
   if (slugTaken) fields.slug = [takenMessages.slug];
   product.variants.forEach((variant, v) => {
     if (takenSkus.has(variant.sku)) fields[`variants.${v}.sku`] = [takenMessages.sku];
   });
+  product.images.forEach((image, index) => {
+    if (usedPaths.has(image.path)) fields[`images.${index}`] = [imageDuplicateMessage];
+  });
+  if (knownCategories !== product.categoryIds.length) {
+    fields.categoryIds = [categoryGoneMessage];
+  }
   return Object.keys(fields).length > 0 ? fields : null;
 }
 
-async function insertProduct(product: ProductFormValues, status: NewProductStatus) {
+async function insertProduct(
+  product: ProductFormValues,
+  status: NewProductStatus,
+  adminId: string,
+) {
   return db.$transaction(async (tx) => {
+    // Before any write, so a category deleted since takenErrors leaves nothing to roll back.
+    if (!(await lockCategories(tx, product.categoryIds))) return null;
+
     const created = await tx.product.create({
       data: {
         name: product.name,
         slug: product.slug,
         description: product.description,
+        featured: product.featured,
+        weightGrams: product.weightGrams,
         status,
       },
       select: { id: true },
     });
 
+    const openings: MovementRow[] = [];
     // Value text to id, one map per option type, to link each variant to its values.
     const valueIds: Map<string, string>[] = [];
     for (const [position, type] of product.optionTypes.entries()) {
@@ -76,21 +100,22 @@ async function insertProduct(product: ProductFormValues, status: NewProductStatu
         },
         select: { values: { select: { id: true, value: true } } },
       });
-      valueIds.push(new Map(row.values.map((value) => [value.value, value.id])));
+      valueIds.push(new Map(row.values.map((value) => [value.value.toLowerCase(), value.id])));
     }
 
     for (const [position, variant] of product.variants.entries()) {
       const ids = variant.values.map((value, t) => {
-        const id = valueIds[t]?.get(value);
+        const id = valueIds[t]?.get(value.toLowerCase());
         // The schema checked every variant against the option values it was sent with.
         if (id === undefined) throw new Error(`No option value "${value}" for option ${t}`);
         return id;
       });
-      await tx.productVariant.create({
+      const row = await tx.productVariant.create({
         data: {
           productId: created.id,
           sku: variant.sku,
           priceCents: variant.price,
+          compareAtPriceCents: variant.compareAt,
           stockQuantity: variant.stock,
           position,
           optionKey: optionKey(ids),
@@ -98,32 +123,39 @@ async function insertProduct(product: ProductFormValues, status: NewProductStatu
         },
         select: { id: true },
       });
+      openings.push({ kind: "initial", variantId: row.id, stockAfter: variant.stock, adminId });
     }
+    // spec 0009, AC-11: every history starts from the count the admin typed, even 0.
+    await recordMovements(tx, openings);
 
-    if (product.image) {
-      await tx.productImage.create({
-        data: {
+    if (product.images.length > 0) {
+      await tx.productImage.createMany({
+        data: product.images.map((image, position) => ({
           productId: created.id,
-          storagePath: product.image.path,
-          altText: product.image.altText,
-          width: product.image.width,
-          height: product.image.height,
-          position: 0,
-        },
-        select: { id: true },
+          storagePath: image.path,
+          altText: image.altText,
+          width: image.width,
+          height: image.height,
+          position,
+          // The schema checked the value exists; option values are unique per type, case
+          // insensitively.
+          optionValueId:
+            image.optionValue === null
+              ? null
+              : (valueIds[image.optionValue.typeIndex]?.get(
+                  image.optionValue.value.toLowerCase(),
+                ) ?? null),
+        })),
       });
     }
 
+    await linkAtEnd(
+      tx,
+      product.categoryIds.map((categoryId) => ({ productId: created.id, categoryId })),
+    );
+
     return created;
   });
-}
-
-// The path pattern is checked by the schema; this confirms the upload really happened.
-async function imageExists(path: string): Promise<boolean> {
-  const { data, error } = await createSupabaseAdminClient()
-    .storage.from(PRODUCT_IMAGE_BUCKET)
-    .exists(path);
-  return !error && data === true;
 }
 
 // spec 0005, AC-3 and AC-4: everything in one transaction, or nothing and a field error.
@@ -143,19 +175,24 @@ export async function createProduct(
   const product = parsed.data;
 
   // Before the transaction: Storage and Postgres share no rollback.
-  if (product.image && !(await imageExists(product.image.path))) {
+  const missing = await missingUploads(product.images.map((image) => image.path));
+  if (missing.length > 0) {
     return {
       ok: false,
-      error: { fields: { image: ["The image did not finish uploading. Choose it again."] } },
+      error: {
+        fields: Object.fromEntries(
+          missing.map((index) => [`images.${index}`, [imageMissingMessage]]),
+        ),
+      },
     };
   }
 
   const taken = await takenErrors(product);
   if (taken) return { ok: false, error: { fields: taken } };
 
-  let created: { readonly id: string };
+  let created: { readonly id: string } | null;
   try {
-    created = await insertProduct(product, parsedStatus.data);
+    created = await insertProduct(product, parsedStatus.data, admin.id);
   } catch (error) {
     // Another admin took the slug or a SKU between the check and the insert.
     if (uniqueViolation(error) === null) throw error;
@@ -164,6 +201,8 @@ export async function createProduct(
       ? { ok: false, error: { fields: raced } }
       : { ok: false, error: { form: "unavailable" } };
   }
+  if (created === null)
+    return { ok: false, error: { fields: { categoryIds: [categoryGoneMessage] } } };
 
   // Only after the commit: the next storefront request reads the new product.
   updateTag(catalogTag);

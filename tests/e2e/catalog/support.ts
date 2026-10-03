@@ -1,6 +1,18 @@
 import { randomUUID } from "node:crypto";
 
+import { expect, type Page } from "@playwright/test";
+
 import { withDb } from "../admin/support";
+
+// An edit page, /admin/products/<uuid> (spec 0009: create opens it).
+export const adminProductUrl = /\/admin\/products\/[0-9a-f]{8}-[0-9a-f-]{27}$/;
+
+// The editor's buttons stay disabled until React takes over, so typing waits for that: a field
+// filled before hydration can be reset under the test.
+export async function waitForEditor(page: Page, name: string) {
+  await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save details" })).toBeEnabled();
+}
 
 // Catalog rows written straight to the database, for tests about the cart rather than the admin
 // form. A fresh slug has never been cached, so its product page renders from these rows.

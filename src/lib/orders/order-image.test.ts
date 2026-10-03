@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { orderLineImage } from "./order-image";
 
-// spec 0002, Value sourcing: order_lines.image_path.
+// spec 0009, AC-15: order_lines.image_path is the first image of the gallery rule.
 
 const red = "value-red";
 const blue = "value-blue";
@@ -19,16 +19,19 @@ describe("orderLineImage", () => {
     expect(orderLineImage(images, ["value-s", red])).toBe("red-1.jpg");
   });
 
-  it("falls back to the product's first image by position", () => {
+  it("falls back to the first image tied to no value", () => {
     const images = [
       { storagePath: "second.jpg", position: 1, optionValueId: null },
       { storagePath: "blue.jpg", position: 0, optionValueId: blue },
     ];
 
-    expect(orderLineImage(images, [red])).toBe("blue.jpg");
+    expect(orderLineImage(images, [red])).toBe("second.jpg");
   });
 
-  it("is null when the product has no image", () => {
+  it("never takes another value's photo, and is null without a match", () => {
+    expect(
+      orderLineImage([{ storagePath: "blue.jpg", position: 0, optionValueId: blue }], [red]),
+    ).toBeNull();
     expect(orderLineImage([], [red])).toBeNull();
   });
 });

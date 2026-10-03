@@ -1,3 +1,5 @@
+import type { Tx } from "@/lib/db";
+
 import { testDb } from "./client";
 
 // Small builders for the db suites. Each returns the created rows; unique fields take a
@@ -54,7 +56,8 @@ export async function createProductWithOptions(suffix = "opt") {
         ],
       },
     },
-    include: { values: true },
+    // Ordered: the values of a nested create come back in no fixed order otherwise.
+    include: { values: { orderBy: { position: "asc" } } },
   });
   const color = await testDb.productOptionType.create({
     data: {
@@ -68,7 +71,8 @@ export async function createProductWithOptions(suffix = "opt") {
         ],
       },
     },
-    include: { values: true },
+    // Ordered: the values of a nested create come back in no fixed order otherwise.
+    include: { values: { orderBy: { position: "asc" } } },
   });
   const variants = [];
   for (const s of size.values) {
@@ -153,4 +157,27 @@ export async function createOrder(input: OrderInput = {}) {
 
 export async function createAdmin(email = "admin@example.com") {
   return testDb.adminUser.create({ data: { id: crypto.randomUUID(), email, name: "Admin" } });
+}
+
+// A transaction that runs `first` (takes its locks), waits for release(), then runs `then` and
+// commits. Await `locked` before starting the action that should meet those locks.
+export function holding(first: (tx: Tx) => Promise<unknown>, then: (tx: Tx) => Promise<unknown>) {
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let signal = () => {};
+  const locked = new Promise<void>((resolve) => {
+    signal = resolve;
+  });
+  const done = testDb.$transaction(
+    async (tx) => {
+      await first(tx);
+      signal();
+      await held;
+      return then(tx);
+    },
+    { timeout: 10_000 },
+  );
+  return { locked, release, done };
 }

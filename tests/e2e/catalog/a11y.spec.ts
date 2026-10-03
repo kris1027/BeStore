@@ -2,7 +2,7 @@ import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoA11yViolations } from "../a11y";
 import { createTestUser, signInFully } from "../admin/support";
-import { seedProduct, seedProductWithOptions, setStock } from "./support";
+import { adminProductUrl, seedProduct, seedProductWithOptions, setStock } from "./support";
 
 // Spec 0005, AC-17: axe on every page of the buy loop, in its states, on desktop and phone
 // (both Playwright projects), plus the flows by keyboard alone.
@@ -102,14 +102,16 @@ test("an admin creates a product by keyboard alone", async ({ page }) => {
 
   await page.getByLabel("Name", { exact: true }).focus();
   await page.keyboard.type(name);
-  await page.getByLabel("Price for the product").focus();
+  await page.getByLabel("Price for the product", { exact: true }).focus();
   await page.keyboard.type("18");
+  // Past the optional compare at price, to the stock field.
+  await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
   await page.keyboard.press("ControlOrMeta+A");
   await page.keyboard.type("4");
   await page.getByRole("button", { name: "Publish" }).focus();
   await page.keyboard.press("Enter");
 
-  await expect(page).toHaveURL("/admin/products");
-  await expect(page.getByRole("cell", { name: new RegExp(name) })).toBeVisible();
+  await expect(page).toHaveURL(adminProductUrl);
+  await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
 });

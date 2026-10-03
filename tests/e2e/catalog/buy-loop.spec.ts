@@ -4,6 +4,7 @@ import { expect, type Page, test } from "@playwright/test";
 
 import { brand } from "../../../src/lib/brand/brand";
 import { createTestUser, signInFully } from "../admin/support";
+import { adminProductUrl } from "./support";
 
 // Spec 0005, milestone 1: one real product from the admin form to a cart that survives reload.
 
@@ -23,15 +24,16 @@ async function createProductAsAdmin(
 
   await page.getByLabel("Name", { exact: true }).fill(product.name);
   await page.getByLabel("Description").fill("Soft, simple and made to last.");
-  await page.getByLabel("Price for the product").fill(product.price);
+  await page.getByLabel("Price for the product", { exact: true }).fill(product.price);
   await page.getByLabel("Stock for the product").fill(product.stock);
   await page.getByRole("button", { name: button }).click();
 
-  await expect(page).toHaveURL("/admin/products");
+  // spec 0009: a new product opens in its editor.
+  await expect(page).toHaveURL(adminProductUrl);
   await expect(
     page.getByText(button === "Publish" ? "Product published" : "Draft saved"),
   ).toBeVisible();
-  await expect(page.getByRole("cell", { name: new RegExp(product.name) })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: product.name })).toBeVisible();
 }
 
 function uniqueName(label: string) {

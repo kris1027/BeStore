@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { testDb, resetDatabaseBeforeEach } from "./client";
+import { createAdmin, holding } from "./fixtures";
 
 // createProduct against a real Postgres: one transaction, and nothing written on any refusal
 // (spec 0005, AC-3, AC-4, AC-15, AC-18).
@@ -22,15 +23,24 @@ vi.mock("@/features/admin-auth/require-admin", () => ({ requireAdmin: mocks.requ
 vi.mock("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: () => ({ storage: { from: () => ({ exists: mocks.exists }) } }),
 }));
-vi.mock("@/lib/logger", () => ({ logger: { info: mocks.info, warn: vi.fn() } }));
+vi.mock("@/lib/logger", async (importOriginal) =>
+  (await import("./logger-mock")).mockLoggerModule(importOriginal, {
+    info: mocks.info,
+    warn: vi.fn(),
+  }),
+);
 
 const { createProduct } = await import("@/features/catalog/actions/create-product");
 
 resetDatabaseBeforeEach();
 
-beforeEach(() => {
+// A real admin row: stock movements reference it.
+let adminId = "";
+
+beforeEach(async () => {
   vi.clearAllMocks();
-  mocks.requireAdmin.mockResolvedValue({ id: "admin-1", email: "a@example.com", name: "Ada" });
+  adminId = (await createAdmin()).id;
+  mocks.requireAdmin.mockResolvedValue({ id: adminId, email: "admin@example.com", name: "Admin" });
 });
 
 const simple = {
@@ -95,11 +105,42 @@ describe("createProduct", () => {
     expect(mocks.info).toHaveBeenCalledWith(
       {
         event: "catalog.product.created",
-        adminId: "admin-1",
+        adminId,
         productId: product.id,
         status: "active",
       },
       "catalog.product.created",
+    );
+  });
+
+  it("opens each variant's stock history with an initial movement, even at 0", async () => {
+    await createProduct(withOptions, "draft");
+
+    const movements = await testDb.stockMovement.findMany({
+      orderBy: { variant: { position: "asc" } },
+      select: {
+        kind: true,
+        delta: true,
+        stockAfter: true,
+        actorType: true,
+        adminId: true,
+        variant: { select: { sku: true } },
+      },
+    });
+    expect(movements).toEqual(
+      [
+        ["TEE-S-RED", 1],
+        ["TEE-S-BLUE", 0],
+        ["TEE-M-RED", 4],
+        ["TEE-M-BLUE", 9],
+      ].map(([sku, stock]) => ({
+        kind: "initial",
+        delta: stock,
+        stockAfter: stock,
+        actorType: "admin",
+        adminId,
+        variant: { sku },
+      })),
     );
   });
 
@@ -165,6 +206,30 @@ describe("createProduct", () => {
     expect(await counts()).toEqual(before);
   });
 
+  it("refuses a category deleted while the insert waited for it, writing nothing", async () => {
+    const gone = await testDb.category.create({
+      data: { name: "Gone", slug: "gone", position: 0 },
+    });
+    const deleting = holding(
+      (tx) => tx.category.delete({ where: { id: gone.id } }),
+      async () => null,
+    );
+    await deleting.locked;
+
+    const creating = createProduct({ ...simple, categoryIds: [gone.id] }, "active");
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    deleting.release();
+    await deleting.done;
+
+    expect(await creating).toEqual({
+      ok: false,
+      error: {
+        fields: { categoryIds: ["A category was deleted meanwhile. Reload and choose again."] },
+      },
+    });
+    expect(await counts()).toEqual({ products: 0, variants: 0, types: 0, values: 0, links: 0 });
+  });
+
   it("refuses invalid input with field errors and writes nothing", async () => {
     const result = await createProduct(
       { ...simple, variants: [{ ...simple.variants[0]!, price: "1.999" }] },
@@ -180,32 +245,103 @@ describe("createProduct", () => {
     expect(await counts()).toEqual({ products: 0, variants: 0, types: 0, values: 0, links: 0 });
   });
 
-  describe("with an image", () => {
+  describe("with images", () => {
     const path = "products/0199a1b2-c3d4-7e5f-8a9b-0123456789ab.png";
+    const second = "products/0199a1b2-c3d4-7e5f-8a9b-0123456789ac.webp";
     const image = { path, altText: "A mug", width: 400, height: 500 };
 
-    it("writes the image row after confirming the upload exists", async () => {
+    it("writes the image rows in order after confirming each upload exists", async () => {
       mocks.exists.mockResolvedValue({ data: true, error: null });
 
-      expect((await createProduct({ ...simple, image }, "active")).ok).toBe(true);
+      expect(
+        (
+          await createProduct(
+            { ...simple, images: [image, { ...image, path: second, altText: "Its handle" }] },
+            "active",
+          )
+        ).ok,
+      ).toBe(true);
 
       expect(mocks.exists).toHaveBeenCalledWith(path);
-      expect(await testDb.productImage.findFirstOrThrow()).toMatchObject({
-        storagePath: path,
-        altText: "A mug",
-        width: 400,
-        height: 500,
-        position: 0,
-        optionValueId: null,
+      expect(mocks.exists).toHaveBeenCalledWith(second);
+      expect(
+        await testDb.productImage.findMany({
+          orderBy: { position: "asc" },
+          select: {
+            storagePath: true,
+            altText: true,
+            width: true,
+            height: true,
+            position: true,
+            optionValueId: true,
+          },
+        }),
+      ).toEqual([
+        {
+          storagePath: path,
+          altText: "A mug",
+          width: 400,
+          height: 500,
+          position: 0,
+          optionValueId: null,
+        },
+        {
+          storagePath: second,
+          altText: "Its handle",
+          width: 400,
+          height: 500,
+          position: 1,
+          optionValueId: null,
+        },
+      ]);
+    });
+
+    // covers: spec 0009 AC-13
+    it("ties an image to an option value named by type index and text", async () => {
+      mocks.exists.mockResolvedValue({ data: true, error: null });
+
+      const result = await createProduct(
+        { ...withOptions, images: [{ ...image, optionValue: { typeIndex: 1, value: "blue" } }] },
+        "draft",
+      );
+
+      expect(result.ok).toBe(true);
+      const blue = await testDb.productOptionValue.findFirstOrThrow({ where: { value: "Blue" } });
+      expect((await testDb.productImage.findFirstOrThrow()).optionValueId).toBe(blue.id);
+    });
+
+    it("refuses a value the product does not have, a 9th image, and a repeated path", async () => {
+      const unknown = await createProduct(
+        { ...withOptions, images: [{ ...image, optionValue: { typeIndex: 1, value: "Green" } }] },
+        "draft",
+      );
+      expect(unknown).toEqual({
+        ok: false,
+        error: { fields: { "images.0.optionValue": ["Choose a value this product has."] } },
       });
+
+      const nine = Array.from({ length: 9 }, (_, i) => ({
+        ...image,
+        path: `products/0199a1b2-c3d4-7e5f-8a9b-0123456789${String(i).padStart(2, "0")}.png`,
+      }));
+      expect(await createProduct({ ...simple, images: nine }, "draft")).toEqual({
+        ok: false,
+        error: { fields: { images: ["Up to 8 images."] } },
+      });
+
+      expect(await createProduct({ ...simple, images: [image, image] }, "draft")).toEqual({
+        ok: false,
+        error: { fields: { "images.1": ["This image is already here."] } },
+      });
+      expect(mocks.exists).not.toHaveBeenCalled();
     });
 
     it("refuses an upload that never landed and writes nothing", async () => {
       mocks.exists.mockResolvedValue({ data: false, error: null });
 
-      expect(await createProduct({ ...simple, image }, "active")).toEqual({
+      expect(await createProduct({ ...simple, images: [image] }, "active")).toEqual({
         ok: false,
-        error: { fields: { image: ["The image did not finish uploading. Choose it again."] } },
+        error: { fields: { "images.0": ["The image did not finish uploading. Choose it again."] } },
       });
       expect(await counts()).toEqual({ products: 0, variants: 0, types: 0, values: 0, links: 0 });
     });
@@ -217,29 +353,39 @@ describe("createProduct", () => {
       "products/0199a1b2-c3d4-7e5f-8a9b-0123456789ab.gif",
     ])("refuses the forged path %s without asking Storage", async (forged) => {
       const result = await createProduct(
-        { ...simple, image: { ...image, path: forged } },
+        { ...simple, images: [{ ...image, path: forged }] },
         "active",
       );
 
       expect(result).toEqual({
         ok: false,
-        error: { fields: { "image.path": ["Choose the image again."] } },
+        error: { fields: { "images.0.path": ["Choose the image again."] } },
       });
       expect(mocks.exists).not.toHaveBeenCalled();
     });
 
     it("requires alt text", async () => {
       const result = await createProduct(
-        { ...simple, image: { ...image, altText: " " } },
+        { ...simple, images: [{ ...image, altText: " " }] },
         "active",
       );
 
       expect(result).toEqual({
         ok: false,
         error: {
-          fields: { "image.altText": ["Describe the image for people who cannot see it."] },
+          fields: { "images.0.altText": ["Describe the image for people who cannot see it."] },
         },
       });
+    });
+  });
+
+  // covers: spec 0009 AC-5 (the create form gains featured and weight)
+  it("saves featured and the weight", async () => {
+    await createProduct({ ...simple, featured: true, weightGrams: "350" }, "draft");
+
+    expect(await testDb.product.findFirstOrThrow()).toMatchObject({
+      featured: true,
+      weightGrams: 350,
     });
   });
 

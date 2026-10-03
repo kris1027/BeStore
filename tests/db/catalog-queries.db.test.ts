@@ -15,7 +15,8 @@ vi.mock("next/cache", () => ({ cacheTag: mocks.cacheTag, cacheLife: mocks.cacheL
 
 const { getActiveProducts, getPrerenderedSlugs, getProductBySlug, HOME_PRODUCT_LIMIT } =
   await import("@/features/catalog/queries");
-const { ADMIN_PRODUCT_LIMIT, getAdminProducts } = await import("@/features/catalog/admin-queries");
+const { getAdminProducts, parseAdminProductsParams } =
+  await import("@/features/catalog/admin-queries");
 
 resetDatabaseBeforeEach();
 
@@ -211,7 +212,7 @@ describe("getPrerenderedSlugs", () => {
 });
 
 describe("getAdminProducts", () => {
-  it("lists every status, newest first, with variant count, total stock and price range", async () => {
+  it("lists newest first, with variant count, total stock and price range", async () => {
     const old = await product("old", { status: "draft", createdAt: at(1) });
     await createVariant(old.id, { sku: "O", priceCents: 900, stockQuantity: 2 });
     const tee = await product("tee", { createdAt: at(2) });
@@ -225,7 +226,7 @@ describe("getAdminProducts", () => {
     });
     await testDb.productVariant.update({ where: { id: archived.id }, data: { archived: true } });
 
-    const rows = await getAdminProducts();
+    const { rows } = await getAdminProducts(parseAdminProductsParams({}));
 
     expect(rows.map((row) => [row.slug, row.status])).toEqual([
       ["tee", "active"],
@@ -240,16 +241,80 @@ describe("getAdminProducts", () => {
     });
   });
 
-  it(`stops at ${200} products`, async () => {
-    await testDb.product.createMany({
-      data: Array.from({ length: 201 }, (_, i) => ({ name: `P${i}`, slug: `p-${i}` })),
+  it("is empty on an empty catalog", async () => {
+    expect(await getAdminProducts(parseAdminProductsParams({}))).toEqual({
+      rows: [],
+      nextBefore: null,
+    });
+  });
+});
+
+// covers: spec 0009 AC-16
+describe("sale prices", () => {
+  it("marks a card on sale only when an in stock, live variant has a compare at price", async () => {
+    const sale = await product("sale", { position: 0 });
+    await createVariant(sale.id, { sku: "SALE-A", stockQuantity: 2, optionKey: "a" });
+    await testDb.productVariant.updateMany({
+      where: { sku: "SALE-A" },
+      data: { compareAtPriceCents: 4000 },
+    });
+    const soldOutSale = await product("sold-out-sale", { position: 1 });
+    await createVariant(soldOutSale.id, { sku: "SOS-A", stockQuantity: 0, optionKey: "a" });
+    await createVariant(soldOutSale.id, { sku: "SOS-B", stockQuantity: 3, optionKey: "b" });
+    await testDb.productVariant.updateMany({
+      where: { sku: "SOS-A" },
+      data: { compareAtPriceCents: 4000 },
     });
 
-    expect(ADMIN_PRODUCT_LIMIT).toBe(200);
-    expect(await getAdminProducts()).toHaveLength(200);
+    const cards = await getActiveProducts();
+
+    expect(cards.map((card) => [card.slug, card.onSale])).toEqual([
+      ["sale", true],
+      ["sold-out-sale", false],
+    ]);
   });
 
-  it("is empty on an empty catalog", async () => {
-    expect(await getAdminProducts()).toEqual([]);
+  it("gives each variant its compare at price on the product page", async () => {
+    const { product: tee, variant } = await createSimpleProduct("1");
+    await testDb.productVariant.update({
+      where: { id: variant.id },
+      data: { compareAtPriceCents: 9900 },
+    });
+
+    const view = await getProductBySlug(tee.slug);
+
+    expect(view?.variants).toEqual([
+      expect.objectContaining({ priceCents: 2500, compareAtPriceCents: 9900 }),
+    ]);
+  });
+});
+
+// covers: spec 0009 AC-15
+describe("product page images", () => {
+  it("returns every image by position with its option link", async () => {
+    const { product: tee, color } = await createProductWithOptions("g");
+    const red = color.values.find((value) => value.value === "Red")!;
+    await testDb.productImage.createMany({
+      data: [
+        {
+          productId: tee.id,
+          storagePath: "products/b.png",
+          altText: "Red",
+          position: 1,
+          optionValueId: red.id,
+        },
+        { productId: tee.id, storagePath: "products/a.png", altText: "Any", position: 0 },
+      ],
+    });
+
+    const view = await getProductBySlug(tee.slug);
+
+    expect(view?.images.map((image) => [image.alt, image.position, image.optionValueId])).toEqual([
+      ["Any", 0, null],
+      ["Red", 1, red.id],
+    ]);
+    expect(view?.images[0]?.src).toBe(
+      "http://127.0.0.1:55321/storage/v1/object/public/product-images/products/a.png",
+    );
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { summarizeVariants } from "./product-summary";
+import { isOnSale, summarizeVariants } from "./product-summary";
 
 describe("summarizeVariants", () => {
   it("sums stock and finds the price range", () => {
@@ -36,5 +36,27 @@ describe("summarizeVariants", () => {
       maxPriceCents: 0,
       soldOut: true,
     });
+  });
+});
+
+// covers: spec 0009 AC-16
+describe("isOnSale", () => {
+  it("is true when an in stock variant has a compare at price", () => {
+    expect(
+      isOnSale([
+        { stockQuantity: 0, compareAtPriceCents: null },
+        { stockQuantity: 2, compareAtPriceCents: 3000 },
+      ]),
+    ).toBe(true);
+  });
+
+  it("ignores a compare at price on a sold out variant", () => {
+    expect(
+      isOnSale([
+        { stockQuantity: 0, compareAtPriceCents: 3000 },
+        { stockQuantity: 4, compareAtPriceCents: null },
+      ]),
+    ).toBe(false);
+    expect(isOnSale([])).toBe(false);
   });
 });

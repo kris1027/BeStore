@@ -4,13 +4,11 @@ import { Price } from "@/components/price";
 import { ProductImage } from "@/components/product-image";
 import { Badge } from "@/components/ui/badge";
 
+import { productPath } from "../paths";
 import type { ProductCard as ProductCardData } from "../queries";
 
-export function productPath(slug: string): string {
-  return `/products/${slug}`;
-}
-
 // spec 0005, AC-6: image, name, price ("From" when variant prices differ), and Sold out.
+// spec 0009, AC-16: "Sale" when an in stock variant has a compare at price; Sold out wins.
 export function ProductCard({
   product,
   priority,
@@ -34,6 +32,8 @@ export function ProductCard({
             <Badge variant="secondary" className="absolute top-2 left-2">
               Sold out
             </Badge>
+          ) : product.onSale ? (
+            <Badge className="absolute top-2 left-2">Sale</Badge>
           ) : null}
         </div>
         <div className="flex flex-col gap-1">

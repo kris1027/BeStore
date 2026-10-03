@@ -8,7 +8,7 @@ import { db } from "@/lib/db";
 import { PLACEHOLDER_IMAGE, productImageUrl } from "@/lib/product-image";
 import { SLUG_PATTERN } from "@/lib/slug";
 
-import { summarizeVariants } from "./product-summary";
+import { isOnSale, summarizeVariants } from "./product-summary";
 
 // The home grid stops here until feature 13 adds paging (spec 0005, AC-6).
 export const HOME_PRODUCT_LIMIT = 48;
@@ -55,6 +55,8 @@ export type ProductCard = {
   readonly minPriceCents: number;
   readonly maxPriceCents: number;
   readonly soldOut: boolean;
+  // spec 0009, AC-16: a variant in stock has a compare at price.
+  readonly onSale: boolean;
 };
 
 // Cached until an admin action expires the catalog tag; drafts never enter it (spec 0005).
@@ -72,7 +74,10 @@ export async function getActiveProducts(): Promise<readonly ProductCard[]> {
       name: true,
       slug: true,
       images: imageSelect,
-      variants: { where: { archived: false }, select: { priceCents: true, stockQuantity: true } },
+      variants: {
+        where: { archived: false },
+        select: { priceCents: true, stockQuantity: true, compareAtPriceCents: true },
+      },
     },
   });
   return products.map((product) => {
@@ -85,6 +90,7 @@ export async function getActiveProducts(): Promise<readonly ProductCard[]> {
       minPriceCents: summary.minPriceCents,
       maxPriceCents: summary.maxPriceCents,
       soldOut: summary.soldOut,
+      onSale: isOnSale(product.variants),
     };
   });
 }
@@ -94,6 +100,8 @@ export async function getActiveProducts(): Promise<readonly ProductCard[]> {
 export type ProductVariantView = {
   readonly id: string;
   readonly priceCents: number;
+  // Shown struck through as "Was"; never charged (AC-16).
+  readonly compareAtPriceCents: number | null;
   readonly availability: Availability;
   // One option value id per option type, in option type order; empty for a default variant.
   readonly optionValueIds: readonly string[];
@@ -105,12 +113,20 @@ export type ProductOptionTypeView = {
   readonly values: readonly { readonly id: string; readonly value: string }[];
 };
 
+// Every image of the product page; the gallery picks per variant (spec 0009, AC-15).
+export type GalleryImage = ProductImage & {
+  readonly id: string;
+  readonly position: number;
+  readonly optionValueId: string | null;
+};
+
 export type ProductView = {
   readonly id: string;
   readonly name: string;
   readonly slug: string;
+  // Markdown, rendered by ProductDescription (spec 0009, AC-6).
   readonly description: string;
-  readonly image: ProductImage;
+  readonly images: readonly GalleryImage[];
   readonly optionTypes: readonly ProductOptionTypeView[];
   readonly variants: readonly ProductVariantView[];
 };
@@ -129,7 +145,18 @@ export async function getProductBySlug(slug: string): Promise<ProductView | null
       name: true,
       slug: true,
       description: true,
-      images: imageSelect,
+      images: {
+        orderBy: [{ position: "asc" }, { id: "asc" }],
+        select: {
+          id: true,
+          storagePath: true,
+          altText: true,
+          width: true,
+          height: true,
+          position: true,
+          optionValueId: true,
+        },
+      },
       optionTypes: {
         orderBy: { position: "asc" },
         select: {
@@ -144,6 +171,7 @@ export async function getProductBySlug(slug: string): Promise<ProductView | null
         select: {
           id: true,
           priceCents: true,
+          compareAtPriceCents: true,
           stockQuantity: true,
           optionValues: { select: { optionValueId: true } },
         },
@@ -161,11 +189,17 @@ export async function getProductBySlug(slug: string): Promise<ProductView | null
     name: product.name,
     slug: product.slug,
     description: product.description,
-    image: toImage(product.images[0]),
+    images: product.images.map((image) => ({
+      ...toImage(image),
+      id: image.id,
+      position: image.position,
+      optionValueId: image.optionValueId,
+    })),
     optionTypes: product.optionTypes,
     variants: product.variants.map((variant) => ({
       id: variant.id,
       priceCents: variant.priceCents,
+      compareAtPriceCents: variant.compareAtPriceCents,
       availability: availability(variant.stockQuantity),
       optionValueIds: variant.optionValues
         .map((link) => link.optionValueId)

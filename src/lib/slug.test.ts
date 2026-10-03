@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SLUG_MAX_LENGTH, SLUG_PATTERN, slugify } from "./slug";
+import { SLUG_MAX_LENGTH, SLUG_PATTERN, slugField, slugify } from "./slug";
 
 describe("slugify", () => {
   it.each([
@@ -28,5 +28,20 @@ describe("SLUG_PATTERN", () => {
 
   it.each(["", "-a", "a-", "a--b", "A", "a_b", "__none__"])("refuses %j", (slug) => {
     expect(slug).not.toMatch(SLUG_PATTERN);
+  });
+});
+
+describe("slugField", () => {
+  it("trims and accepts a valid slug", () => {
+    expect(slugField.parse("  linen-shirt ")).toBe("linen-shirt");
+  });
+
+  it.each([
+    ["", "Enter a URL name."],
+    ["a".repeat(SLUG_MAX_LENGTH + 1), `Keep it under ${SLUG_MAX_LENGTH} characters.`],
+    ["Linen Shirt", "Use lowercase letters and digits, joined by single hyphens."],
+  ])("refuses %j with its message", (slug, message) => {
+    const result = slugField.safeParse(slug);
+    expect(result.success ? undefined : result.error.issues[0]?.message).toBe(message);
   });
 });
