@@ -192,7 +192,7 @@ spec [0009](../specs/0009-admin-catalog-management/index.md) · code in `src/fea
   - [x] Categories, arranging, list and delete: category pages and actions, assignment from both sides, arrange products and categories, list search, filters and paging, delete with checkout lock (AC-1, AC-4, AC-17, AC-18, AC-19, AC-20)
   - [x] Safety net: DB tests for every conflict and guard, e2e with axe and keyboard on every touched page (AC-1 to AC-25)
 - [x] Verify it: `/check verify admin catalog management`
-- [ ] Test it: `/test admin catalog management`
+- [x] Test it: `/test admin catalog management`
 
 ## Slice 4: Orders
 
