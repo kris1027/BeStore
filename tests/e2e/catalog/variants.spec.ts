@@ -31,9 +31,9 @@ test("options build a variant grid that keeps typed rows, and the picker follows
   await addOption(page, 0, "Size", ["S", "M"]);
   await addOption(page, 1, "Color", ["Navy"]);
 
-  await page.getByLabel("Price for S / Navy").fill("49");
+  await page.getByLabel("Price for S / Navy", { exact: true }).fill("49");
   await page.getByLabel("Stock for S / Navy").fill("0");
-  await page.getByLabel("Price for M / Navy").fill("55");
+  await page.getByLabel("Price for M / Navy", { exact: true }).fill("55");
   await page.getByLabel("Stock for M / Navy").fill("12");
   await expect(page.getByLabel("SKU for M / Navy")).toHaveValue(/-M-NAVY$/);
 
@@ -41,10 +41,10 @@ test("options build a variant grid that keeps typed rows, and the picker follows
   await page.getByRole("button", { name: "Add value to Color" }).click();
   await page.getByLabel("Color value 2", { exact: true }).fill("Oat");
   await expect(page.getByLabel(/^Price for/)).toHaveCount(4);
-  await expect(page.getByLabel("Price for M / Navy")).toHaveValue("55");
-  await page.getByLabel("Price for S / Oat").fill("49");
+  await expect(page.getByLabel("Price for M / Navy", { exact: true })).toHaveValue("55");
+  await page.getByLabel("Price for S / Oat", { exact: true }).fill("49");
   await page.getByLabel("Stock for S / Oat").fill("0");
-  await page.getByLabel("Price for M / Oat").fill("55.5");
+  await page.getByLabel("Price for M / Oat", { exact: true }).fill("55.5");
   await page.getByLabel("Stock for M / Oat").fill("3");
 
   await page.getByRole("button", { name: "Publish" }).click();
@@ -76,7 +76,7 @@ test("the form shows each refusal on its field", async ({ page }) => {
   await signInAsAdmin(page);
   await page.getByLabel("Name", { exact: true }).fill("Bad input");
   await page.getByLabel("URL name").fill("Bad Slug");
-  await page.getByLabel("Price for the product").fill("1.999");
+  await page.getByLabel("Price for the product", { exact: true }).fill("1.999");
   await page.getByLabel("Stock for the product").fill("-2");
   await page.getByRole("button", { name: "Save as draft" }).click();
 
@@ -105,7 +105,7 @@ test("a URL name another product uses is refused by the server", async ({ page }
   for (const attempt of [1, 2]) {
     if (attempt === 2) await page.goto("/admin/products/new");
     await page.getByLabel("Name", { exact: true }).fill(name);
-    await page.getByLabel("Price for the product").fill("5");
+    await page.getByLabel("Price for the product", { exact: true }).fill("5");
     await page
       .getByLabel("SKU for the product")
       .fill(`TWIN-${attempt}-${randomUUID().slice(0, 6)}`);

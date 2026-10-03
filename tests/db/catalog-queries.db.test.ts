@@ -253,3 +253,43 @@ describe("getAdminProducts", () => {
     expect(await getAdminProducts({ tab: "all" })).toEqual([]);
   });
 });
+
+// covers: spec 0009 AC-16
+describe("sale prices", () => {
+  it("marks a card on sale only when an in stock, live variant has a compare at price", async () => {
+    const sale = await product("sale", { position: 0 });
+    await createVariant(sale.id, { sku: "SALE-A", stockQuantity: 2, optionKey: "a" });
+    await testDb.productVariant.updateMany({
+      where: { sku: "SALE-A" },
+      data: { compareAtPriceCents: 4000 },
+    });
+    const soldOutSale = await product("sold-out-sale", { position: 1 });
+    await createVariant(soldOutSale.id, { sku: "SOS-A", stockQuantity: 0, optionKey: "a" });
+    await createVariant(soldOutSale.id, { sku: "SOS-B", stockQuantity: 3, optionKey: "b" });
+    await testDb.productVariant.updateMany({
+      where: { sku: "SOS-A" },
+      data: { compareAtPriceCents: 4000 },
+    });
+
+    const cards = await getActiveProducts();
+
+    expect(cards.map((card) => [card.slug, card.onSale])).toEqual([
+      ["sale", true],
+      ["sold-out-sale", false],
+    ]);
+  });
+
+  it("gives each variant its compare at price on the product page", async () => {
+    const { product: tee, variant } = await createSimpleProduct("1");
+    await testDb.productVariant.update({
+      where: { id: variant.id },
+      data: { compareAtPriceCents: 9900 },
+    });
+
+    const view = await getProductBySlug(tee.slug);
+
+    expect(view?.variants).toEqual([
+      expect.objectContaining({ priceCents: 2500, compareAtPriceCents: 9900 }),
+    ]);
+  });
+});

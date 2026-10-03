@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { testDb, resetDatabaseBeforeEach } from "./client";
-import { createProduct, createVariant } from "./fixtures";
+import { createAdmin, createProduct, createVariant } from "./fixtures";
 
 // The Details section and status changes against a real Postgres (spec 0009, AC-2, AC-3, AC-5,
 // AC-21, AC-23, AC-24).
@@ -25,9 +25,13 @@ const { getAdminProducts, getProductForEdit, parseAdminProductsParams } =
 
 resetDatabaseBeforeEach();
 
-beforeEach(() => {
+// A real admin row: stock movements reference it.
+let adminId = "";
+
+beforeEach(async () => {
   vi.clearAllMocks();
-  mocks.requireAdmin.mockResolvedValue({ id: "admin-1", email: "a@example.com", name: "Ada" });
+  adminId = (await createAdmin()).id;
+  mocks.requireAdmin.mockResolvedValue({ id: adminId, email: "admin@example.com", name: "Admin" });
 });
 
 async function details(productId: string, overrides: Record<string, unknown> = {}) {
@@ -74,7 +78,7 @@ describe("updateProductDetails", () => {
     expect(mocks.info).toHaveBeenCalledWith(
       {
         event: "catalog.product.updated",
-        adminId: "admin-1",
+        adminId,
         productId: product.id,
         section: "details",
       },
@@ -170,7 +174,7 @@ describe("changeProductStatus", () => {
     expect(mocks.info).toHaveBeenCalledWith(
       {
         event: "catalog.product.status_changed",
-        adminId: "admin-1",
+        adminId,
         productId: draft.id,
         from: "draft",
         to: "active",
@@ -237,7 +241,8 @@ describe("admin reads", () => {
       id: product.id,
       slug: "tee-1",
       status: "active",
-      activeVariantCount: 1,
+      optionTypes: [],
+      variants: [{ label: "Default", optionValueIds: [], archived: false }],
     });
     expect(await getProductForEdit("01890000-0000-7000-8000-000000000000")).toBeNull();
     expect(await getProductForEdit("not-a-uuid")).toBeNull();

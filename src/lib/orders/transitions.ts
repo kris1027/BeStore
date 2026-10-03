@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Prisma } from "@/generated/prisma/client";
 import type { Tx } from "@/lib/db";
+import { type MovementRow, recordMovements } from "@/lib/stock-movements";
 
 // The only code that changes orders.status (spec 0006, State transitions). Both functions run
 // inside the caller's transaction and move an order only while it is still pending_payment:
@@ -59,10 +60,24 @@ export async function markPaid(tx: Tx, input: PaidInput): Promise<PaidOrder | nu
   });
 
   const shortfalls: Shortfall[] = [];
+  const sales: MovementRow[] = [];
   for (const line of lines) {
-    const taken = line.variantId === null ? 0 : await takeStock(tx, line.variantId, line.quantity);
+    const stock =
+      line.variantId === null ? null : await takeStock(tx, line.variantId, line.quantity);
+    const taken = stock === null ? 0 : stock.before - stock.after;
     if (taken < line.quantity) shortfalls.push({ sku: line.sku, missing: line.quantity - taken });
+    // spec 0009, AC-11: what the sale really took (2 of 3 asked is -2); nothing taken, no row.
+    if (stock !== null && line.variantId !== null && taken > 0) {
+      sales.push({
+        kind: "sale",
+        variantId: line.variantId,
+        delta: -taken,
+        stockAfter: stock.after,
+        orderId: input.orderId,
+      });
+    }
   }
+  await recordMovements(tx, sales);
 
   const receivedCurrency = input.currency?.toUpperCase() ?? null;
   const mismatch: AmountMismatch | null =
@@ -129,9 +144,14 @@ export async function markPaid(tx: Tx, input: PaidInput): Promise<PaidOrder | nu
   };
 }
 
-// Takes what stock there is, never below 0, and answers how much it took. The CTE locks the row
-// and reads the value the UPDATE starts from, so a concurrent sale cannot slip in between.
-async function takeStock(tx: Tx, variantId: string, quantity: number): Promise<number> {
+// Takes what stock there is, never below 0, and answers the count before and after, or null
+// when the variant row is gone. The CTE locks the row and reads the value the UPDATE starts
+// from, so a concurrent sale cannot slip in between.
+async function takeStock(
+  tx: Tx,
+  variantId: string,
+  quantity: number,
+): Promise<{ readonly before: number; readonly after: number } | null> {
   const [row] = await tx.$queryRaw<{ before: number; after: number }[]>`
     WITH old AS (
       SELECT id, stock_quantity FROM product_variants WHERE id = ${variantId}::uuid FOR UPDATE
@@ -141,7 +161,7 @@ async function takeStock(tx: Tx, variantId: string, quantity: number): Promise<n
         updated_at = now()
     FROM old WHERE p.id = old.id
     RETURNING old.stock_quantity AS before, p.stock_quantity AS after`;
-  return row ? row.before - row.after : 0;
+  return row ?? null;
 }
 
 // Never touches stock. Callers make sure Stripe can no longer take the money first: the session

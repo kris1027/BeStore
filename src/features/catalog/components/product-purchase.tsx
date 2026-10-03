@@ -56,6 +56,7 @@ export function ProductPurchase({
   const limit = variant ? quantityLimit(variant.availability) : 0;
   const canAdd = variant !== undefined && limit > 0;
   const priceCents = variant?.priceCents ?? Math.min(...variants.map((v) => v.priceCents));
+  const compareAtCents = variant?.compareAtPriceCents ?? null;
 
   function add() {
     if (!variant) return;
@@ -90,9 +91,18 @@ export function ProductPurchase({
     >
       {/* Price and availability change with the picker, so screen readers hear the update. */}
       <div className="flex flex-col gap-1" aria-live="polite" aria-atomic="true">
-        <p className="text-xl">
-          <span className="sr-only">Price: </span>
-          <Price cents={priceCents} />
+        <p className="flex flex-wrap items-baseline gap-x-3 text-xl">
+          <span>
+            <span className="sr-only">Price: </span>
+            <Price cents={priceCents} />
+          </span>
+          {/* spec 0009, AC-16: the old price, read out as "Was" since a strike is visual only. */}
+          {compareAtCents !== null ? (
+            <s className="text-base text-muted-foreground">
+              <span className="sr-only">Was </span>
+              <Price cents={compareAtCents} />
+            </s>
+          ) : null}
         </p>
         <p className="text-sm text-muted-foreground">{availabilityText(variant?.availability)}</p>
       </div>

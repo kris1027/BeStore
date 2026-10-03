@@ -22,3 +22,16 @@ export function summarizeVariants(variants: readonly VariantFacts[]): ProductSum
     soldOut: variants.every((variant) => availability(variant.stockQuantity).kind === "sold_out"),
   };
 }
+
+// spec 0009, AC-16: a card shows "Sale" when a variant a customer could buy now has a compare at
+// price. Callers pass only non archived variants.
+export function isOnSale(
+  variants: readonly {
+    readonly stockQuantity: number;
+    readonly compareAtPriceCents: number | null;
+  }[],
+): boolean {
+  return variants.some(
+    (variant) => variant.stockQuantity > 0 && variant.compareAtPriceCents !== null,
+  );
+}

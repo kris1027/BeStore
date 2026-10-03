@@ -9,6 +9,7 @@ import { uniqueViolation } from "@/lib/db-errors";
 import { env } from "@/lib/env";
 import { PRODUCT_IMAGE_BUCKET } from "@/lib/product-image";
 import type { ActionResult } from "@/lib/result";
+import { type MovementRow, recordMovements } from "@/lib/stock-movements";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 import { logCatalogEvent } from "../log";
@@ -52,7 +53,11 @@ async function takenErrors(
   return Object.keys(fields).length > 0 ? fields : null;
 }
 
-async function insertProduct(product: ProductFormValues, status: NewProductStatus) {
+async function insertProduct(
+  product: ProductFormValues,
+  status: NewProductStatus,
+  adminId: string,
+) {
   return db.$transaction(async (tx) => {
     const created = await tx.product.create({
       data: {
@@ -64,6 +69,7 @@ async function insertProduct(product: ProductFormValues, status: NewProductStatu
       select: { id: true },
     });
 
+    const openings: MovementRow[] = [];
     // Value text to id, one map per option type, to link each variant to its values.
     const valueIds: Map<string, string>[] = [];
     for (const [position, type] of product.optionTypes.entries()) {
@@ -86,11 +92,12 @@ async function insertProduct(product: ProductFormValues, status: NewProductStatu
         if (id === undefined) throw new Error(`No option value "${value}" for option ${t}`);
         return id;
       });
-      await tx.productVariant.create({
+      const row = await tx.productVariant.create({
         data: {
           productId: created.id,
           sku: variant.sku,
           priceCents: variant.price,
+          compareAtPriceCents: variant.compareAt,
           stockQuantity: variant.stock,
           position,
           optionKey: optionKey(ids),
@@ -98,7 +105,10 @@ async function insertProduct(product: ProductFormValues, status: NewProductStatu
         },
         select: { id: true },
       });
+      openings.push({ kind: "initial", variantId: row.id, stockAfter: variant.stock, adminId });
     }
+    // spec 0009, AC-11: every history starts from the count the admin typed, even 0.
+    await recordMovements(tx, openings);
 
     if (product.image) {
       await tx.productImage.create({
@@ -155,7 +165,7 @@ export async function createProduct(
 
   let created: { readonly id: string };
   try {
-    created = await insertProduct(product, parsedStatus.data);
+    created = await insertProduct(product, parsedStatus.data, admin.id);
   } catch (error) {
     // Another admin took the slug or a SKU between the check and the insert.
     if (uniqueViolation(error) === null) throw error;

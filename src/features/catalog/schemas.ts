@@ -25,14 +25,22 @@ const priceMessages: Record<ParseMoneyError | "zero", string> = {
   zero: "Enter a price above zero.",
 };
 
+export const optionNameField = z
+  .string()
+  .trim()
+  .min(1, "Name the option, like Size.")
+  .max(50, "Keep it under 50 characters.");
+
+export const optionValueField = z
+  .string()
+  .trim()
+  .min(1, "Enter a value.")
+  .max(50, "Keep it under 50 characters.");
+
 const optionTypeSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, "Name the option, like Size.")
-    .max(50, "Keep it under 50 characters."),
+  name: optionNameField,
   values: z
-    .array(z.string().trim().min(1, "Enter a value.").max(50, "Keep it under 50 characters."))
+    .array(optionValueField)
     .min(1, "Add at least one value.")
     .max(MAX_OPTION_VALUES, `Up to ${MAX_OPTION_VALUES} values.`),
 });
@@ -53,35 +61,75 @@ const imageSchema = z
   })
   .nullable();
 
-function variantSchema(currency: string) {
-  return z.object({
-    // One value per option type, by index; empty for the default variant.
-    values: z.array(z.string().trim()),
-    price: z.string().transform((text, ctx) => {
+export function priceField(currency: string) {
+  return z.string().transform((text, ctx) => {
+    const parsed = parseMoney(text, currency);
+    if (!parsed.ok) {
+      ctx.addIssue({ code: "custom", message: priceMessages[parsed.error] });
+      return z.NEVER;
+    }
+    if (parsed.cents < 1) {
+      ctx.addIssue({ code: "custom", message: priceMessages.zero });
+      return z.NEVER;
+    }
+    return parsed.cents;
+  });
+}
+
+// Optional: empty (or left out) means no compare at price. Whether it sits above the selling
+// price is checked where both are known.
+export function compareAtField(currency: string) {
+  return z
+    .string()
+    .optional()
+    .transform((text, ctx) => {
+      if (text === undefined || text.trim() === "") return null;
       const parsed = parseMoney(text, currency);
       if (!parsed.ok) {
         ctx.addIssue({ code: "custom", message: priceMessages[parsed.error] });
         return z.NEVER;
       }
-      if (parsed.cents < 1) {
-        ctx.addIssue({ code: "custom", message: priceMessages.zero });
-        return z.NEVER;
-      }
       return parsed.cents;
-    }),
-    stock: z
-      .string()
-      .trim()
-      .regex(/^\d+$/, "Enter a whole number.")
-      .transform(Number)
-      .pipe(z.number().max(MAX_STOCK, `Stock goes up to ${MAX_STOCK}.`)),
-    sku: z
-      .string()
-      .trim()
-      .toUpperCase()
-      .min(1, "Enter a SKU.")
-      .regex(SKU_PATTERN, "Use up to 64 letters, digits, dots, dashes or underscores."),
-  });
+    });
+}
+
+export const compareAtMessage = "Enter a price above the selling price.";
+
+export const stockField = z
+  .string()
+  .trim()
+  .regex(/^\d+$/, "Enter a whole number.")
+  .transform(Number)
+  .pipe(z.number().max(MAX_STOCK, `Stock goes up to ${MAX_STOCK}.`));
+
+export const skuField = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .min(1, "Enter a SKU.")
+  .regex(SKU_PATTERN, "Use up to 64 letters, digits, dots, dashes or underscores.");
+
+// spec 0009, AC-7: a compare at price, when given, sits above the selling price.
+function checkCompareAt(
+  row: { readonly price: number; readonly compareAt: number | null },
+  ctx: z.RefinementCtx,
+) {
+  if (row.compareAt !== null && row.compareAt <= row.price) {
+    ctx.addIssue({ code: "custom", path: ["compareAt"], message: compareAtMessage });
+  }
+}
+
+function variantSchema(currency: string) {
+  return z
+    .object({
+      // One value per option type, by index; empty for the default variant.
+      values: z.array(z.string().trim()),
+      price: priceField(currency),
+      compareAt: compareAtField(currency),
+      stock: stockField,
+      sku: skuField,
+    })
+    .superRefine(checkCompareAt);
 }
 
 // Field rules shared by the create form and the edit sections (spec 0009: edits follow the
@@ -248,3 +296,156 @@ export function pathErrors(error: z.ZodError): Record<string, readonly string[]>
   }
   return fields;
 }
+
+const variantId = z.uuid();
+const loadedCents = z.number().int().min(0);
+
+export const NOTE_MAX_LENGTH = 200;
+
+// spec 0009, AC-10: per row, the count the page showed and the count the admin typed.
+export const stockSchema = z
+  .object({
+    productId,
+    rows: z
+      .array(
+        z.object({
+          variantId,
+          expected: z.number().int().min(0).max(MAX_STOCK),
+          next: stockField,
+          note: z
+            .string()
+            .trim()
+            .max(NOTE_MAX_LENGTH, `Keep it under ${NOTE_MAX_LENGTH} characters.`)
+            .default(""),
+        }),
+      )
+      .min(1)
+      .max(MAX_COMBINATIONS),
+  })
+  .superRefine((input, ctx) => {
+    if (new Set(input.rows.map((row) => row.variantId)).size !== input.rows.length) {
+      ctx.addIssue({ code: "custom", path: ["rows"], message: "Each variant once." });
+    }
+  });
+
+export type StockInput = z.input<typeof stockSchema>;
+
+// Duplicate names within one list, compared case insensitively (AC-7: as on create).
+function duplicateIndexes(names: readonly string[]): readonly number[] {
+  const seen = new Set<string>();
+  return names.flatMap((name, index) => {
+    const key = name.toLowerCase();
+    if (seen.has(key)) return [index];
+    seen.add(key);
+    return [];
+  });
+}
+
+// spec 0009, AC-7 and AC-21: every variant row and option name, with what the page loaded so
+// the action can refuse a save over someone else's change.
+export function variantsSchema(currency: string) {
+  return z
+    .object({
+      productId,
+      rows: z
+        .array(
+          z
+            .object({
+              variantId,
+              loaded: z.object({
+                price: loadedCents,
+                compareAt: loadedCents.nullable(),
+                sku: z.string(),
+                archived: z.boolean(),
+              }),
+              price: priceField(currency),
+              compareAt: compareAtField(currency),
+              sku: skuField,
+              archived: z.boolean(),
+            })
+            .superRefine(checkCompareAt),
+        )
+        .min(1)
+        .max(MAX_COMBINATIONS),
+      optionNames: z
+        .array(
+          z.object({
+            typeId: z.uuid(),
+            loadedName: z.string(),
+            name: optionNameField,
+            values: z
+              .array(
+                z.object({ valueId: z.uuid(), loadedValue: z.string(), value: optionValueField }),
+              )
+              .min(1)
+              .max(MAX_OPTION_VALUES),
+          }),
+        )
+        .max(MAX_OPTION_TYPES),
+    })
+    .superRefine((input, ctx) => {
+      for (const index of duplicateIndexes(input.optionNames.map((type) => type.name))) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["optionNames", index, "name"],
+          message: "This option is already there.",
+        });
+      }
+      input.optionNames.forEach((type, t) => {
+        for (const index of duplicateIndexes(type.values.map((entry) => entry.value))) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["optionNames", t, "values", index, "value"],
+            message: "This value is already there.",
+          });
+        }
+      });
+      for (const index of duplicateIndexes(input.rows.map((row) => row.sku))) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["rows", index, "sku"],
+          message: "Another variant uses this SKU.",
+        });
+      }
+    });
+}
+
+export type VariantsInput = z.input<ReturnType<typeof variantsSchema>>;
+export type VariantsValues = z.output<ReturnType<typeof variantsSchema>>;
+
+// spec 0009, AC-8: a new value for one option type, and one row per new combination.
+export function addOptionValueSchema(currency: string) {
+  return z
+    .object({
+      productId,
+      optionTypeId: z.uuid(),
+      value: optionValueField,
+      newVariants: z
+        .array(
+          z
+            .object({
+              // The other option types' value ids, in option type order.
+              otherValueIds: z.array(z.uuid()).max(MAX_OPTION_TYPES - 1),
+              price: priceField(currency),
+              compareAt: compareAtField(currency),
+              stock: stockField,
+              sku: skuField,
+            })
+            .superRefine(checkCompareAt),
+        )
+        .min(1)
+        .max(MAX_COMBINATIONS),
+    })
+    .superRefine((input, ctx) => {
+      for (const index of duplicateIndexes(input.newVariants.map((row) => row.sku))) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["newVariants", index, "sku"],
+          message: "Another variant uses this SKU.",
+        });
+      }
+    });
+}
+
+export type AddOptionValueInput = z.input<ReturnType<typeof addOptionValueSchema>>;
+export type AddOptionValueValues = z.output<ReturnType<typeof addOptionValueSchema>>;

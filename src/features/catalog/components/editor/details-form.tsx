@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
+import { useHydrated } from "@/hooks/use-hydrated";
 
 import { updateProductDetails } from "../../actions/update-details";
 import { detailsSchema, MAX_WEIGHT_GRAMS } from "../../schemas";
@@ -59,6 +60,7 @@ export function DetailsForm({
   };
 }) {
   const router = useRouter();
+  const hydrated = useHydrated();
   const [pending, startTransition] = useTransition();
   const [notice, setNotice] = useState<string | null>(null);
   const form = useForm<DetailsValues, unknown, z.output<typeof formSchema>>({
@@ -123,7 +125,12 @@ export function DetailsForm({
 
   return (
     <Card>
-      <form onSubmit={onSubmit} noValidate aria-labelledby="details-heading">
+      <form
+        onSubmit={onSubmit}
+        noValidate
+        aria-labelledby="details-heading"
+        className="flex flex-col gap-6"
+      >
         <CardHeader>
           <CardTitle>
             <h2 id="details-heading">Details</h2>
@@ -231,8 +238,8 @@ export function DetailsForm({
             </Field>
           </FieldGroup>
         </CardContent>
-        <CardFooter className="mt-6">
-          <Button type="submit" disabled={pending}>
+        <CardFooter>
+          <Button type="submit" disabled={pending || !hydrated}>
             {pending ? <Spinner data-icon="inline-start" /> : null}
             Save details
           </Button>

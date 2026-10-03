@@ -69,7 +69,13 @@ import { ImageField, type StorageTarget, type UploadedImage } from "./image-fiel
 // not by their text: renaming a value keeps the price and stock typed in its rows.
 type ValueField = { readonly id: string; value: string };
 type OptionTypeField = { readonly id: string; name: string; values: ValueField[] };
-type VariantField = { readonly key: string; price: string; stock: string; sku: string };
+type VariantField = {
+  readonly key: string;
+  price: string;
+  compareAt: string;
+  stock: string;
+  sku: string;
+};
 
 type FormState = {
   name: string;
@@ -85,6 +91,7 @@ const newId = () => crypto.randomUUID();
 const defaultVariant = (slug: string): VariantField => ({
   key: combinationKey([]),
   price: "",
+  compareAt: "",
   stock: "0",
   sku: suggestSku(slug, []),
 });
@@ -174,6 +181,7 @@ export function ProductForm({ storage }: { readonly storage: StorageTarget }) {
         byKey.get(row.key) ?? {
           key: row.key,
           price: "",
+          compareAt: "",
           stock: "0",
           sku: suggestSku(slug, row.values),
         },
@@ -220,6 +228,7 @@ export function ProductForm({ storage }: { readonly storage: StorageTarget }) {
       variants: state.variants.map((variant, i) => ({
         values: labels[i]?.values ?? [],
         price: variant.price,
+        compareAt: variant.compareAt,
         stock: variant.stock,
         sku: variant.sku,
       })),
@@ -386,8 +395,8 @@ export function ProductForm({ storage }: { readonly storage: StorageTarget }) {
                 </h2>
               </CardTitle>
               <CardDescription>
-                Prices in {currency}, like {(19.99).toFixed(digits)}. Stock is the number you can
-                sell now.
+                Prices in {currency}, like {(19.99).toFixed(digits)}. A compare at price is optional
+                and shows struck through, as a sale. Stock is the number you can sell now.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
@@ -617,11 +626,14 @@ function VariantsTable({
   const hasOptions = (rows[0]?.values.length ?? 0) > 0;
   return (
     <Table>
-      <TableCaption className="sr-only">Price, stock and SKU of each variant</TableCaption>
+      <TableCaption className="sr-only">
+        Price, compare at price, stock and SKU of each variant
+      </TableCaption>
       <TableHeader>
         <TableRow>
           {hasOptions ? <TableHead>Variant</TableHead> : null}
           <TableHead>Price</TableHead>
+          <TableHead>Compare at</TableHead>
           <TableHead>Stock</TableHead>
           <TableHead>SKU</TableHead>
         </TableRow>
@@ -640,11 +652,16 @@ function VariantsTable({
               {hasOptions ? (
                 <TableCell className="pt-4 font-medium">{values.join(" / ")}</TableCell>
               ) : null}
-              {(["price", "stock", "sku"] as const).map((column) => {
+              {(["price", "compareAt", "stock", "sku"] as const).map((column) => {
                 const path = `variants.${i}.${column}` as const;
                 const id = fieldId(path);
                 const error = errorAt(errors, path);
-                const columnLabel = { price: "Price", stock: "Stock", sku: "SKU" }[column];
+                const columnLabel = {
+                  price: "Price",
+                  compareAt: "Compare at price",
+                  stock: "Stock",
+                  sku: "SKU",
+                }[column];
                 return (
                   <TableCell key={column} className="min-w-28 whitespace-normal">
                     <label htmlFor={id} className="sr-only">
@@ -653,7 +670,7 @@ function VariantsTable({
                     <Input
                       id={id}
                       inputMode={
-                        column === "sku" ? undefined : column === "price" ? "decimal" : "numeric"
+                        column === "sku" ? undefined : column === "stock" ? "numeric" : "decimal"
                       }
                       autoCapitalize={column === "sku" ? "characters" : undefined}
                       aria-invalid={error ? true : undefined}

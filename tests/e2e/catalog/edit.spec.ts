@@ -2,7 +2,7 @@ import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoA11yViolations } from "../a11y";
 import { createTestUser, signInFully } from "../admin/support";
-import { seedProduct } from "./support";
+import { seedProduct, waitForEditor } from "./support";
 
 // spec 0009, milestone 1: one edit from the admin editor to the storefront, and the status
 // buttons that take a product off the storefront and put it back first in line.
@@ -16,7 +16,7 @@ async function openEditor(page: Page, product: { readonly id: string; readonly n
   await page.goto("/admin/products");
   await page.getByRole("link", { name: product.name }).click();
   await expect(page).toHaveURL(`/admin/products/${product.id}`);
-  await expect(page.getByRole("heading", { level: 1, name: product.name })).toBeVisible();
+  await waitForEditor(page, product.name);
 }
 
 test("an admin renames a live product and the storefront follows on its next request", async ({
@@ -103,10 +103,10 @@ test("archive and restore never put a product straight back live", async ({ page
   await signInAsAdmin(page);
   await openEditor(page, product);
 
-  await page.getByRole("button", { name: "Archive" }).click();
+  await page.getByRole("button", { name: "Archive", exact: true }).click();
   await expect(page.getByText("Product archived")).toBeVisible();
   await expect(page.getByRole("button", { name: "Publish" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Restore" }).click();
+  await page.getByRole("button", { name: "Restore", exact: true }).click();
   await expect(page.getByText("Product restored as a draft")).toBeVisible();
   await expect(page.getByRole("button", { name: "Publish" })).toBeVisible();
 
@@ -124,7 +124,7 @@ test("the edit page has no axe violations and an unknown id shows the not found 
   const product = await seedProduct({ stock: 2, label: "Wax candle" });
   await signInAsAdmin(page);
   await page.goto(`/admin/products/${product.id}`);
-  await expect(page.getByRole("heading", { level: 1, name: product.name })).toBeVisible();
+  await waitForEditor(page, product.name);
   await expectNoA11yViolations(page);
 
   await page.getByLabel("Weight in grams").fill("0");

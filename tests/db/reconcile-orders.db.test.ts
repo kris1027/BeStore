@@ -89,6 +89,13 @@ describe("GET /api/cron/reconcile-orders", () => {
     expect(second.body).toEqual({ checked: 0, paid: 0, expired: 0, skipped: 0, unresolved: 0 });
     expect((await testDb.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe("paid");
     expect(await stock(variant.id)).toBe(3);
+    // spec 0009, AC-11: the cron's sale writes the same movement as the webhook's.
+    expect(
+      await testDb.stockMovement.findMany({
+        where: { variantId: variant.id },
+        select: { kind: true, delta: true, stockAfter: true, orderId: true },
+      }),
+    ).toEqual([{ kind: "sale", delta: -2, stockAfter: 3, orderId: order.id }]);
     expect(mocks.list).toHaveBeenCalledWith(
       expect.objectContaining({
         types: expect.arrayContaining(["checkout.session.completed", "checkout.session.expired"]),

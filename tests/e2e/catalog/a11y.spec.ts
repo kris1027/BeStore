@@ -102,8 +102,10 @@ test("an admin creates a product by keyboard alone", async ({ page }) => {
 
   await page.getByLabel("Name", { exact: true }).focus();
   await page.keyboard.type(name);
-  await page.getByLabel("Price for the product").focus();
+  await page.getByLabel("Price for the product", { exact: true }).focus();
   await page.keyboard.type("18");
+  // Past the optional compare at price, to the stock field.
+  await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
   await page.keyboard.press("ControlOrMeta+A");
   await page.keyboard.type("4");

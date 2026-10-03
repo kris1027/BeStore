@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
+import { useHydrated } from "@/hooks/use-hydrated";
 
 import { changeProductStatus } from "../../actions/change-status";
 import {
@@ -70,6 +71,7 @@ export function StatusCard({
   readonly deleteSlot?: React.ReactNode;
 }) {
   const router = useRouter();
+  const hydrated = useHydrated();
   const [pending, startTransition] = useTransition();
   const [running, setRunning] = useState<StatusAction | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -111,7 +113,7 @@ export function StatusCard({
             key={action}
             type="button"
             variant={index === 0 ? "default" : "outline"}
-            disabled={pending}
+            disabled={pending || !hydrated}
             onClick={() => run(action)}
           >
             {running === action ? <Spinner data-icon="inline-start" /> : null}

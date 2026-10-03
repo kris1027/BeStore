@@ -77,6 +77,14 @@ enum EmailKind {
   @@map("email_kind")
 }
 
+enum StockMovementKind {
+  initial
+  adjustment
+  sale
+
+  @@map("stock_movement_kind")
+}
+
 enum EmailSendStatus {
   pending
   sent
@@ -126,10 +134,11 @@ model ProductVariant {
   createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  product      Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
-  optionValues VariantOptionValue[]
-  cartItems    CartItem[]
-  orderLines   OrderLine[]
+  product        Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  optionValues   VariantOptionValue[]
+  cartItems      CartItem[]
+  orderLines     OrderLine[]
+  stockMovements StockMovement[]
 
   // Also serves as the product_id FK index.
   @@unique([productId, optionKey])
@@ -229,6 +238,33 @@ model ProductImage {
   @@map("product_images")
 }
 
+// One row per change to a variant's stock_quantity, written in the same transaction as the
+// change (spec 0009): `initial` on create, `adjustment` by an admin, `sale` when a paid order
+// takes stock. The actor and kind rules are CHECKs in the migration.
+model StockMovement {
+  id         String            @id @default(uuid(7)) @db.Uuid
+  variantId  String            @map("variant_id") @db.Uuid
+  kind       StockMovementKind
+  delta      Int
+  stockAfter Int               @map("stock_after")
+  actorType  ActorType         @map("actor_type")
+  adminId    String?           @map("admin_id") @db.Uuid
+  orderId    String?           @map("order_id") @db.Uuid
+  // Admin text on an adjustment only; never logged.
+  note       String?
+  createdAt  DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  admin   AdminUser?     @relation(fields: [adminId], references: [id], onDelete: Restrict)
+  // Restrict: orders are never deleted, and SetNull would break the sale CHECK.
+  order   Order?         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([variantId, createdAt])
+  @@index([orderId])
+  @@index([adminId])
+  @@map("stock_movements")
+}
+
 // ─── People and cart ────────────────────────────────────────────────────────
 
 // id is the Supabase auth user id (no FK into `auth`, spec 0001). Admins are disabled via
@@ -241,8 +277,9 @@ model AdminUser {
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  orderEvents OrderEvent[]
-  refunds     Refund[]
+  orderEvents    OrderEvent[]
+  refunds        Refund[]
+  stockMovements StockMovement[]
 
   @@map("admin_users")
 }
@@ -367,14 +404,15 @@ model Order {
   createdAt               DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt               DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  customer   Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  cart       Cart?               @relation(fields: [cartId], references: [id], onDelete: SetNull)
-  discount   DiscountCode?       @relation(fields: [discountCodeId], references: [id], onDelete: SetNull)
-  lines      OrderLine[]
-  events     OrderEvent[]
-  refunds    Refund[]
-  redemption DiscountRedemption?
-  emailSends EmailSend[]
+  customer       Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  cart           Cart?               @relation(fields: [cartId], references: [id], onDelete: SetNull)
+  discount       DiscountCode?       @relation(fields: [discountCodeId], references: [id], onDelete: SetNull)
+  lines          OrderLine[]
+  events         OrderEvent[]
+  refunds        Refund[]
+  redemption     DiscountRedemption?
+  emailSends     EmailSend[]
+  stockMovements StockMovement[]
 
   // One pending order per cart, so paying twice for one cart is impossible.
   @@unique([cartId], map: "orders_one_pending_per_cart_key", where: raw("status = 'pending_payment'::order_status"))

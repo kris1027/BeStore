@@ -24,7 +24,7 @@ async function createProductAsAdmin(
 
   await page.getByLabel("Name", { exact: true }).fill(product.name);
   await page.getByLabel("Description").fill("Soft, simple and made to last.");
-  await page.getByLabel("Price for the product").fill(product.price);
+  await page.getByLabel("Price for the product", { exact: true }).fill(product.price);
   await page.getByLabel("Stock for the product").fill(product.stock);
   await page.getByRole("button", { name: button }).click();
 

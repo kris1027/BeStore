@@ -57,6 +57,14 @@ beforeEach(() => {
   mocks.failNextPaid = false;
 });
 
+async function salesOf(variantId: string) {
+  return testDb.stockMovement.findMany({
+    where: { variantId, kind: "sale" },
+    orderBy: { createdAt: "asc" },
+    select: { delta: true, stockAfter: true, orderId: true, actorType: true, adminId: true },
+  });
+}
+
 async function post(event: Parameters<typeof signedRequest>[0]) {
   const response = await stripeWebhookRequest(signedRequest(event));
   return { status: response.status, body: (await response.json()) as { result?: string } };
@@ -126,6 +134,10 @@ describe("a paid event", () => {
       cartId: null,
     });
     expect(await stock(variant.id)).toBe(3);
+    // spec 0009, AC-11: one sale movement in the same transaction, by the system.
+    expect(await salesOf(variant.id)).toEqual([
+      { delta: -2, stockAfter: 3, orderId: order.id, actorType: "system", adminId: null },
+    ]);
     expect(await testDb.cart.findUnique({ where: { id: cart.id } })).toBeNull();
     expect(await testDb.stripeEvent.findUnique({ where: { id: event.id } })).toMatchObject({
       type: "checkout.session.completed",
@@ -155,6 +167,7 @@ describe("a paid event", () => {
       "stale",
     ]);
     expect(await stock(variant.id)).toBe(3);
+    expect(await salesOf(variant.id)).toHaveLength(1);
     const changes = (await eventsOf(order.id)).filter((e) => e.type === "status_changed");
     expect(changes).toHaveLength(1);
     expect(await testDb.stripeEvent.count()).toBe(2);
@@ -227,6 +240,10 @@ describe("shortfalls and mismatches", () => {
     );
 
     expect(await stock(variant.id)).toBe(0);
+    // What the sale really took: 2 of the 3 asked.
+    expect(await salesOf(variant.id)).toEqual([
+      { delta: -2, stockAfter: 0, orderId: order.id, actorType: "system", adminId: null },
+    ]);
     const paid = await testDb.order.findUniqueOrThrow({ where: { id: order.id } });
     expect(paid).toMatchObject({ status: "paid", needsAttention: true });
     const shortfalls = (await eventsOf(order.id)).filter((e) => e.type === "stock_shortfall");
@@ -318,6 +335,8 @@ describe("shortfalls and mismatches", () => {
     expect(await stock(first.variant.id)).toBe(0);
     expect(await testDb.order.count({ where: { status: "paid" } })).toBe(2);
     expect(await testDb.orderEvent.count({ where: { type: "stock_shortfall" } })).toBe(1);
+    // The order that found no stock took nothing, so it wrote no movement.
+    expect(await salesOf(first.variant.id)).toHaveLength(1);
   });
 });
 

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { testDb, resetDatabaseBeforeEach } from "./client";
+import { createAdmin } from "./fixtures";
 
 // createProduct against a real Postgres: one transaction, and nothing written on any refusal
 // (spec 0005, AC-3, AC-4, AC-15, AC-18).
@@ -28,9 +29,13 @@ const { createProduct } = await import("@/features/catalog/actions/create-produc
 
 resetDatabaseBeforeEach();
 
-beforeEach(() => {
+// A real admin row: stock movements reference it.
+let adminId = "";
+
+beforeEach(async () => {
   vi.clearAllMocks();
-  mocks.requireAdmin.mockResolvedValue({ id: "admin-1", email: "a@example.com", name: "Ada" });
+  adminId = (await createAdmin()).id;
+  mocks.requireAdmin.mockResolvedValue({ id: adminId, email: "admin@example.com", name: "Admin" });
 });
 
 const simple = {
@@ -95,11 +100,42 @@ describe("createProduct", () => {
     expect(mocks.info).toHaveBeenCalledWith(
       {
         event: "catalog.product.created",
-        adminId: "admin-1",
+        adminId,
         productId: product.id,
         status: "active",
       },
       "catalog.product.created",
+    );
+  });
+
+  it("opens each variant's stock history with an initial movement, even at 0", async () => {
+    await createProduct(withOptions, "draft");
+
+    const movements = await testDb.stockMovement.findMany({
+      orderBy: { variant: { position: "asc" } },
+      select: {
+        kind: true,
+        delta: true,
+        stockAfter: true,
+        actorType: true,
+        adminId: true,
+        variant: { select: { sku: true } },
+      },
+    });
+    expect(movements).toEqual(
+      [
+        ["TEE-S-RED", 1],
+        ["TEE-S-BLUE", 0],
+        ["TEE-M-RED", 4],
+        ["TEE-M-BLUE", 9],
+      ].map(([sku, stock]) => ({
+        kind: "initial",
+        delta: stock,
+        stockAfter: stock,
+        actorType: "admin",
+        adminId,
+        variant: { sku },
+      })),
     );
   });
 

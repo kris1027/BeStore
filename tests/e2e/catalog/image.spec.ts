@@ -20,7 +20,7 @@ test("an admin uploads a product image that the storefront shows with its alt te
   await page.goto("/admin/products/new");
 
   await page.getByLabel("Name", { exact: true }).fill(name);
-  await page.getByLabel("Price for the product").fill("24");
+  await page.getByLabel("Price for the product", { exact: true }).fill("24");
   await page.getByLabel("Stock for the product").fill("7");
   await page.getByLabel("Photo").setInputFiles(fixture);
   await expect(page.getByLabel("Alt text")).toBeVisible();
