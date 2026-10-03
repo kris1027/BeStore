@@ -104,7 +104,7 @@ Reasoning and options: see [rationale.md](rationale.md).
 | `src/features/catalog/stock.ts` | pure: movement row builders, `formatDelta` |
 | `src/features/categories/` | `schemas.ts`, `actions/` (`create-category.ts`, `update-category.ts`, `delete-category.ts`, `reorder-categories.ts`, `set-category-products.ts`), `admin-queries.ts`, `components/`, `log.ts` |
 | `src/lib/stock-movements.ts` | `recordMovement(tx, row)`: shared by catalog actions and `src/lib/orders/transitions.ts` (a feature cannot import another's internals) |
-| `src/lib/product-image-files.ts` | `deleteUnreferencedImageFiles(paths)`: checks `order_lines.image_path`, then deletes from the bucket, logs failures |
+| `src/features/catalog/image-files.ts` | `deleteUnreferencedImageFiles(paths)`: checks `order_lines.image_path`, then deletes from the bucket, logs failures |
 | `src/components/sortable-list.tsx` | the shared dnd-kit sortable list with keyboard support and announcements |
 | `app/admin/(panel)/products/[id]/page.tsx`, `products/arrange/page.tsx` | edit and arrange pages |
 | `app/admin/(panel)/categories/page.tsx`, `categories/new/page.tsx`, `categories/[id]/page.tsx` | category pages |
@@ -266,7 +266,7 @@ Tracer Bullet: milestone 1 pushes one real edit through every layer (admin page,
 
 **Milestone 3, images and Markdown**
 9. Install dnd-kit; `src/components/sortable-list.tsx` with keyboard sensor and named announcements; unit and e2e keyboard tests, satisfies **AC-13**, **AC-25**
-10. Images section (shared with create): up to 8, alt text, option value link, reorder; `updateProductImages` with the id set conflict check; `src/lib/product-image-files.ts` deleting unreferenced files after commit (also used by `deleteProduct` later), satisfies **AC-13**, **AC-14**, **AC-21**
+10. Images section (shared with create): up to 8, alt text, option value link, reorder; `updateProductImages` with the id set conflict check; `src/features/catalog/image-files.ts` deleting unreferenced files after commit (also used by `deleteProduct` later), satisfies **AC-13**, **AC-14**, **AC-21**
 11. `src/lib/product-gallery.ts` with unit tests; product page gallery with thumbnail buttons; `getProductBySlug` returns all images; `orderLineImage` uses the same rule (update `order-image.test.ts`), satisfies **AC-15**
 12. Install `react-markdown`; `markdown.tsx`; Write and Preview in Details and create; product page renders it; tests for every refused construct, satisfies **AC-6**
 
