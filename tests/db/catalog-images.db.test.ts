@@ -30,7 +30,13 @@ vi.mock("@/lib/supabase/admin", () => ({
     storage: { from: () => ({ exists: mocks.exists, remove: mocks.remove }) },
   }),
 }));
-vi.mock("@/lib/logger", () => ({ logger: { info: mocks.info, warn: mocks.warn, error: vi.fn() } }));
+vi.mock("@/lib/logger", async (importOriginal) =>
+  (await import("./logger-mock")).mockLoggerModule(importOriginal, {
+    info: mocks.info,
+    warn: mocks.warn,
+    error: vi.fn(),
+  }),
+);
 
 const { updateProductImages } = await import("@/features/catalog/actions/update-images");
 

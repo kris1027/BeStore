@@ -23,7 +23,13 @@ vi.mock("@/lib/db", async () => ({ db: (await import("./client")).testDb }));
 vi.mock("@/lib/env", () => ({ env: { STORE_CURRENCY: "EUR" } }));
 vi.mock("next/cache", () => ({ updateTag: mocks.updateTag }));
 vi.mock("@/features/admin-auth/require-admin", () => ({ requireAdmin: mocks.requireAdmin }));
-vi.mock("@/lib/logger", () => ({ logger: { info: mocks.info, warn: vi.fn(), error: vi.fn() } }));
+vi.mock("@/lib/logger", async (importOriginal) =>
+  (await import("./logger-mock")).mockLoggerModule(importOriginal, {
+    info: mocks.info,
+    warn: vi.fn(),
+    error: vi.fn(),
+  }),
+);
 
 const { updateVariants } = await import("@/features/catalog/actions/update-variants");
 const { addOptionValue } = await import("@/features/catalog/actions/add-option-value");

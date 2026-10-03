@@ -11,7 +11,13 @@ const mocks = vi.hoisted(() => ({ requireAdmin: vi.fn(), info: vi.fn() }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", async () => ({ db: (await import("./client")).testDb }));
 vi.mock("@/features/admin-auth/require-admin", () => ({ requireAdmin: mocks.requireAdmin }));
-vi.mock("@/lib/logger", () => ({ logger: { info: mocks.info, warn: vi.fn(), error: vi.fn() } }));
+vi.mock("@/lib/logger", async (importOriginal) =>
+  (await import("./logger-mock")).mockLoggerModule(importOriginal, {
+    info: mocks.info,
+    warn: vi.fn(),
+    error: vi.fn(),
+  }),
+);
 
 const { createCategory } = await import("@/features/categories/actions/create-category");
 const { updateCategory } = await import("@/features/categories/actions/update-category");

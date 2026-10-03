@@ -23,7 +23,12 @@ vi.mock("@/features/admin-auth/require-admin", () => ({ requireAdmin: mocks.requ
 vi.mock("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: () => ({ storage: { from: () => ({ exists: mocks.exists }) } }),
 }));
-vi.mock("@/lib/logger", () => ({ logger: { info: mocks.info, warn: vi.fn() } }));
+vi.mock("@/lib/logger", async (importOriginal) =>
+  (await import("./logger-mock")).mockLoggerModule(importOriginal, {
+    info: mocks.info,
+    warn: vi.fn(),
+  }),
+);
 
 const { createProduct } = await import("@/features/catalog/actions/create-product");
 

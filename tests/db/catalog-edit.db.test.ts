@@ -16,7 +16,12 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", async () => ({ db: (await import("./client")).testDb }));
 vi.mock("next/cache", () => ({ updateTag: mocks.updateTag }));
 vi.mock("@/features/admin-auth/require-admin", () => ({ requireAdmin: mocks.requireAdmin }));
-vi.mock("@/lib/logger", () => ({ logger: { info: mocks.info, warn: vi.fn() } }));
+vi.mock("@/lib/logger", async (importOriginal) =>
+  (await import("./logger-mock")).mockLoggerModule(importOriginal, {
+    info: mocks.info,
+    warn: vi.fn(),
+  }),
+);
 
 const { updateProductDetails } = await import("@/features/catalog/actions/update-details");
 const { changeProductStatus } = await import("@/features/catalog/actions/change-status");
