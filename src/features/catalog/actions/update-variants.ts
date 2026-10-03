@@ -36,6 +36,11 @@ const skuTakenMessage = "Another variant already uses this SKU.";
 // renames, in one transaction. The product row lock serializes this with publishing and adding
 // a value; conflicts compare only the fields this section edits, so a sale in between (which
 // changes stock alone) never refuses a price edit.
+//
+// Deadlock rules, as in delete-product.ts: the product lock is FOR NO KEY UPDATE, because a
+// checkout holding these variants still needs a key share on the product for its order line,
+// and a changed SKU (a key column) waits for that checkout. Rows are written in id order, the
+// order adjustStock and markPaid lock variants in.
 export async function updateVariants(
   input: unknown,
 ): Promise<ActionResult<null, UpdateVariantsError>> {
@@ -74,7 +79,7 @@ async function save(
 ): Promise<{ readonly slug: string; readonly changed: boolean } | UpdateVariantsError> {
   const { productId } = values;
   const [product] = await tx.$queryRaw<{ status: string; slug: string }[]>`
-    SELECT status, slug FROM products WHERE id = ${productId}::uuid FOR UPDATE`;
+    SELECT status, slug FROM products WHERE id = ${productId}::uuid FOR NO KEY UPDATE`;
   if (!product) return { code: "not_found" };
 
   const [variants, optionTypes] = await Promise.all([
@@ -142,7 +147,8 @@ async function save(
   const taken = await takenSkus(tx, values);
   if (taken) return { code: "sku_taken", fields: taken };
 
-  for (const row of edited) {
+  const inIdOrder = [...edited].sort((a, b) => (a.variantId < b.variantId ? -1 : 1));
+  for (const row of inIdOrder) {
     await tx.productVariant.update({
       where: { id: row.variantId },
       data: {

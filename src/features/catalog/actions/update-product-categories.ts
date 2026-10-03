@@ -2,7 +2,7 @@
 
 import { requireAdmin } from "@/features/admin-auth/require-admin";
 import { db } from "@/lib/db";
-import { linkAtEnd } from "@/lib/product-categories";
+import { linkAtEnd, lockCategories } from "@/lib/product-categories";
 import type { ActionResult } from "@/lib/result";
 import { sameIdSet } from "@/lib/sortable";
 
@@ -17,6 +17,10 @@ export type UpdateProductCategoriesError =
 // spec 0009, AC-18 and AC-21: sets the product's categories, refused when its stored set
 // differs from the one the page loaded. A new category takes the product at its end. Nothing
 // is expired: no storefront read uses categories until feature 13 (AC-23).
+//
+// The product lock is FOR NO KEY UPDATE: the category page locks a category and then links a
+// product, whose foreign key needs a key share on the product row, so a full lock here would
+// deadlock with it.
 export async function updateProductCategories(
   input: unknown,
 ): Promise<ActionResult<null, UpdateProductCategoriesError>> {
@@ -29,7 +33,7 @@ export async function updateProductCategories(
   const outcome = await db.$transaction(
     async (tx): Promise<"saved" | UpdateProductCategoriesError> => {
       const [product] = await tx.$queryRaw<{ id: string }[]>`
-        SELECT id FROM products WHERE id = ${productId}::uuid FOR UPDATE`;
+        SELECT id FROM products WHERE id = ${productId}::uuid FOR NO KEY UPDATE`;
       if (!product) return { code: "not_found" };
 
       const stored = await tx.productCategory.findMany({
@@ -39,8 +43,7 @@ export async function updateProductCategories(
       const storedIds = stored.map((link) => link.categoryId);
       if (!sameIdSet(loadedCategoryIds, storedIds)) return { code: "stale" };
 
-      const known = await tx.category.count({ where: { id: { in: categoryIds } } });
-      if (known !== categoryIds.length) return { code: "unknown_category" };
+      if (!(await lockCategories(tx, categoryIds))) return { code: "unknown_category" };
 
       const removed = storedIds.filter((id) => !categoryIds.includes(id));
       if (removed.length > 0) {

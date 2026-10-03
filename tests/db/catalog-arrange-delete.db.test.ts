@@ -6,6 +6,7 @@ import {
   createOrder,
   createProductWithOptions,
   createSimpleProduct,
+  holding,
   inThirtyDays,
 } from "./fixtures";
 
@@ -313,5 +314,57 @@ describe("updateProductCategories", () => {
         categoryIds: ["01890000-0000-7000-8000-000000000000"],
       }),
     ).toEqual({ ok: false, error: { code: "unknown_category" } });
+  });
+
+  it("refuses a category deleted while the save waited for it, as a value", async () => {
+    const { product } = await createSimpleProduct("1");
+    const gone = await category("gone", 0);
+
+    const deleting = holding(
+      (tx) => tx.category.delete({ where: { id: gone.id } }),
+      async () => null,
+    );
+    await deleting.locked;
+
+    const saving = updateProductCategories({
+      productId: product.id,
+      loadedCategoryIds: [],
+      categoryIds: [gone.id],
+    });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    deleting.release();
+    await deleting.done;
+
+    expect(await saving).toEqual({ ok: false, error: { code: "unknown_category" } });
+    expect(await testDb.productCategory.count()).toBe(0);
+  });
+
+  it("does not deadlock with products being added to the category from its page", async () => {
+    const { product } = await createSimpleProduct("1");
+    const join = await category("join", 0);
+
+    // setCategoryProducts: the category row first, then a link whose foreign key needs a key
+    // share on the product.
+    const adding = holding(
+      (tx) => tx.$queryRaw`SELECT id FROM categories WHERE id = ${join.id}::uuid FOR UPDATE`,
+      (tx) =>
+        tx.productCategory.create({
+          data: { productId: product.id, categoryId: join.id, position: 0 },
+        }),
+    );
+    await adding.locked;
+
+    const saving = updateProductCategories({
+      productId: product.id,
+      loadedCategoryIds: [],
+      categoryIds: [join.id],
+    });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    adding.release();
+
+    await expect(adding.done).resolves.toBeDefined();
+    // The link the category page made first is the one kept.
+    expect(await saving).toEqual({ ok: true, data: null });
+    expect(await testDb.productCategory.count()).toBe(1);
   });
 });

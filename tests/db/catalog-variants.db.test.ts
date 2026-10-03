@@ -3,8 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { testDb, resetDatabaseBeforeEach } from "./client";
 import {
   createAdmin,
+  createOrder,
   createProductWithOptions as createRawProduct,
   createSimpleProduct,
+  holding,
 } from "./fixtures";
 
 // The Variants section and adding an option value against a real Postgres (spec 0009, AC-7 to
@@ -292,6 +294,69 @@ describe("updateVariants", () => {
 
     expect(await updateVariants(await variantsInput(product.id))).toEqual({ ok: true, data: null });
     expect(mocks.updateTag).not.toHaveBeenCalled();
+  });
+
+  it("does not deadlock with a checkout holding the variant whose SKU it changes", async () => {
+    const { product, variant } = await createSimpleProduct("1");
+    const order = await createOrder();
+
+    // startCheckout: FOR KEY SHARE on the variant, then an order line whose foreign key needs a
+    // key share on the product row.
+    const checkout = holding(
+      (tx) =>
+        tx.$queryRaw`SELECT id FROM product_variants WHERE id = ${variant.id}::uuid FOR KEY SHARE`,
+      (tx) =>
+        tx.orderLine.create({
+          data: {
+            orderId: order.id,
+            variantId: variant.id,
+            productId: product.id,
+            productName: "Tee",
+            sku: variant.sku,
+            unitPriceCents: 5000,
+            quantity: 1,
+            lineTotalCents: 5000,
+          },
+        }),
+    );
+    await checkout.locked;
+
+    const saving = updateVariants(
+      await variantsInput(product.id, { rows: { 0: { sku: "SKU-1-NEW" } } }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    checkout.release();
+
+    await expect(checkout.done).resolves.toBeDefined();
+    expect(await saving).toEqual({ ok: true, data: null });
+  });
+
+  it("updates rows in id order, so it does not deadlock with a paid order taking stock", async () => {
+    const { product, variants } = await createProductWithOptions("t");
+    const [low, high] = [...variants].sort((a, b) => (a.id < b.id ? -1 : 1));
+    const input = await variantsInput(product.id);
+    const edited = {
+      ...input,
+      // The form sends rows in display order; put the higher id first.
+      rows: input.rows
+        .filter((row) => row.variantId === low!.id || row.variantId === high!.id)
+        .sort((a) => (a.variantId === high!.id ? -1 : 1))
+        .map((row) => ({ ...row, price: "33" })),
+    };
+
+    // markPaid: takeStock locks each line's variant in id order.
+    const paid = holding(
+      (tx) => tx.$queryRaw`SELECT id FROM product_variants WHERE id = ${low!.id}::uuid FOR UPDATE`,
+      (tx) => tx.$queryRaw`SELECT id FROM product_variants WHERE id = ${high!.id}::uuid FOR UPDATE`,
+    );
+    await paid.locked;
+
+    const saving = updateVariants(edited);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    paid.release();
+
+    await expect(paid.done).resolves.toBeDefined();
+    expect(await saving).toEqual({ ok: true, data: null });
   });
 });
 

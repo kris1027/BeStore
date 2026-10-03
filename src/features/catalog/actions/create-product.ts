@@ -7,7 +7,7 @@ import { catalogTag, productTag } from "@/lib/cache-tags";
 import { db } from "@/lib/db";
 import { uniqueViolation } from "@/lib/db-errors";
 import { env } from "@/lib/env";
-import { linkAtEnd } from "@/lib/product-categories";
+import { linkAtEnd, lockCategories } from "@/lib/product-categories";
 import {
   imageDuplicateMessage,
   imageMissingMessage,
@@ -36,6 +36,7 @@ const takenMessages = {
   slug: "Another product already uses this URL name.",
   sku: "Another product already uses this SKU.",
 } as const;
+const categoryGoneMessage = "A category was deleted meanwhile. Reload and choose again.";
 
 // The field errors for a slug, SKUs or image paths already in use, or null when all are free.
 async function takenErrors(
@@ -64,7 +65,7 @@ async function takenErrors(
     if (usedPaths.has(image.path)) fields[`images.${index}`] = [imageDuplicateMessage];
   });
   if (knownCategories !== product.categoryIds.length) {
-    fields.categoryIds = ["A category was deleted meanwhile. Reload and choose again."];
+    fields.categoryIds = [categoryGoneMessage];
   }
   return Object.keys(fields).length > 0 ? fields : null;
 }
@@ -75,6 +76,9 @@ async function insertProduct(
   adminId: string,
 ) {
   return db.$transaction(async (tx) => {
+    // Before any write, so a category deleted since takenErrors leaves nothing to roll back.
+    if (!(await lockCategories(tx, product.categoryIds))) return null;
+
     const created = await tx.product.create({
       data: {
         name: product.name,
@@ -190,7 +194,7 @@ export async function createProduct(
   const taken = await takenErrors(product);
   if (taken) return { ok: false, error: { fields: taken } };
 
-  let created: { readonly id: string };
+  let created: { readonly id: string } | null;
   try {
     created = await insertProduct(product, parsedStatus.data, admin.id);
   } catch (error) {
@@ -201,6 +205,8 @@ export async function createProduct(
       ? { ok: false, error: { fields: raced } }
       : { ok: false, error: { form: "unavailable" } };
   }
+  if (created === null)
+    return { ok: false, error: { fields: { categoryIds: [categoryGoneMessage] } } };
 
   // Only after the commit: the next storefront request reads the new product.
   updateTag(catalogTag);

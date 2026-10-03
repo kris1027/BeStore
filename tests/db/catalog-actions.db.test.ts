@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { testDb, resetDatabaseBeforeEach } from "./client";
-import { createAdmin } from "./fixtures";
+import { createAdmin, holding } from "./fixtures";
 
 // createProduct against a real Postgres: one transaction, and nothing written on any refusal
 // (spec 0005, AC-3, AC-4, AC-15, AC-18).
@@ -199,6 +199,30 @@ describe("createProduct", () => {
       },
     });
     expect(await counts()).toEqual(before);
+  });
+
+  it("refuses a category deleted while the insert waited for it, writing nothing", async () => {
+    const gone = await testDb.category.create({
+      data: { name: "Gone", slug: "gone", position: 0 },
+    });
+    const deleting = holding(
+      (tx) => tx.category.delete({ where: { id: gone.id } }),
+      async () => null,
+    );
+    await deleting.locked;
+
+    const creating = createProduct({ ...simple, categoryIds: [gone.id] }, "active");
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    deleting.release();
+    await deleting.done;
+
+    expect(await creating).toEqual({
+      ok: false,
+      error: {
+        fields: { categoryIds: ["A category was deleted meanwhile. Reload and choose again."] },
+      },
+    });
+    expect(await counts()).toEqual({ products: 0, variants: 0, types: 0, values: 0, links: 0 });
   });
 
   it("refuses invalid input with field errors and writes nothing", async () => {
