@@ -99,7 +99,7 @@ Reasoning and options: see [rationale.md](rationale.md).
 | `src/features/catalog/schemas.ts` | create schema extended; section schemas: `detailsSchema`, `variantsSchema`, `addOptionValueSchema`, `stockSchema`, `imagesSchema`, `productCategoriesSchema` |
 | `src/features/catalog/actions/` | `update-details.ts`, `change-status.ts`, `delete-product.ts`, `update-variants.ts`, `add-option-value.ts`, `adjust-stock.ts`, `update-images.ts`, `update-product-categories.ts`, `reorder-products.ts` |
 | `src/features/catalog/admin-queries.ts` | `getAdminProducts(filters)` (paged), `getProductForEdit(id)`, `getStockHistory(productId)`, `getArrangeList()`, `searchProductsForPicker(q)` |
-| `src/features/catalog/gallery.ts` | pure: `galleryImages(images, selectedValueIds)` |
+| `src/lib/product-gallery.ts` | pure: `galleryImages(images, selectedValueIds)`; in `src/lib/` because `src/lib/orders/order-image.ts` uses it too |
 | `src/features/catalog/markdown.tsx` | the one Markdown renderer config (allowed elements, link rules) |
 | `src/features/catalog/stock.ts` | pure: movement row builders, `formatDelta` |
 | `src/features/categories/` | `schemas.ts`, `actions/` (`create-category.ts`, `update-category.ts`, `delete-category.ts`, `reorder-categories.ts`, `set-category-products.ts`), `admin-queries.ts`, `components/`, `log.ts` |
@@ -176,7 +176,7 @@ Storefront reads (cached, changed): `getActiveProducts` adds `onSale`; `getProdu
 | Admin list | next page cursor | fetch 51 rows; when there are 51, `id` of the 50th is the next `before` (`id < before`, ordered `id desc`); a `before` that is not a UUID is ignored |
 | Admin list | category options | `categories` by `position` |
 | Publish | new `position` | `min(position) - 1` over `status = 'active'`, read in the same transaction (0 when none) |
-| Delete | "on an order" | `EXISTS order_lines WHERE product_id = $id OR variant_id IN (the product's variants)`, any order status, checked in the transaction after `SELECT ... FOR UPDATE` on the product row |
+| Delete | "on an order" | `EXISTS order_lines WHERE product_id = $id OR variant_id IN (the product's variants)`, any order status, checked in the transaction after `SELECT ... FOR NO KEY UPDATE` on the product row, then `FOR UPDATE` on its variant rows |
 | Delete | files to delete | the product's `product_images.storage_path`, read before the delete |
 | Details save | conflict | `products.updated_at` sent from the loaded page vs the row |
 | Details save | tags to expire | old slug (read in the transaction) and new slug |
@@ -214,7 +214,7 @@ Storefront reads (cached, changed): `getActiveProducts` adds `onSale`; `getProdu
 - A product referenced by any order line is never hard deleted by the app.
 - At most 8 `product_images` per product (checked in the action; the count runs inside the transaction).
 - Catalog tags are expired only after the commit.
-- `startCheckout` takes `FOR KEY SHARE` on the variants it snapshots, so a concurrent `deleteProduct` (which holds `FOR UPDATE` on the product and deletes its variants) waits or sees the new order line; a product is never deleted under a pending order.
+- `startCheckout` takes `FOR KEY SHARE` on the variants it snapshots, so a concurrent `deleteProduct` (which holds `FOR NO KEY UPDATE` on the product and `FOR UPDATE` on its variants, then deletes them) waits or sees the new order line; a product is never deleted under a pending order. The product lock is `FOR NO KEY UPDATE`, not `FOR UPDATE`, because the checkout still needs a key share on the product for its order line's foreign key, and a full lock would deadlock with it (`updateVariants` and `updateProductCategories` lock the product the same way).
 - Hiding, archiving, repricing or deleting never touches an existing pending order: it is charged its snapshot price and takes stock when paid (spec 0006).
 - `markdown.tsx` is shared by the cached server render and the client Preview, so it carries no `server-only` import.
 - Prices, stock and id sets from the client are compared, never trusted (AC-22).
@@ -267,7 +267,7 @@ Tracer Bullet: milestone 1 pushes one real edit through every layer (admin page,
 **Milestone 3, images and Markdown**
 9. Install dnd-kit; `src/components/sortable-list.tsx` with keyboard sensor and named announcements; unit and e2e keyboard tests, satisfies **AC-13**, **AC-25**
 10. Images section (shared with create): up to 8, alt text, option value link, reorder; `updateProductImages` with the id set conflict check; `src/lib/product-image-files.ts` deleting unreferenced files after commit (also used by `deleteProduct` later), satisfies **AC-13**, **AC-14**, **AC-21**
-11. `gallery.ts` with unit tests; product page gallery with thumbnail buttons; `getProductBySlug` returns all images; `orderLineImage` uses the same rule (update `order-image.test.ts`), satisfies **AC-15**
+11. `src/lib/product-gallery.ts` with unit tests; product page gallery with thumbnail buttons; `getProductBySlug` returns all images; `orderLineImage` uses the same rule (update `order-image.test.ts`), satisfies **AC-15**
 12. Install `react-markdown`; `markdown.tsx`; Write and Preview in Details and create; product page renders it; tests for every refused construct, satisfies **AC-6**
 
 **Milestone 4, categories, arranging, list and delete**
