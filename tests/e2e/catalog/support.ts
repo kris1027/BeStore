@@ -2,6 +2,9 @@ import { randomUUID } from "node:crypto";
 
 import { withDb } from "../admin/support";
 
+// An edit page, /admin/products/<uuid> (spec 0009: create opens it).
+export const adminProductUrl = /\/admin\/products\/[0-9a-f]{8}-[0-9a-f-]{27}$/;
+
 // Catalog rows written straight to the database, for tests about the cart rather than the admin
 // form. A fresh slug has never been cached, so its product page renders from these rows.
 

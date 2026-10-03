@@ -4,6 +4,7 @@ import path from "node:path";
 import { expect, test } from "@playwright/test";
 
 import { createTestUser, signInFully } from "../admin/support";
+import { adminProductUrl } from "./support";
 
 // Spec 0005, AC-5 and AC-6: one optional image, uploaded straight to Storage, with alt text.
 
@@ -31,7 +32,7 @@ test("an admin uploads a product image that the storefront shows with its alt te
 
   await page.getByLabel("Alt text").fill("A sand colored mug on a wooden table");
   await page.getByRole("button", { name: "Publish" }).click();
-  await expect(page).toHaveURL("/admin/products");
+  await expect(page).toHaveURL(adminProductUrl);
 
   const customer = await (await browser.newContext()).newPage();
   await customer.goto("/");

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { expect, type Page, test } from "@playwright/test";
 
 import { createTestUser, signInFully } from "../admin/support";
+import { adminProductUrl } from "./support";
 
 // Spec 0005, milestone 2: options generate the variant grid, and the product page picks one.
 
@@ -47,7 +48,8 @@ test("options build a variant grid that keeps typed rows, and the picker follows
   await page.getByLabel("Stock for M / Oat").fill("3");
 
   await page.getByRole("button", { name: "Publish" }).click();
-  await expect(page).toHaveURL("/admin/products");
+  await expect(page).toHaveURL(adminProductUrl);
+  await page.goto("/admin/products");
   await expect(page.getByRole("row", { name: new RegExp(name) })).toContainText("€49.00 to €55.50");
 
   await page.goto(`/products/${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`);
@@ -108,7 +110,7 @@ test("a URL name another product uses is refused by the server", async ({ page }
       .getByLabel("SKU for the product")
       .fill(`TWIN-${attempt}-${randomUUID().slice(0, 6)}`);
     await page.getByRole("button", { name: "Save as draft" }).click();
-    if (attempt === 1) await expect(page).toHaveURL("/admin/products");
+    if (attempt === 1) await expect(page).toHaveURL(adminProductUrl);
   }
   await expect(page.getByText("Another product already uses this URL name.")).toBeVisible();
   await expect(page.getByLabel("URL name")).toBeFocused();

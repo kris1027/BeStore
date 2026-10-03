@@ -52,6 +52,7 @@ import { fractionDigits } from "@/lib/money";
 import { slugify } from "@/lib/slug";
 
 import { createProduct } from "../actions/create-product";
+import { adminProductPath, adminProductsPath } from "../paths";
 import { type NewProductStatus, pathErrors, productFormSchema } from "../schemas";
 import {
   combinationCount,
@@ -63,8 +64,6 @@ import {
   suggestSku,
 } from "../variant-grid";
 import { ImageField, type StorageTarget, type UploadedImage } from "./image-field";
-
-const productsPath = "/admin/products";
 
 // Each option value carries a client id, so a variant row is keyed by which values it combines,
 // not by their text: renaming a value keeps the price and stock typed in its rows.
@@ -249,7 +248,8 @@ export function ProductForm({ storage }: { readonly storage: StorageTarget }) {
         description: state.name.trim(),
         type: "success",
       });
-      router.push(productsPath);
+      // spec 0009, Decision: the new product opens in its editor, ready for the next step.
+      router.push(adminProductPath(result.data.productId));
     });
   }
 
@@ -268,7 +268,7 @@ export function ProductForm({ storage }: { readonly storage: StorageTarget }) {
     >
       <div className="flex flex-col gap-3">
         <Link
-          href={productsPath}
+          href={adminProductsPath}
           className="inline-flex items-center gap-1 self-start text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
         >
           <ArrowLeftIcon className="size-4" aria-hidden="true" />

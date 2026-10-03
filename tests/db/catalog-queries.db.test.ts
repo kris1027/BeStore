@@ -225,7 +225,7 @@ describe("getAdminProducts", () => {
     });
     await testDb.productVariant.update({ where: { id: archived.id }, data: { archived: true } });
 
-    const rows = await getAdminProducts();
+    const rows = await getAdminProducts({ tab: "all" });
 
     expect(rows.map((row) => [row.slug, row.status])).toEqual([
       ["tee", "active"],
@@ -246,10 +246,10 @@ describe("getAdminProducts", () => {
     });
 
     expect(ADMIN_PRODUCT_LIMIT).toBe(200);
-    expect(await getAdminProducts()).toHaveLength(200);
+    expect(await getAdminProducts({ tab: "all" })).toHaveLength(200);
   });
 
   it("is empty on an empty catalog", async () => {
-    expect(await getAdminProducts()).toEqual([]);
+    expect(await getAdminProducts({ tab: "all" })).toEqual([]);
   });
 });

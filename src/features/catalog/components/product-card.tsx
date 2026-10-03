@@ -4,11 +4,8 @@ import { Price } from "@/components/price";
 import { ProductImage } from "@/components/product-image";
 import { Badge } from "@/components/ui/badge";
 
+import { productPath } from "../paths";
 import type { ProductCard as ProductCardData } from "../queries";
-
-export function productPath(slug: string): string {
-  return `/products/${slug}`;
-}
 
 // spec 0005, AC-6: image, name, price ("From" when variant prices differ), and Sold out.
 export function ProductCard({

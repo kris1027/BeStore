@@ -84,17 +84,53 @@ function variantSchema(currency: string) {
   });
 }
 
+// Field rules shared by the create form and the edit sections (spec 0009: edits follow the
+// create rules).
+export const nameField = z
+  .string()
+  .trim()
+  .min(1, "Enter a name.")
+  .max(200, "Keep it under 200 characters.");
+
+export const slugField = z
+  .string()
+  .trim()
+  .min(1, "Enter a URL name.")
+  .max(SLUG_MAX_LENGTH, `Keep it under ${SLUG_MAX_LENGTH} characters.`)
+  .regex(SLUG_PATTERN, "Use lowercase letters and digits, joined by single hyphens.");
+
+export const DESCRIPTION_MAX_LENGTH = 5000;
+
+export const descriptionField = z
+  .string()
+  .trim()
+  .max(DESCRIPTION_MAX_LENGTH, `Keep it under ${DESCRIPTION_MAX_LENGTH} characters.`);
+
+export const MAX_WEIGHT_GRAMS = 100_000;
+
+// Typed as text; empty means "not set" (spec 0009, AC-5).
+export const weightField = z
+  .string()
+  .trim()
+  .transform((text, ctx) => {
+    if (text === "") return null;
+    const grams = /^\d+$/.test(text) ? Number(text) : Number.NaN;
+    if (!Number.isInteger(grams) || grams < 1 || grams > MAX_WEIGHT_GRAMS) {
+      ctx.addIssue({
+        code: "custom",
+        message: `Enter whole grams from 1 to ${MAX_WEIGHT_GRAMS}, or leave it empty.`,
+      });
+      return z.NEVER;
+    }
+    return grams;
+  });
+
 export function productFormSchema(currency: string) {
   return z
     .object({
-      name: z.string().trim().min(1, "Enter a name.").max(200, "Keep it under 200 characters."),
-      slug: z
-        .string()
-        .trim()
-        .min(1, "Enter a URL name.")
-        .max(SLUG_MAX_LENGTH, `Keep it under ${SLUG_MAX_LENGTH} characters.`)
-        .regex(SLUG_PATTERN, "Use lowercase letters and digits, joined by single hyphens."),
-      description: z.string().trim().max(5000, "Keep it under 5000 characters."),
+      name: nameField,
+      slug: slugField,
+      description: descriptionField,
       optionTypes: z
         .array(optionTypeSchema)
         .max(MAX_OPTION_TYPES, `Up to ${MAX_OPTION_TYPES} options.`),
@@ -178,6 +214,29 @@ export type ProductFormValues = z.output<ReturnType<typeof productFormSchema>>;
 
 export const productStatusSchema = z.enum(["draft", "active"]);
 export type NewProductStatus = z.infer<typeof productStatusSchema>;
+
+const productId = z.uuid();
+// The moment a section was loaded, as the page rendered it (Date.toISOString()).
+const loadedAt = z.iso.datetime().transform((text) => new Date(text));
+
+// spec 0009, AC-5: the Details section.
+export const detailsSchema = z.object({
+  productId,
+  loadedUpdatedAt: loadedAt,
+  name: nameField,
+  slug: slugField,
+  description: descriptionField,
+  featured: z.boolean(),
+  weightGrams: weightField,
+});
+
+export type DetailsInput = z.input<typeof detailsSchema>;
+
+// spec 0009, State transitions: the statuses a button can ask for.
+export const statusChangeSchema = z.object({
+  productId,
+  to: z.enum(["draft", "active", "archived"]),
+});
 
 // Field errors keyed by their dotted path ("variants.0.price"), which React Hook Form's
 // setError accepts as is; the form shows the first message of each.

@@ -23,12 +23,38 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { type DateFormat, formatDate } from "@/lib/dates";
+import { cn } from "@/lib/utils";
 
-import { ADMIN_PRODUCT_LIMIT, type AdminProductRow } from "../admin-queries";
+import {
+  ADMIN_PRODUCT_LIMIT,
+  type AdminProductRow,
+  type AdminProductsParams,
+  type ProductListTab,
+  productListTabs,
+} from "../admin-queries";
+import { adminProductPath, adminProductsPath, newProductPath } from "../paths";
 
-export const newProductPath = "/admin/products/new";
+export const statusLabels = { draft: "Draft", active: "Active", archived: "Archived" } as const;
 
-const statusLabels = { draft: "Draft", active: "Active", archived: "Archived" } as const;
+const tabLabels: Record<ProductListTab, string> = {
+  all: "All",
+  active: "Active",
+  draft: "Draft",
+  archived: "Archived",
+  featured: "Featured",
+};
+
+const tabEmpty: Record<ProductListTab, string> = {
+  all: "No products to show",
+  active: "No active products",
+  draft: "No drafts",
+  archived: "No archived products",
+  featured: "No featured products",
+};
+
+function listHref(tab: ProductListTab): string {
+  return tab === "all" ? adminProductsPath : `${adminProductsPath}?status=${tab}`;
+}
 
 function NewProductLink() {
   return (
@@ -39,12 +65,17 @@ function NewProductLink() {
   );
 }
 
-// spec 0005, AC-1.
+// spec 0005, AC-1 and spec 0009, AC-1.
 export function AdminProductsList({
   products,
+  params,
+  catalogEmpty,
   dateFormat,
 }: {
   readonly products: readonly AdminProductRow[];
+  readonly params: AdminProductsParams;
+  // No product at all, in any status: the first run state.
+  readonly catalogEmpty: boolean;
   readonly dateFormat: DateFormat;
 }) {
   return (
@@ -56,9 +87,29 @@ export function AdminProductsList({
             Everything in the catalog, newest first. Active products show on the storefront.
           </p>
         </div>
-        {products.length > 0 ? <NewProductLink /> : null}
+        {catalogEmpty ? null : <NewProductLink />}
       </div>
-      {products.length === 0 ? (
+      {catalogEmpty ? null : (
+        <nav
+          aria-label="Product views"
+          className="flex flex-wrap gap-1 self-start rounded-md border p-1"
+        >
+          {productListTabs.map((tab) => (
+            <Link
+              key={tab}
+              href={listHref(tab)}
+              aria-current={params.tab === tab ? "page" : undefined}
+              className={cn(
+                buttonVariants({ variant: params.tab === tab ? "secondary" : "ghost", size: "sm" }),
+                "aria-[current=page]:font-semibold",
+              )}
+            >
+              {tabLabels[tab]}
+            </Link>
+          ))}
+        </nav>
+      )}
+      {catalogEmpty ? (
         <Empty className="border">
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -76,12 +127,29 @@ export function AdminProductsList({
             <NewProductLink />
           </EmptyContent>
         </Empty>
+      ) : products.length === 0 ? (
+        <Empty className="border">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <PackageIcon aria-hidden="true" />
+            </EmptyMedia>
+            <EmptyTitle>
+              <h2>{tabEmpty[params.tab]}</h2>
+            </EmptyTitle>
+            <EmptyDescription>Products with this status show here.</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Link href={adminProductsPath} className={buttonVariants({ variant: "outline" })}>
+              Show all products
+            </Link>
+          </EmptyContent>
+        </Empty>
       ) : (
         <Card>
           <CardContent>
             <Table containerProps={{ tabIndex: 0, role: "region", "aria-label": "Products" }}>
               <TableCaption className="sr-only">
-                Products, newest first
+                {tabLabels[params.tab]} products, newest first
                 {products.length === ADMIN_PRODUCT_LIMIT
                   ? ` (the first ${ADMIN_PRODUCT_LIMIT})`
                   : ""}
@@ -100,7 +168,12 @@ export function AdminProductsList({
                 {products.map((product) => (
                   <TableRow key={product.id}>
                     <TableCell className="font-medium whitespace-normal">
-                      {product.name}
+                      <Link
+                        href={adminProductPath(product.id)}
+                        className="underline-offset-4 hover:underline"
+                      >
+                        {product.name}
+                      </Link>
                       <span className="block text-xs font-normal text-muted-foreground">
                         /products/{product.slug}
                       </span>
