@@ -5,7 +5,7 @@ import { updateTag } from "next/cache";
 import { requireAdmin } from "@/features/admin-auth/require-admin";
 import { catalogTag, productTag } from "@/lib/cache-tags";
 import { db } from "@/lib/db";
-import { deleteUnreferencedImageFiles } from "@/lib/product-image-files";
+import { deleteUnreferencedImageFiles } from "../image-files";
 import type { ActionResult } from "@/lib/result";
 
 import { logCatalogEvent } from "../log";

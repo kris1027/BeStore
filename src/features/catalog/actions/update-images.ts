@@ -11,7 +11,7 @@ import {
   imageDuplicateMessage,
   imageMissingMessage,
   missingUploads,
-} from "@/lib/product-image-files";
+} from "../image-files";
 import type { ActionResult } from "@/lib/result";
 
 import { imagesStale } from "../image-edit";

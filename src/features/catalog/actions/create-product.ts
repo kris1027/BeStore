@@ -8,11 +8,7 @@ import { db } from "@/lib/db";
 import { uniqueViolation } from "@/lib/db-errors";
 import { env } from "@/lib/env";
 import { linkAtEnd, lockCategories } from "@/lib/product-categories";
-import {
-  imageDuplicateMessage,
-  imageMissingMessage,
-  missingUploads,
-} from "@/lib/product-image-files";
+import { imageDuplicateMessage, imageMissingMessage, missingUploads } from "../image-files";
 import type { ActionResult } from "@/lib/result";
 import { type MovementRow, recordMovements } from "@/lib/stock-movements";
 
