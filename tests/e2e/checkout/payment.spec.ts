@@ -175,13 +175,12 @@ test("the admin order pages work by keyboard alone", async ({ page, browser, req
   await adminPage.goto("/admin/orders");
   await expect(adminPage.getByRole("heading", { level: 1, name: "Orders" })).toBeVisible();
 
-  const allView = adminPage.getByRole("navigation", { name: "Order views" }).getByRole("link", {
-    name: "All orders",
-  });
-  await tabTo(adminPage, allView);
+  // spec 0010, AC-1: find the order by its number from the search box.
+  const search = adminPage.getByLabel("Order number, email or name");
+  await tabTo(adminPage, search);
+  await adminPage.keyboard.type(String(order.number));
   await adminPage.keyboard.press("Enter");
-  await expect(adminPage).toHaveURL(/view=all/);
-  await expect(allView).toHaveAttribute("aria-current", "page");
+  await expect(adminPage).toHaveURL(new RegExp(`q=${order.number}`));
 
   const orderLink = adminPage.getByRole("link", { name: `#${order.number}` });
   await tabTo(adminPage, orderLink);
