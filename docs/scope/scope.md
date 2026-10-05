@@ -23,7 +23,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 8 | Shipping address & flat rate | Slice 2 | done |
 | 22 | Purge PII from expired orders | Slice 2 follow up | done |
 | 9 | Admin catalog management | Slice 3 | done |
-| 10 | Admin order management | Slice 4 | planned |
+| 10 | Admin order management | Slice 4 | in-progress |
 | 11 | Order emails | Slice 5 | planned |
 | 12 | Customer accounts | Slice 6 | planned |
 | 13 | Categories, search & filters | Slice 7 | planned |
@@ -197,10 +197,19 @@ spec [0009](../specs/0009-admin-catalog-management/index.md) · code in `src/fea
 
 ## Slice 4: Orders
 
-### 10. Admin order management · needs a decision
+### 10. Admin order management · in-progress
 Run orders after payment: filter and search orders, move them through statuses (paid, shipped, delivered, cancelled, refunded), and issue refunds.
 **Done when:** an admin can find any order, change its status with a history of who changed what, and refund all or part of it through the payment provider; a refund returns stock when chosen.
-- [ ] Design it (spec): `/architect admin order management`
+spec [0010](../specs/0010-admin-order-management/index.md) · code in [src/features/orders/](../../src/features/orders/), [src/lib/orders/](../../src/lib/orders/), [app/admin/(panel)/orders/](../../app/admin/(panel)/orders/), [prisma/migrations/](../../prisma/migrations/)
+- [x] Design it (spec): `/architect admin order management`
+- [x] Build it: `/develop admin order management`
+  - [x] Thin thread and status actions: migrations, mark shipped, delivered, undo, edit tracking, notes, resolve attention, history (AC-4 to AC-8, AC-19 to AC-22)
+  - [x] Refunds and cancel: refund math, reserve then Stripe then settle, per line restock, cancel paid and unpaid (AC-9 to AC-15, AC-18)
+  - [x] Stripe side refunds and sync: `refund.*` webhook events, the refund outcomes table, sync in the reconcile cron and "Check with Stripe" (AC-16, AC-17)
+  - [x] Finding orders: search, status, attention, refund state and date filters with paging (AC-1 to AC-3)
+  - [x] Safety net: log redaction, keyboard and axe, e2e (refund and cancel under `STRIPE_E2E=1`) (AC-23, AC-24)
+- [ ] Verify it: `/check verify admin order management`
+- [ ] Test it: `/test admin order management`
 
 ## Slice 5: Emails
 
@@ -272,6 +281,7 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Wishlist**: save products for later · needs a decision
 - **Dark mode**: a dark token set with its own contrast pass and a theme switch; the semantic tokens rule keeps it a token change · needs a decision · from spec 0003
 - **Sweep abandoned product image uploads**: delete files in `product-images` that no image row and no order line references, older than a day, if storage cost grows · from spec 0009
+- **Trigram search indexes for admin orders**: `pg_trgm` indexes on the searched order columns, once the list is measured as slow · from spec 0010
 - **Redact customer data at Stripe**: remove the name, email and address Stripe keeps on expired Checkout Sessions, if its redaction tooling fits · needs a decision · from spec 0008
 
 ## Legend

@@ -42,6 +42,8 @@ enum OrderEventType {
   refund_failed
   stock_shortfall
   note
+  tracking_updated
+  attention_cleared
 
   @@map("order_event_type")
 }
@@ -81,6 +83,7 @@ enum StockMovementKind {
   initial
   adjustment
   sale
+  return
 
   @@map("stock_movement_kind")
 }
@@ -240,7 +243,7 @@ model ProductImage {
 
 // One row per change to a variant's stock_quantity, written in the same transaction as the
 // change (spec 0009): `initial` on create, `adjustment` by an admin, `sale` when a paid order
-// takes stock. The actor and kind rules are CHECKs in the migration.
+// takes stock, `return` when a succeeded refund puts it back (spec 0010). The actor and kind rules are CHECKs in the migration.
 model StockMovement {
   id         String            @id @default(uuid(7)) @db.Uuid
   variantId  String            @map("variant_id") @db.Uuid
@@ -256,7 +259,7 @@ model StockMovement {
 
   variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
   admin   AdminUser?     @relation(fields: [adminId], references: [id], onDelete: Restrict)
-  // Restrict: orders are never deleted, and SetNull would break the sale CHECK.
+  // Restrict: orders are never deleted, and SetNull would break the sale and return CHECK.
   order   Order?         @relation(fields: [orderId], references: [id], onDelete: Restrict)
 
   @@index([variantId, createdAt])
@@ -477,18 +480,20 @@ model OrderEvent {
 }
 
 model Refund {
-  id             String       @id @default(uuid(7)) @db.Uuid
-  orderId        String       @map("order_id") @db.Uuid
-  amountCents    Int          @map("amount_cents")
-  reason         String?
-  status         RefundStatus @default(pending)
-  stripeRefundId String?      @unique @map("stripe_refund_id")
-  actorType      ActorType    @map("actor_type")
+  id               String       @id @default(uuid(7)) @db.Uuid
+  orderId          String       @map("order_id") @db.Uuid
+  amountCents      Int          @map("amount_cents")
+  reason           String?
+  status           RefundStatus @default(pending)
+  stripeRefundId   String?      @unique @map("stripe_refund_id")
+  // This refund included the delivery fee (spec 0010); system refunds never do.
+  includesShipping Boolean      @default(false) @map("includes_shipping")
+  actorType        ActorType    @map("actor_type")
   // Required exactly when actor_type = admin (CHECK in the migration).
-  adminId        String?      @map("admin_id") @db.Uuid
-  succeededAt    DateTime?    @map("succeeded_at") @db.Timestamptz(3)
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  adminId          String?      @map("admin_id") @db.Uuid
+  succeededAt      DateTime?    @map("succeeded_at") @db.Timestamptz(3)
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   order Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
   admin AdminUser?   @relation(fields: [adminId], references: [id], onDelete: Restrict)
@@ -501,11 +506,15 @@ model Refund {
 }
 
 model RefundLine {
-  id          String  @id @default(uuid(7)) @db.Uuid
-  refundId    String  @map("refund_id") @db.Uuid
-  orderLineId String  @map("order_line_id") @db.Uuid
-  quantity    Int
-  restocked   Boolean @default(false)
+  id               String  @id @default(uuid(7)) @db.Uuid
+  refundId         String  @map("refund_id") @db.Uuid
+  orderLineId      String  @map("order_line_id") @db.Uuid
+  quantity         Int
+  // What the admin asked for (spec 0010); returned_quantity is what came back to stock once the
+  // refund succeeded, and restocked = returned_quantity > 0. CHECKs keep the three in step.
+  restock          Boolean @default(false)
+  restocked        Boolean @default(false)
+  returnedQuantity Int     @default(0) @map("returned_quantity")
 
   refund    Refund    @relation(fields: [refundId], references: [id], onDelete: Cascade)
   orderLine OrderLine @relation(fields: [orderLineId], references: [id], onDelete: Cascade)

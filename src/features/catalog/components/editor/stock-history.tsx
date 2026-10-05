@@ -18,6 +18,8 @@ const kindLabels: Record<StockHistoryRow["kind"], string> = {
   initial: "Opening count",
   adjustment: "Adjustment",
   sale: "Sale",
+  // spec 0010: a refund put units back; the admin who refunded is the actor.
+  return: "Refund return",
 };
 
 function Who({ actor }: { readonly actor: StockHistoryRow["actor"] }) {

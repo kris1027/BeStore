@@ -6,7 +6,8 @@ import { describe, expect, it } from "vitest";
 import { expectViolation, resetDatabaseBeforeEach, SQLSTATE, testDb } from "./client";
 import { createAdmin, createOrder, createSimpleProduct } from "./fixtures";
 
-// The stock_movements table (spec 0009, AC-11, AC-12): its CHECKs and the migration's backfill.
+// The stock_movements table (spec 0009, AC-11, AC-12; spec 0010 adds `return`): its CHECKs and
+// the migration's backfill.
 
 resetDatabaseBeforeEach();
 
@@ -47,10 +48,19 @@ describe("stock_movements CHECKs", () => {
           actorType: "system",
           orderId: order.id,
         },
+        {
+          variantId: variant.id,
+          kind: "return",
+          delta: 1,
+          stockAfter: 4,
+          actorType: "admin",
+          adminId: admin.id,
+          orderId: order.id,
+        },
       ],
     });
 
-    expect(await testDb.stockMovement.count()).toBe(3);
+    expect(await testDb.stockMovement.count()).toBe(4);
   });
 
   it.each([
@@ -77,12 +87,35 @@ describe("stock_movements CHECKs", () => {
     [
       "a sale without an order",
       { kind: "sale", delta: -1, stockAfter: 4, actorType: "system" },
-      "stock_movements_sale_order_check",
+      "stock_movements_order_check",
     ],
     [
       "an order on something other than a sale",
       { kind: "initial", delta: 1, stockAfter: 1, actorType: "system", order: true },
-      "stock_movements_sale_order_check",
+      "stock_movements_order_check",
+    ],
+    [
+      "a return without an order",
+      { kind: "return", delta: 1, stockAfter: 6, actorType: "admin", admin: true },
+      "stock_movements_order_check",
+    ],
+    [
+      "a return by the system",
+      { kind: "return", delta: 1, stockAfter: 6, actorType: "system", order: true },
+      "stock_movements_return_actor_check",
+    ],
+    [
+      "a note on a return",
+      {
+        kind: "return",
+        delta: 1,
+        stockAfter: 6,
+        actorType: "admin",
+        admin: true,
+        order: true,
+        note: "Not allowed",
+      },
+      "stock_movements_note_check",
     ],
     [
       "a sale by an admin",
