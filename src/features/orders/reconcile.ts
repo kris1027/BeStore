@@ -13,16 +13,20 @@ import { type HandledEventType, handledEventTypes } from "./event-decision";
 import {
   logReconcile,
   logReconcileOrderFailed,
+  logReconcileRefunds,
   logReconcileStripeFailed,
   logReconcileUnresolved,
   type ReconcileCounts,
 } from "./log";
+import { syncPendingRefunds } from "./refund-sync";
 import { expireCatalogTags, handleStripeEvent } from "./stripe-events";
 
 export const RECONCILE_BATCH = 100;
 // The 31 minute session plus an hour for Stripe's own webhook retries.
 export const STALE_AFTER_MS = 90 * 60 * 1000;
 export const EVENT_SEARCH_CAP = 500;
+// The refund sync stops starting new refunds after this much of the run (spec 0010, AC-17).
+export const RECONCILE_BUDGET_MS = 50_000;
 
 // The decisive event wins over the one that only started the story.
 const eventPreference: readonly HandledEventType[] = [
@@ -166,7 +170,23 @@ export async function reconcileOrdersRequest(request: Request): Promise<Response
   if (!isCronRequest(request)) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
-  const counts = await reconcileOrders();
+  const startedMs = Date.now();
+  const counts = await reconcileOrders(startedMs);
   logReconcile(counts);
-  return Response.json(counts);
+  // spec 0010, AC-17: then the pending refunds, oldest first, each failure isolated.
+  const refunds = await syncPendingRefunds(Date.now(), {
+    deadlineMs: startedMs + RECONCILE_BUDGET_MS,
+  });
+  if (refunds.productSlugs.length > 0) expireCatalogTags(refunds.productSlugs);
+  logReconcileRefunds({
+    checked: refunds.checked,
+    settled: refunds.settled,
+    failed: refunds.failed,
+    skipped: refunds.skipped,
+  });
+  return Response.json({
+    ...counts,
+    refundsSynced: refunds.settled,
+    refundsFailed: refunds.failed,
+  });
 }

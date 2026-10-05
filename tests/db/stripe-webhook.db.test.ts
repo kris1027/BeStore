@@ -223,11 +223,18 @@ describe("failed and abandoned payments", () => {
 
     const late = await post(sessionEvent("checkout.session.completed", { orderId: order.id }));
 
-    expect(late.body.result).toBe("stale");
-    expect((await testDb.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe(
-      "expired",
-    );
+    // spec 0010, AC-15: still not paid and no stock taken, but flagged so the money is refunded.
+    expect(late.body.result).toBe("late_payment");
+    expect(await testDb.order.findUniqueOrThrow({ where: { id: order.id } })).toMatchObject({
+      status: "expired",
+      needsAttention: true,
+    });
     expect(await stock(variant.id)).toBe(5);
+    expect((await eventsOf(order.id)).at(-1)).toMatchObject({
+      type: "note",
+      actorType: "system",
+      message: "Payment received after the order left pending; refund it",
+    });
   });
 });
 

@@ -42,3 +42,32 @@ export function decideEvent(type: HandledEventType, paymentStatus: string): Even
       return { kind: "expire", reason: expiryReasons.sessionExpired };
   }
 }
+
+// ─── Refund events (spec 0010, AC-16) ────────────────────────────────────────
+
+export const refundEventTypes = ["refund.created", "refund.updated", "refund.failed"] as const;
+
+export type RefundEventType = (typeof refundEventTypes)[number];
+
+export function isRefundEventType(type: string): type is RefundEventType {
+  return (refundEventTypes as readonly string[]).includes(type);
+}
+
+// What a Stripe refund status means for our refund row, the same idea as sessionState: a value
+// newer than the pinned API version is `unknown`, kept pending and flagged, never guessed.
+export type RefundOutcome = "pending" | "succeeded" | "failed" | "unknown";
+
+export function refundOutcome(status: string | null): RefundOutcome {
+  switch (status) {
+    case "succeeded":
+      return "succeeded";
+    case "failed":
+    case "canceled":
+      return "failed";
+    case "pending":
+    case "requires_action":
+      return "pending";
+    default:
+      return "unknown";
+  }
+}
