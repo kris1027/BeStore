@@ -208,8 +208,9 @@ spec [0010](../specs/0010-admin-order-management/index.md) · code in [src/featu
   - [x] Stripe side refunds and sync: `refund.*` webhook events, the refund outcomes table, sync in the reconcile cron and "Check with Stripe" (AC-16, AC-17)
   - [x] Finding orders: search, status, attention, refund state and date filters with paging (AC-1 to AC-3)
   - [x] Safety net: log redaction, keyboard and axe, e2e (refund and cancel under `STRIPE_E2E=1`) (AC-23, AC-24)
-- [ ] Verify it: `/check verify admin order management`
-- [ ] Test it: `/test admin order management`
+- [x] Verify it: `/check verify admin order management`
+- [x] Test it: `/test admin order management`
+- [x] Review it (fresh model): `/check review admin order management`
 
 ## Slice 5: Emails
 
