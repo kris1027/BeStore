@@ -28,9 +28,13 @@ import { deliveryLabel } from "@/lib/shipping/rule";
 import { cn } from "@/lib/utils";
 
 import type { AdminOrderDetail as Detail } from "../admin-queries";
-import { adminOrdersPath } from "./admin-orders-list";
+import { adminOrdersPath } from "../paths";
+import { NoteForm } from "./note-form";
+import { OrderActionsPanel } from "./order-actions-panel";
 import { NeedsAttentionBadge, orderStatusLabels, OrderStatusBadge } from "./order-status-badge";
 import { OrderEmail, PersonalDataField } from "./personal-data";
+import { RefundStateBadge } from "./refund-state-badge";
+import { RefundsSection } from "./refunds-section";
 
 type Event = Detail["events"][number];
 
@@ -64,15 +68,21 @@ function eventTitle(event: Event): string {
       return "Refund succeeded";
     case "refund_failed":
       return "Refund failed";
+    case "tracking_updated":
+      return "Tracking updated";
+    case "attention_cleared":
+      return "Marked resolved";
   }
 }
 
+// spec 0010, AC-21: the admin's name, "Customer", or "Stripe" for everything the payment
+// provider and the store's own jobs did.
 function actorLabel(event: Event): string {
   if (event.actorType === "admin") return event.adminName ?? "Admin";
-  return event.actorType === "customer" ? "Customer" : "System";
+  return event.actorType === "customer" ? "Customer" : "Stripe";
 }
 
-// spec 0006, AC-13.
+// spec 0006, AC-13 and spec 0010, AC-21.
 export function AdminOrderDetail({
   order,
   dateFormat,
@@ -80,9 +90,7 @@ export function AdminOrderDetail({
   readonly order: Detail;
   readonly dateFormat: DateFormat;
 }) {
-  const reasons = order.events.filter(
-    (event) => event.type === "stock_shortfall" || event.type === "note",
-  );
+  const pendingRefunds = order.refunds.filter((refund) => refund.status === "pending");
   return (
     <>
       <div className="flex flex-col gap-3">
@@ -90,8 +98,14 @@ export function AdminOrderDetail({
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold">Order #{order.number}</h1>
           <OrderStatusBadge status={order.status} />
+          <RefundStateBadge state={order.refundState} />
           {order.needsAttention ? <NeedsAttentionBadge /> : null}
         </div>
+        {pendingRefunds.map((refund) => (
+          <p key={refund.id} role="status" className="text-sm font-medium">
+            Refund pending: <Price cents={refund.amountCents} currency={order.currency} />
+          </p>
+        ))}
       </div>
 
       {order.needsAttention ? (
@@ -99,18 +113,28 @@ export function AdminOrderDetail({
           <TriangleAlertIcon aria-hidden="true" />
           <AlertTitle>This order needs your attention</AlertTitle>
           <AlertDescription>
-            <ul className="list-disc pl-4">
-              {reasons.map((event) => (
-                <li key={event.id}>{event.message}</li>
-              ))}
-            </ul>
-            <p>
-              If you cannot fulfil it, refund the payment in the Stripe dashboard. Refunds from this
-              panel are not available yet.
-            </p>
+            {order.attentionReasons.length > 0 ? (
+              <ul className="list-disc pl-4">
+                {order.attentionReasons.map((reason) => (
+                  <li key={reason.id}>{reason.message}</li>
+                ))}
+              </ul>
+            ) : null}
+            <p>Refund or fix it with the actions below, then mark it resolved.</p>
           </AlertDescription>
         </Alert>
       ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            <h2>Actions</h2>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <OrderActionsPanel order={order} />
+        </CardContent>
+      </Card>
 
       <div className="grid items-start gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
@@ -175,6 +199,14 @@ export function AdminOrderDetail({
               <dd className="text-right font-semibold">
                 <Price cents={order.totalCents} currency={order.currency} />
               </dd>
+              {order.refundedCents > 0 ? (
+                <>
+                  <dt>Refunded</dt>
+                  <dd className="text-right">
+                    −<Price cents={order.refundedCents} currency={order.currency} />
+                  </dd>
+                </>
+              ) : null}
             </dl>
           </CardContent>
         </Card>
@@ -204,6 +236,24 @@ export function AdminOrderDetail({
               <DetailRow label="Paid">
                 {order.paidAt ? formatDateTime(order.paidAt, dateFormat) : "Not paid"}
               </DetailRow>
+              {order.shippedAt ? (
+                <DetailRow label="Shipped">{formatDateTime(order.shippedAt, dateFormat)}</DetailRow>
+              ) : null}
+              {order.deliveredAt ? (
+                <DetailRow label="Delivered">
+                  {formatDateTime(order.deliveredAt, dateFormat)}
+                </DetailRow>
+              ) : null}
+              {order.cancelledAt ? (
+                <DetailRow label="Cancelled">
+                  {formatDateTime(order.cancelledAt, dateFormat)}
+                </DetailRow>
+              ) : null}
+              {order.carrier || order.trackingNumber ? (
+                <DetailRow label="Tracking">
+                  {[order.carrier, order.trackingNumber].filter(Boolean).join(", ")}
+                </DetailRow>
+              ) : null}
               <DetailRow label="Stripe payment" className="border-t pt-3">
                 <StripeLink id={order.stripe.paymentIntentId} href={order.stripe.paymentUrl} />
               </DetailRow>
@@ -218,15 +268,34 @@ export function AdminOrderDetail({
       <Card>
         <CardHeader>
           <CardTitle>
-            <h2>History</h2>
+            <h2>Refunds</h2>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ol className="flex flex-col gap-4">
+          <RefundsSection
+            orderNumber={order.number}
+            refunds={order.refunds}
+            currency={order.currency}
+            dateFormat={dateFormat}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            <h2>History</h2>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-6">
+          <NoteForm orderNumber={order.number} />
+          <ol className="flex flex-col gap-4" aria-label="History, newest first">
             {order.events.map((event) => (
               <li key={event.id} className="flex flex-col gap-0.5 border-l-2 pl-4">
                 <p className="font-medium">{eventTitle(event)}</p>
-                {event.message ? <p className="text-sm">{event.message}</p> : null}
+                {event.message ? (
+                  <p className="text-sm whitespace-pre-wrap">{event.message}</p>
+                ) : null}
                 <p className="text-xs text-muted-foreground">
                   <time dateTime={event.createdAt.toISOString()}>
                     {formatDateTime(event.createdAt, dateFormat)}

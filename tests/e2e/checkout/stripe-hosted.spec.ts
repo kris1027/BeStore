@@ -6,7 +6,7 @@ import { addToCart, fillCheckout, payButton, stockOf } from "./support";
 // @stripe, local only (spec 0006): a real payment on Stripe's hosted page, confirmed by the real
 // webhook. Needs a Stripe test key in .env.local and, in another terminal:
 //   stripe listen --forward-to localhost:3000/api/stripe/webhook --events \
-//     checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,checkout.session.expired
+//     checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,checkout.session.expired,refund.created,refund.updated,refund.failed
 // Run with: STRIPE_E2E=1 pnpm test:e2e --grep @stripe --project desktop
 
 test.skip(!process.env.STRIPE_E2E, "set STRIPE_E2E=1 with `stripe listen` running");

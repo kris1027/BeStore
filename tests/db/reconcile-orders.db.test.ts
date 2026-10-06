@@ -85,8 +85,24 @@ describe("GET /api/cron/reconcile-orders", () => {
     const first = await run();
     const second = await run();
 
-    expect(first.body).toEqual({ checked: 1, paid: 1, expired: 0, skipped: 0, unresolved: 0 });
-    expect(second.body).toEqual({ checked: 0, paid: 0, expired: 0, skipped: 0, unresolved: 0 });
+    expect(first.body).toEqual({
+      checked: 1,
+      paid: 1,
+      expired: 0,
+      skipped: 0,
+      unresolved: 0,
+      refundsSynced: 0,
+      refundsFailed: 0,
+    });
+    expect(second.body).toEqual({
+      checked: 0,
+      paid: 0,
+      expired: 0,
+      skipped: 0,
+      unresolved: 0,
+      refundsSynced: 0,
+      refundsFailed: 0,
+    });
     expect((await testDb.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe("paid");
     expect(await stock(variant.id)).toBe(3);
     // spec 0009, AC-11: the cron's sale writes the same movement as the webhook's.
@@ -280,6 +296,8 @@ describe("GET /api/cron/reconcile-orders", () => {
       expired: 0,
       skipped: 1,
       unresolved: 0,
+      refundsSynced: 0,
+      refundsFailed: 0,
     });
     const settled = await testDb.order.findUniqueOrThrow({ where: { id: order.id } });
     expect(settled).toMatchObject({ status: "paid", needsAttention: false });
@@ -295,7 +313,9 @@ describe("GET /api/cron/reconcile-orders", () => {
     mocks.retrieve.mockImplementation(async () => {
       await testDb.order.update({
         where: { id: order.id },
-        data: { status: "expired", expiredAt: new Date() },
+        // Paid by the webhook meanwhile. (An expired order would now be flagged on purpose:
+        // spec 0010, AC-15 never keeps a late payment silently.)
+        data: { status: "paid", paidAt: new Date() },
       });
       return { id: "cs_test_stale", status: "complete", payment_status: "paid" };
     });
@@ -308,9 +328,15 @@ describe("GET /api/cron/reconcile-orders", () => {
       ]),
     );
 
-    expect((await run()).body).toMatchObject({ checked: 1, skipped: 1, unresolved: 0 });
+    expect((await run()).body).toMatchObject({
+      checked: 1,
+      skipped: 1,
+      unresolved: 0,
+      refundsSynced: 0,
+      refundsFailed: 0,
+    });
     const settled = await testDb.order.findUniqueOrThrow({ where: { id: order.id } });
-    expect(settled).toMatchObject({ status: "expired", needsAttention: false });
+    expect(settled).toMatchObject({ status: "paid", needsAttention: false });
     expect((await eventsOf(order.id)).filter((e) => e.type === "note")).toHaveLength(0);
   });
 
@@ -325,6 +351,8 @@ describe("GET /api/cron/reconcile-orders", () => {
       expired: 1,
       skipped: 1,
       unresolved: 0,
+      refundsSynced: 0,
+      refundsFailed: 0,
     });
   });
 
@@ -348,6 +376,17 @@ describe("GET /api/cron/reconcile-orders", () => {
       "expired",
     );
     expect(mocks.retrieve).not.toHaveBeenCalled();
+  });
+
+  it("starts no order once the run's time budget is spent", async () => {
+    const { order } = await seedPendingOrder({ sessionId: null, createdAt: twoHoursAgo() });
+
+    const counts = await reconcileOrders(Date.now(), 100, Date.now() - 1);
+
+    expect(counts).toEqual({ checked: 0, paid: 0, expired: 0, skipped: 0, unresolved: 0 });
+    expect((await testDb.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe(
+      "pending_payment",
+    );
   });
 
   it("skips an order whose database write fails and carries on with the rest", async () => {
@@ -378,6 +417,8 @@ describe("GET /api/cron/reconcile-orders", () => {
         expired: 1,
         skipped: 1,
         unresolved: 0,
+        refundsSynced: 0,
+        refundsFailed: 0,
       });
     } finally {
       transaction.mockRestore();

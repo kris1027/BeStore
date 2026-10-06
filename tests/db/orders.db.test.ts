@@ -79,7 +79,15 @@ describe("the order thread (happy path)", () => {
           amountCents: 3000,
           actorType: "admin",
           adminId: admin.id,
-          lines: { create: { orderLineId: order.lines[0]!.id, quantity: 1, restocked: true } },
+          lines: {
+            create: {
+              orderLineId: order.lines[0]!.id,
+              quantity: 1,
+              restock: true,
+              restocked: true,
+              returnedQuantity: 1,
+            },
+          },
         },
       });
       await tx.refund.update({
@@ -372,6 +380,71 @@ describe("money (AC-6)", () => {
     await expect(
       testDb.refundLine.create({
         data: { refundId: refund.id, orderLineId: line.id, quantity: 1 },
+      }),
+    ).resolves.toBeDefined();
+  });
+
+  // spec 0010: restock is what the admin asked for, returned_quantity what came back, and
+  // restocked says some units did.
+  it.each([
+    [
+      "restocked without restock",
+      { restocked: true, returnedQuantity: 1 },
+      "refund_lines_restocked_check",
+    ],
+    [
+      "more returned than refunded",
+      { restock: true, restocked: true, returnedQuantity: 3 },
+      "refund_lines_returned_quantity_check",
+    ],
+    [
+      "a negative return",
+      { restock: true, returnedQuantity: -1 },
+      "refund_lines_returned_quantity_check",
+    ],
+    [
+      "restocked with nothing returned",
+      { restock: true, restocked: true },
+      "refund_lines_returned_restocked_check",
+    ],
+    [
+      "units returned but not restocked",
+      { restock: true, returnedQuantity: 1 },
+      "refund_lines_returned_restocked_check",
+    ],
+  ] as const)("rejects a refund line with %s", async (_name, columns, constraint) => {
+    const order = await createOrder();
+    const line = await testDb.orderLine.create({
+      data: {
+        orderId: order.id,
+        productName: "Tee",
+        sku: "SKU",
+        unitPriceCents: 1000,
+        quantity: 2,
+        lineTotalCents: 2000,
+      },
+    });
+    const refund = await testDb.refund.create({
+      data: { orderId: order.id, amountCents: 1000, actorType: "system" },
+    });
+
+    await expectViolation(
+      testDb.refundLine.create({
+        data: { refundId: refund.id, orderLineId: line.id, quantity: 2, ...columns },
+      }),
+      SQLSTATE.check,
+      constraint,
+    );
+    await expect(
+      testDb.refundLine.create({
+        data: {
+          refundId: refund.id,
+          orderLineId: line.id,
+          quantity: 2,
+          restock: true,
+          restocked: true,
+          returnedQuantity: 1,
+        },
       }),
     ).resolves.toBeDefined();
   });

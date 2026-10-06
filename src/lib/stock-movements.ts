@@ -31,6 +31,16 @@ export type MovementRow =
       readonly delta: number;
       readonly stockAfter: number;
       readonly orderId: string;
+    }
+  | {
+      // What a succeeded refund put back (spec 0010, AC-13), named after the refund's admin;
+      // never written for a return of 0 units.
+      readonly kind: "return";
+      readonly variantId: string;
+      readonly delta: number;
+      readonly stockAfter: number;
+      readonly orderId: string;
+      readonly adminId: string;
     };
 
 function columns(row: MovementRow) {
@@ -61,6 +71,16 @@ function columns(row: MovementRow) {
         delta: row.delta,
         stockAfter: row.stockAfter,
         actorType: "system" as const,
+        orderId: row.orderId,
+      };
+    case "return":
+      return {
+        variantId: row.variantId,
+        kind: row.kind,
+        delta: row.delta,
+        stockAfter: row.stockAfter,
+        actorType: "admin" as const,
+        adminId: row.adminId,
         orderId: row.orderId,
       };
   }

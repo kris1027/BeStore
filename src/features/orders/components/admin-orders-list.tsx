@@ -6,6 +6,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -21,27 +22,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { type DateFormat, formatDate } from "@/lib/dates";
-import { cn } from "@/lib/utils";
 
-import type { AdminOrdersPage, AdminOrdersParams } from "../admin-queries";
+import type { AdminOrdersPage } from "../admin-queries";
+import { adminOrdersHref, type AdminOrdersParams, hasFilters } from "../list-params";
+import { adminOrderPath, adminOrdersPath } from "../paths";
+import { refundState } from "../refund-math";
 import { NeedsAttentionBadge, OrderStatusBadge } from "./order-status-badge";
+import { OrdersFilters } from "./orders-filters";
 import { OrderEmail, PersonalDataField } from "./personal-data";
+import { RefundStateBadge } from "./refund-state-badge";
 
-export const adminOrdersPath = "/admin/orders";
-
-export function adminOrderPath(number: number): string {
-  return `${adminOrdersPath}/${number}`;
-}
-
-function listHref(all: boolean, before: number | null): string {
-  const query = new URLSearchParams();
-  if (all) query.set("view", "all");
-  if (before !== null) query.set("before", String(before));
-  const search = query.toString();
-  return search ? `${adminOrdersPath}?${search}` : adminOrdersPath;
-}
-
-// spec 0006, AC-12.
+// spec 0006, AC-12 and spec 0010, AC-1 to AC-3.
 export function AdminOrdersList({
   page,
   params,
@@ -52,26 +43,21 @@ export function AdminOrdersList({
   readonly dateFormat: DateFormat;
 }) {
   const { rows, olderBefore } = page;
+  const filtered = hasFilters(params);
+  const all = params.status === "all";
   return (
     <>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold">Orders</h1>
           <p className="text-sm text-muted-foreground">
-            {params.all
+            {all
               ? "Every order, newest first, including checkouts that were never paid."
-              : "Paid orders, newest first."}
+              : "Newest first. Paid orders unless you choose another status."}
           </p>
         </div>
-        <nav aria-label="Order views" className="flex gap-1 rounded-md border p-1">
-          <ViewLink href={listHref(false, null)} current={!params.all}>
-            Paid orders
-          </ViewLink>
-          <ViewLink href={listHref(true, null)} current={params.all}>
-            All orders
-          </ViewLink>
-        </nav>
       </div>
+      <OrdersFilters params={params} />
       {rows.length === 0 ? (
         <Empty className="border">
           <EmptyHeader>
@@ -79,22 +65,33 @@ export function AdminOrdersList({
               <ReceiptIcon aria-hidden="true" />
             </EmptyMedia>
             <EmptyTitle>
-              <h2>{params.before === null ? "No orders yet" : "No older orders"}</h2>
+              <h2>
+                {filtered
+                  ? "No orders match these filters."
+                  : params.before === null
+                    ? "No orders yet"
+                    : "No older orders"}
+              </h2>
             </EmptyTitle>
             <EmptyDescription>
-              {params.all
-                ? "Orders appear here as soon as a customer starts checkout."
+              {filtered
+                ? "Try another search, or clear the filters."
                 : "Orders appear here once a customer's payment goes through."}
             </EmptyDescription>
           </EmptyHeader>
+          {filtered ? (
+            <EmptyContent>
+              <Link href={adminOrdersPath} className={buttonVariants({ variant: "outline" })}>
+                Clear filters
+              </Link>
+            </EmptyContent>
+          ) : null}
         </Empty>
       ) : (
         <Card>
           <CardContent>
             <Table containerProps={{ tabIndex: 0, role: "region", "aria-label": "Orders" }}>
-              <TableCaption className="sr-only">
-                {params.all ? "All orders" : "Paid orders"}, newest first
-              </TableCaption>
+              <TableCaption className="sr-only">Orders, newest first</TableCaption>
               <TableHeader>
                 <TableRow>
                   <TableHead>Order</TableHead>
@@ -131,6 +128,11 @@ export function AdminOrdersList({
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         <OrderStatusBadge status={order.status} />
+                        {order.refundedCents > 0 ? (
+                          <RefundStateBadge
+                            state={refundState(order.totalCents, order.refundedCents)}
+                          />
+                        ) : null}
                         {order.needsAttention ? <NeedsAttentionBadge /> : null}
                       </div>
                     </TableCell>
@@ -148,10 +150,7 @@ export function AdminOrdersList({
       {params.before !== null || olderBefore !== null ? (
         <nav aria-label="Pages" className="flex justify-between gap-2">
           {params.before !== null ? (
-            <Link
-              href={listHref(params.all, null)}
-              className={buttonVariants({ variant: "outline" })}
-            >
+            <Link href={adminOrdersHref(params)} className={buttonVariants({ variant: "outline" })}>
               Newest orders
             </Link>
           ) : (
@@ -159,7 +158,7 @@ export function AdminOrdersList({
           )}
           {olderBefore !== null ? (
             <Link
-              href={listHref(params.all, olderBefore)}
+              href={adminOrdersHref(params, olderBefore)}
               className={buttonVariants({ variant: "outline" })}
             >
               Older orders
@@ -168,28 +167,5 @@ export function AdminOrdersList({
         </nav>
       ) : null}
     </>
-  );
-}
-
-function ViewLink({
-  href,
-  current,
-  children,
-}: {
-  readonly href: string;
-  readonly current: boolean;
-  readonly children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      aria-current={current ? "page" : undefined}
-      className={cn(
-        buttonVariants({ variant: current ? "secondary" : "ghost", size: "sm" }),
-        "aria-[current=page]:font-semibold",
-      )}
-    >
-      {children}
-    </Link>
   );
 }

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { decideEvent, isHandledEventType } from "./event-decision";
+import {
+  decideEvent,
+  isHandledEventType,
+  isRefundEventType,
+  refundOutcome,
+} from "./event-decision";
 
 // spec 0006, AC-4 and AC-6.
 
@@ -44,5 +49,26 @@ describe("isHandledEventType", () => {
     expect(isHandledEventType("checkout.session.expired")).toBe(true);
     expect(isHandledEventType("payment_intent.succeeded")).toBe(false);
     expect(isHandledEventType("checkout.session.created")).toBe(false);
+  });
+});
+
+// spec 0010, Decisions made in design: a status newer than the pinned API version is never
+// guessed.
+describe("refundOutcome", () => {
+  it.each([
+    ["succeeded", "succeeded"],
+    ["failed", "failed"],
+    ["canceled", "failed"],
+    ["pending", "pending"],
+    ["requires_action", "pending"],
+    ["reversed", "unknown"],
+    [null, "unknown"],
+  ] as const)("maps %j to %s", (status, outcome) => {
+    expect(refundOutcome(status)).toBe(outcome);
+  });
+
+  it("knows the three refund event types", () => {
+    expect(isRefundEventType("refund.updated")).toBe(true);
+    expect(isRefundEventType("charge.refunded")).toBe(false);
   });
 });

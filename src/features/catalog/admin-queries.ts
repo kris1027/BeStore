@@ -308,7 +308,7 @@ export type StockHistoryRow = {
   readonly id: string;
   readonly createdAt: Date;
   readonly variantLabel: string;
-  readonly kind: "initial" | "adjustment" | "sale";
+  readonly kind: "initial" | "adjustment" | "sale" | "return";
   readonly delta: number;
   readonly stockAfter: number;
   readonly note: string | null;

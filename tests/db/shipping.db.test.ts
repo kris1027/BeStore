@@ -40,7 +40,8 @@ const { checkoutPrefill, getCompletion } = await import("@/features/checkout/que
 const { updateShippingSettings } =
   await import("@/features/settings/actions/update-shipping-settings");
 const { getAdminShippingSettings } = await import("@/features/settings/admin-queries");
-const { getAdminOrder, getAdminOrders } = await import("@/features/orders/admin-queries");
+const { getAdminOrder, getAdminOrders, parseAdminOrdersParams } =
+  await import("@/features/orders/admin-queries");
 const { getShippingSettings, readShippingSettings } = await import("@/lib/shipping/settings");
 
 resetDatabaseBeforeEach();
@@ -298,7 +299,7 @@ describe("the address on admin pages (AC-11, AC-12)", () => {
     });
     const without = await createOrder({ status: "paid" });
 
-    const page = await getAdminOrders({ all: false, before: null });
+    const page = await getAdminOrders(parseAdminOrdersParams({}));
     expect(page.rows.map((row) => [row.number, row.shipTo])).toEqual([
       [without.number, null],
       [withAddress.number, "Anna Kowalska, Warsaw"],

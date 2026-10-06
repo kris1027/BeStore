@@ -9,7 +9,9 @@ import { seedPendingOrder } from "./stripe-support";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", async () => ({ db: (await import("./client")).testDb }));
-vi.mock("@/lib/env", () => ({ env: { STRIPE_SECRET_KEY: "sk_test_abc" } }));
+vi.mock("@/lib/env", () => ({
+  env: { STRIPE_SECRET_KEY: "sk_test_abc", STORE_TIMEZONE: "Europe/Warsaw", STORE_LOCALE: "en" },
+}));
 vi.mock("@/lib/stripe", async () => {
   const actual = await vi.importActual<typeof import("@/lib/stripe")>("@/lib/stripe");
   return { stripeDashboardUrl: actual.stripeDashboardUrl };
@@ -23,6 +25,9 @@ const { getAdminOrder, getAdminOrders, parseAdminOrdersParams } =
   await import("@/features/orders/admin-queries");
 
 resetDatabaseBeforeEach();
+
+// The list as the page parses it from the URL.
+const view = (params: Record<string, string> = {}) => parseAdminOrdersParams(params);
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -53,8 +58,8 @@ describe("getAdminOrders", () => {
       await createOrder({ status });
     }
 
-    const settled = await getAdminOrders({ all: false, before: null });
-    const all = await getAdminOrders({ all: true, before: null });
+    const settled = await getAdminOrders(view());
+    const all = await getAdminOrders(view({ status: "all" }));
 
     expect(settled.rows.map((row) => row.status)).toEqual([
       "cancelled",
@@ -68,8 +73,8 @@ describe("getAdminOrders", () => {
   it("pages 50 at a time, newest first, by order number", async () => {
     for (let i = 0; i < 55; i += 1) await createOrder({ status: "paid" });
 
-    const first = await getAdminOrders({ all: false, before: null });
-    const second = await getAdminOrders({ all: false, before: first.olderBefore });
+    const first = await getAdminOrders(view());
+    const second = await getAdminOrders({ ...view(), before: first.olderBefore });
 
     expect(first.rows).toHaveLength(50);
     expect(first.rows[0]?.number).toBe(1055);
@@ -85,7 +90,7 @@ describe("getAdminOrders", () => {
       data: { status: "paid", needsAttention: true },
     });
 
-    const [row] = (await getAdminOrders({ all: false, before: null })).rows;
+    const [row] = (await getAdminOrders(view())).rows;
 
     expect(row).toMatchObject({
       number: 1001,
@@ -109,7 +114,7 @@ describe("getAdminOrders", () => {
     });
     await testDb.order.update({ where: { id: order.id }, data: { status: "paid" } });
 
-    const [row] = (await getAdminOrders({ all: false, before: null })).rows;
+    const [row] = (await getAdminOrders(view())).rows;
 
     expect(row?.itemCount).toBe(5);
   });
@@ -120,7 +125,7 @@ describe("getAdminOrders on purged orders (spec 0008)", () => {
     await createOrder({ status: "paid", email: "kept@example.com" });
     const purged = await purgedOrder();
 
-    const { rows } = await getAdminOrders({ all: true, before: null });
+    const { rows } = await getAdminOrders(view({ status: "all" }));
 
     expect(rows).toHaveLength(2);
     expect(rows.find((row) => row.id === purged.id)).toMatchObject({
@@ -138,7 +143,7 @@ describe("getAdminOrders on purged orders (spec 0008)", () => {
   it("does not log a purged order as missing its email (AC-9)", async () => {
     await purgedOrder();
 
-    await getAdminOrders({ all: true, before: null });
+    await getAdminOrders(view({ status: "all" }));
 
     expect(mocks.error).not.toHaveBeenCalled();
   });
@@ -146,21 +151,7 @@ describe("getAdminOrders on purged orders (spec 0008)", () => {
   it("keeps a purged order out of the default view, which shows paid and later only", async () => {
     await purgedOrder();
 
-    expect((await getAdminOrders({ all: false, before: null })).rows).toEqual([]);
-  });
-});
-
-describe("parseAdminOrdersParams", () => {
-  it("reads the view and the page, ignoring anything malformed", () => {
-    expect(parseAdminOrdersParams({ view: "all", before: "1050" })).toEqual({
-      all: true,
-      before: 1050,
-    });
-    expect(parseAdminOrdersParams({ view: "weird", before: "abc" })).toEqual({
-      all: false,
-      before: null,
-    });
-    expect(parseAdminOrdersParams({})).toEqual({ all: false, before: null });
+    expect((await getAdminOrders(view())).rows).toEqual([]);
   });
 });
 
@@ -217,5 +208,89 @@ describe("getAdminOrder", () => {
     await createOrder();
 
     expect(await getAdminOrder(value)).toBeNull();
+  });
+});
+
+describe("getAdminOrders filters (spec 0010, AC-1 to AC-3)", () => {
+  async function order(input: Parameters<typeof createOrder>[0] & { name?: string } = {}) {
+    const { name, ...rest } = input;
+    const created = await createOrder({ status: "paid", ...rest });
+    if (name) {
+      await testDb.order.update({ where: { id: created.id }, data: { customerName: name } });
+    }
+    return created;
+  }
+
+  const numbers = async (params: Record<string, string>) =>
+    (await getAdminOrders(view(params))).rows.map((row) => row.number);
+
+  it("searches the exact number, and email and names case insensitively as substrings", async () => {
+    await order({ email: "ada@example.com" });
+    await order({ email: "bob@example.com", name: "Grace HOPPER" });
+    const shipped = await order({ email: "cy@example.com" });
+    await testDb.order.update({ where: { id: shipped.id }, data: { shipFullName: "Linus" } });
+
+    expect(await numbers({ q: "1002" })).toEqual([1002]);
+    expect(await numbers({ q: "ADA@" })).toEqual([1001]);
+    expect(await numbers({ q: "hopper" })).toEqual([1002]);
+    expect(await numbers({ q: "linu" })).toEqual([1003]);
+    expect(await numbers({ q: "99999999999" })).toEqual([]);
+  });
+
+  it("matches %, _ and \\ literally", async () => {
+    await order({ email: "fifty%off@example.com" });
+    await order({ email: "fifty1off@example.com" });
+    await order({ email: "a_b@example.com" });
+    await order({ email: "axb@example.com" });
+
+    expect(await numbers({ q: "fifty%" })).toEqual([1001]);
+    expect(await numbers({ q: "a_b" })).toEqual([1003]);
+    expect(await numbers({ q: "\\" })).toEqual([]);
+  });
+
+  it("filters by status, attention and refund state, combined", async () => {
+    await order({ status: "shipped" });
+    const flagged = await order();
+    await testDb.order.update({ where: { id: flagged.id }, data: { needsAttention: true } });
+    const partial = await order();
+    await testDb.order.update({ where: { id: partial.id }, data: { refundedCents: 100 } });
+    const full = await order();
+    await testDb.order.update({ where: { id: full.id }, data: { refundedCents: full.totalCents } });
+    await order({ status: "expired" });
+
+    expect(await numbers({ status: "shipped" })).toEqual([1001]);
+    expect(await numbers({ attention: "1" })).toEqual([1002]);
+    expect(await numbers({ refund: "partial" })).toEqual([1003]);
+    expect(await numbers({ refund: "full" })).toEqual([1004]);
+    expect(await numbers({ refund: "none" })).toEqual([1002, 1001]);
+    expect(await numbers({ refund: "none", status: "all" })).toEqual([1005, 1002, 1001]);
+    expect(await numbers({ status: "paid", attention: "1", refund: "none" })).toEqual([1002]);
+  });
+
+  it("takes whole days in the store's time zone, both ends inclusive", async () => {
+    const at = async (iso: string) => {
+      const created = await order();
+      await testDb.order.update({ where: { id: created.id }, data: { createdAt: new Date(iso) } });
+    };
+    await at("2026-09-30T21:59:00Z"); // 23:59 on 30 Sept in Warsaw
+    await at("2026-09-30T22:00:00Z"); // 00:00 on 1 Oct
+    await at("2026-10-01T21:59:59Z"); // 23:59 on 1 Oct
+    await at("2026-10-01T22:00:00Z"); // 00:00 on 2 Oct
+
+    expect(await numbers({ from: "2026-10-01", to: "2026-10-01" })).toEqual([1003, 1002]);
+    expect(await numbers({ to: "2026-09-30" })).toEqual([1001]);
+    // A backwards range is ignored.
+    expect(await numbers({ from: "2026-10-02", to: "2026-10-01" })).toHaveLength(4);
+  });
+
+  it("keeps the filters across pages", async () => {
+    for (let i = 0; i < 52; i += 1) await order({ status: i % 2 === 0 ? "paid" : "shipped" });
+
+    const first = await getAdminOrders(view({ status: "paid" }));
+    expect(first.olderBefore).toBeNull();
+    expect(first.rows).toHaveLength(26);
+    const all = await getAdminOrders(view({ status: "all" }));
+    const second = await getAdminOrders({ ...view({ status: "all" }), before: all.olderBefore });
+    expect(second.rows.map((row) => row.number)).toEqual([1002, 1001]);
   });
 });

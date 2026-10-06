@@ -13,16 +13,21 @@ import { type HandledEventType, handledEventTypes } from "./event-decision";
 import {
   logReconcile,
   logReconcileOrderFailed,
+  logReconcileRefunds,
   logReconcileStripeFailed,
   logReconcileUnresolved,
   type ReconcileCounts,
 } from "./log";
+import { syncPendingRefunds } from "./refund-sync";
 import { expireCatalogTags, handleStripeEvent } from "./stripe-events";
 
 export const RECONCILE_BATCH = 100;
 // The 31 minute session plus an hour for Stripe's own webhook retries.
 export const STALE_AFTER_MS = 90 * 60 * 1000;
 export const EVENT_SEARCH_CAP = 500;
+// The whole run, order replay and refund sync together, stops starting new work after this
+// (spec 0010, AC-17), well inside the function's time limit.
+export const RECONCILE_BUDGET_MS = 50_000;
 
 // The decisive event wins over the one that only started the story.
 const eventPreference: readonly HandledEventType[] = [
@@ -40,6 +45,7 @@ type Verdict = "paid" | "expired" | "skipped" | "unresolved";
 export async function reconcileOrders(
   nowMs: number = Date.now(),
   batchSize: number = RECONCILE_BATCH,
+  deadlineMs: number = Number.POSITIVE_INFINITY,
 ): Promise<ReconcileCounts> {
   const orders = await db.order.findMany({
     where: { status: "pending_payment", createdAt: { lt: new Date(nowMs - STALE_AFTER_MS) } },
@@ -50,13 +56,16 @@ export async function reconcileOrders(
     select: { id: true, stripeCheckoutSessionId: true, createdAt: true, needsAttention: true },
   });
 
-  const counts = { paid: 0, expired: 0, skipped: 0, unresolved: 0 };
+  const counts = { checked: 0, paid: 0, expired: 0, skipped: 0, unresolved: 0 };
   for (const order of orders) {
+    // Orders not reached wait for the next run, as orders past the batch do.
+    if (Date.now() > deadlineMs) break;
+    counts.checked += 1;
     counts[await reconcileOrderOrSkip(order)] += 1;
   }
   // Bounds how long a failed tag expiry after a sale can show stale stock.
   expireCatalogTags([]);
-  return { checked: orders.length, ...counts };
+  return counts;
 }
 
 type StaleOrder = {
@@ -166,7 +175,22 @@ export async function reconcileOrdersRequest(request: Request): Promise<Response
   if (!isCronRequest(request)) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
-  const counts = await reconcileOrders();
+  const startedMs = Date.now();
+  const deadlineMs = startedMs + RECONCILE_BUDGET_MS;
+  const counts = await reconcileOrders(startedMs, RECONCILE_BATCH, deadlineMs);
   logReconcile(counts);
-  return Response.json(counts);
+  // spec 0010, AC-17: then the pending refunds, oldest first, each failure isolated.
+  const refunds = await syncPendingRefunds(Date.now(), { deadlineMs });
+  if (refunds.productSlugs.length > 0) expireCatalogTags(refunds.productSlugs);
+  logReconcileRefunds({
+    checked: refunds.checked,
+    settled: refunds.settled,
+    failed: refunds.failed,
+    skipped: refunds.skipped,
+  });
+  return Response.json({
+    ...counts,
+    refundsSynced: refunds.settled,
+    refundsFailed: refunds.failed,
+  });
 }

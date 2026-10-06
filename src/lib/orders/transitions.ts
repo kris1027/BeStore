@@ -1,12 +1,13 @@
 import "server-only";
 
-import type { Prisma } from "@/generated/prisma/client";
+import type { OrderStatus, Prisma } from "@/generated/prisma/client";
 import type { Tx } from "@/lib/db";
 import { type MovementRow, recordMovements } from "@/lib/stock-movements";
 
-// The only code that changes orders.status (spec 0006, State transitions). Both functions run
-// inside the caller's transaction and move an order only while it is still pending_payment:
-// zero rows updated means another path already moved it, so they do nothing else.
+// The only code that changes orders.status (spec 0006 and spec 0010, State transitions). Every
+// function runs inside the caller's transaction and moves an order only while it is still in
+// the status it moves from: zero rows updated means another path already moved it, so they do
+// nothing else. Raw SQL never runs Prisma's @updatedAt, so each statement sets updated_at.
 
 export type Shortfall = { readonly sku: string; readonly missing: number };
 
@@ -184,5 +185,172 @@ export async function markExpired(tx: Tx, orderId: string, reason: string): Prom
       message: reason,
     },
   });
+  return true;
+}
+
+// spec 0010, AC-15: a payment that lands after the order left pending (an admin cancelled it, or
+// it expired) is never silently kept. markPaid already refused it; this flags the order and
+// says why. Returns false for any other status, where the payment is the order's own.
+// The payment intent is saved (never overwriting one) so the refund action and Stripe's refund
+// events can find this payment; without it the "refund it" note could not be acted on.
+export async function flagLatePayment(
+  tx: Tx,
+  orderId: string,
+  paymentIntentId: string | null,
+): Promise<boolean> {
+  const flagged = await tx.$executeRaw`
+    UPDATE orders SET needs_attention = true, updated_at = now(),
+      stripe_payment_intent_id = COALESCE(stripe_payment_intent_id, ${paymentIntentId})
+    WHERE id = ${orderId}::uuid AND status IN ('cancelled', 'expired')`;
+  if (flagged === 0) return false;
+  await tx.orderEvent.create({
+    data: {
+      orderId,
+      type: "note",
+      actorType: "system",
+      message: "Payment received after the order left pending; refund it",
+    },
+  });
+  return true;
+}
+
+// ─── Admin transitions (spec 0010) ───────────────────────────────────────────
+
+type AdminMove = { readonly orderId: string; readonly adminId: string };
+
+async function statusEvent(
+  tx: Tx,
+  move: AdminMove,
+  fromStatus: OrderStatus,
+  toStatus: OrderStatus,
+  message: string | null,
+) {
+  await tx.orderEvent.create({
+    data: {
+      orderId: move.orderId,
+      type: "status_changed",
+      fromStatus,
+      toStatus,
+      actorType: "admin",
+      adminId: move.adminId,
+      message,
+    },
+  });
+}
+
+type Tracking = { readonly carrier: string | null; readonly trackingNumber: string | null };
+
+// The parts that apply, joined into one sentence; null when none does.
+function sentence(parts: readonly (string | null)[]): string | null {
+  const text = parts.filter((part) => part !== null).join(", ");
+  return text === "" ? null : text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+// AC-4: "Carrier: DHL, tracking: 123", with only the parts that were given.
+export function shippingMessage(carrier: string | null, trackingNumber: string | null) {
+  return sentence([
+    carrier === null ? null : `Carrier: ${carrier}`,
+    trackingNumber === null ? null : `tracking: ${trackingNumber}`,
+  ]);
+}
+
+// AC-7: "Carrier: A → B, tracking: X → Y", only the parts that changed; null when nothing did.
+export function trackingChangeMessage(from: Tracking, to: Tracking) {
+  const show = (value: string | null) => value ?? "none";
+  return sentence([
+    from.carrier === to.carrier ? null : `Carrier: ${show(from.carrier)} → ${show(to.carrier)}`,
+    from.trackingNumber === to.trackingNumber
+      ? null
+      : `tracking: ${show(from.trackingNumber)} → ${show(to.trackingNumber)}`,
+  ]);
+}
+
+export async function markShipped(
+  tx: Tx,
+  move: AdminMove & { readonly carrier: string | null; readonly trackingNumber: string | null },
+): Promise<boolean> {
+  const moved = await tx.$executeRaw`
+    UPDATE orders
+    SET status = 'shipped', shipped_at = now(), carrier = ${move.carrier},
+        tracking_number = ${move.trackingNumber}, updated_at = now()
+    WHERE id = ${move.orderId}::uuid AND status = 'paid'`;
+  if (moved === 0) return false;
+  await statusEvent(
+    tx,
+    move,
+    "paid",
+    "shipped",
+    shippingMessage(move.carrier, move.trackingNumber),
+  );
+  return true;
+}
+
+export async function markDelivered(tx: Tx, move: AdminMove): Promise<boolean> {
+  const moved = await tx.$executeRaw`
+    UPDATE orders SET status = 'delivered', delivered_at = now(), updated_at = now()
+    WHERE id = ${move.orderId}::uuid AND status = 'shipped'`;
+  if (moved === 0) return false;
+  await statusEvent(tx, move, "shipped", "delivered", null);
+  return true;
+}
+
+// AC-6: carrier and tracking stay, so shipping again prefills them.
+export async function revertShipped(
+  tx: Tx,
+  move: AdminMove & { readonly reason: string },
+): Promise<boolean> {
+  const moved = await tx.$executeRaw`
+    UPDATE orders SET status = 'paid', shipped_at = NULL, updated_at = now()
+    WHERE id = ${move.orderId}::uuid AND status = 'shipped'`;
+  if (moved === 0) return false;
+  await statusEvent(tx, move, "shipped", "paid", move.reason);
+  return true;
+}
+
+export async function revertDelivered(
+  tx: Tx,
+  move: AdminMove & { readonly reason: string },
+): Promise<boolean> {
+  const moved = await tx.$executeRaw`
+    UPDATE orders SET status = 'shipped', delivered_at = NULL, updated_at = now()
+    WHERE id = ${move.orderId}::uuid AND status = 'delivered'`;
+  if (moved === 0) return false;
+  await statusEvent(tx, move, "delivered", "shipped", move.reason);
+  return true;
+}
+
+// AC-14 and AC-15. A paid order is only cancelled in the transaction that reserves its refund;
+// a pending one only once Stripe can no longer take its money. Cancelling a pending order frees
+// its discount use, as expiry does.
+export async function markCancelled(
+  tx: Tx,
+  move: AdminMove & { readonly from: "paid" | "pending_payment"; readonly reason: string },
+): Promise<boolean> {
+  const moved =
+    move.from === "paid"
+      ? await tx.$executeRaw`
+          UPDATE orders SET status = 'cancelled', cancelled_at = now(), updated_at = now()
+          WHERE id = ${move.orderId}::uuid AND status = 'paid'`
+      : await tx.$executeRaw`
+          UPDATE orders SET status = 'cancelled', cancelled_at = now(), updated_at = now()
+          WHERE id = ${move.orderId}::uuid AND status = 'pending_payment'`;
+  if (moved === 0) return false;
+  if (move.from === "pending_payment") {
+    await tx.discountRedemption.deleteMany({ where: { orderId: move.orderId } });
+  }
+  await statusEvent(tx, move, move.from, "cancelled", move.reason);
+  return true;
+}
+
+export const cancelUndoneMessage = "Cancel undone: Stripe refused the refund";
+
+// AC-14: the only way out of cancelled. Stripe refused the refund reserved with the cancel, so
+// the order still holds the money and goes back to paid.
+export async function revertCancelled(tx: Tx, move: AdminMove): Promise<boolean> {
+  const moved = await tx.$executeRaw`
+    UPDATE orders SET status = 'paid', cancelled_at = NULL, updated_at = now()
+    WHERE id = ${move.orderId}::uuid AND status = 'cancelled'`;
+  if (moved === 0) return false;
+  await statusEvent(tx, move, "cancelled", "paid", cancelUndoneMessage);
   return true;
 }
