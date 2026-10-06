@@ -44,7 +44,8 @@ export function useOrderAction() {
   function run<T>(
     call: () => Promise<ActionResult<T, OrderActionError>>,
     handlers: {
-      readonly success: string;
+      // A fixed toast, or one chosen from what the action answered.
+      readonly success: string | ((data: T) => string);
       readonly onSuccess?: (data: T) => void;
       // Returns true when it showed the field errors itself.
       readonly onFields?: (fields: Readonly<Record<string, readonly string[]>>) => boolean;
@@ -54,7 +55,9 @@ export function useOrderAction() {
     startTransition(async () => {
       const result = await call();
       if (result.ok) {
-        toast.add({ title: handlers.success, type: "success" });
+        const title =
+          typeof handlers.success === "string" ? handlers.success : handlers.success(result.data);
+        toast.add({ title, type: "success" });
         handlers.onSuccess?.(result.data);
         router.refresh();
         return;

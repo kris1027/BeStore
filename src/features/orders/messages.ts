@@ -19,6 +19,9 @@ export const paymentInProgressMessage =
 export const refundCheckingMessage = "Stripe did not answer. The refund is being checked.";
 export const stripeRetryMessage = "Stripe did not answer. Try again.";
 export const nothingChangedMessage = "Nothing changed.";
+// AC-15: expiring the checkout let Stripe's expiry event settle the order first.
+export const expiredBeforeCancelMessage =
+  "The checkout expired first, so the order is expired. No payment can be taken.";
 
 export function stripeRefusedMessage(message: string): string {
   return `Stripe refused the refund: ${message}`;

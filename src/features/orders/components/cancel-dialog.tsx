@@ -7,7 +7,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 
 import type { AdminOrderLine } from "../admin-queries";
-import { cancelOrder } from "../admin-actions";
+import { cancelOrder } from "../actions/cancel";
+import { expiredBeforeCancelMessage } from "../messages";
 import { REASON_MAX_LENGTH, reasonField } from "../schemas";
 import {
   ActionDialog,
@@ -63,7 +64,8 @@ export function CancelDialog({
     action.run(
       () => cancelOrder({ ...orderRef, reason, restockLineIds: paid ? [...restock] : [] }),
       {
-        success: "Order cancelled",
+        success: (data) =>
+          data.status === "expired" ? expiredBeforeCancelMessage : "Order cancelled",
         onSuccess: () => setOpen(false),
         onFields: (fields) => {
           const message = firstErrors(fields).reason;
