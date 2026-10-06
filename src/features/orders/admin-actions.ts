@@ -600,6 +600,22 @@ async function cancelPending(
   }
 
   const outcome = await db.$transaction(async (tx) => {
+    // Expiring the session makes Stripe send checkout.session.expired, which can expire the
+    // order before this runs. That is the outcome the admin asked for (no money can be taken),
+    // so it counts as done, with their reason kept as a note, not as a stale page.
+    const locked = await lockOrderByNumber(tx, input.orderNumber);
+    if (locked?.status === "expired" && first.order.status === "pending_payment") {
+      await tx.orderEvent.create({
+        data: {
+          orderId: locked.id,
+          type: "note",
+          actorType: "admin",
+          adminId,
+          message: `Cancelled: ${input.reason}`,
+        },
+      });
+      return { expired: locked };
+    }
     const guarded = await guard(tx, input, "cancel");
     if (isError(guarded)) return guarded;
     if (guarded.order.status !== "pending_payment") {
@@ -614,6 +630,10 @@ async function cancelPending(
     return moved ? guarded.order : ({ code: "invalid_transition" } as const);
   });
   if (isError(outcome)) return refused(adminId, input.orderNumber, "cancel", outcome);
+  if ("expired" in outcome) {
+    logCancelled(adminId, first.order, null);
+    return { ok: true, data: { status: "expired", refundId: null } };
+  }
 
   logCancelled(adminId, outcome, null);
   return { ok: true, data: { status: "cancelled", refundId: null } };

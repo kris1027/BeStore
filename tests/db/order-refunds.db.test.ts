@@ -439,6 +439,27 @@ describe("cancelOrder (AC-14, AC-15)", () => {
     expect((await orderOf()).status).toBe("cancelled");
   });
 
+  it("succeeds when the expiry webhook lands before the cancel writes, keeping the reason", async () => {
+    const { seedPendingOrder, sessionEvent } = await import("./stripe-support");
+    const { order } = await seedPendingOrder();
+    mocks.sessionRetrieve.mockResolvedValue({ status: "open", payment_status: "unpaid" });
+    // Stripe sends checkout.session.expired as soon as the session is expired, and it can win.
+    mocks.sessionExpire.mockImplementation(async () => {
+      await post(sessionEvent("checkout.session.expired", { orderId: order.id }));
+      return {};
+    });
+
+    expect(
+      await cancelOrder({ ...(await orderRef()), reason: "Duplicate", restockLineIds: [] }),
+    ).toEqual({ ok: true, data: { status: "expired", refundId: null } });
+    expect((await orderOf()).status).toBe("expired");
+    expect((await eventsOf(order.id)).at(-1)).toMatchObject({
+      type: "note",
+      actorType: "admin",
+      message: "Cancelled: Duplicate",
+    });
+  });
+
   it("refunds a payment that lands after the pending order was cancelled (AC-15)", async () => {
     const { seedPendingOrder, sessionEvent } = await import("./stripe-support");
     const { order } = await seedPendingOrder();
