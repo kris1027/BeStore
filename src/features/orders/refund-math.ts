@@ -17,7 +17,7 @@ export type MathRefund = {
   readonly lines: readonly { readonly orderLineId: string; readonly quantity: number }[];
 };
 
-export type MathOrder = {
+export type RefundLedger = {
   readonly totalCents: number;
   readonly shippingCents: number;
   readonly lines: readonly MathLine[];
@@ -36,7 +36,7 @@ export function reservedCents(refunds: readonly MathRefund[]): number {
     .reduce((sum, refund) => sum + refund.amountCents, 0);
 }
 
-export function remainingCents(order: MathOrder): number {
+export function remainingCents(order: RefundLedger): number {
   return Math.max(0, order.totalCents - reservedCents(order.refunds));
 }
 
@@ -49,12 +49,12 @@ export function refundedUnits(refunds: readonly MathRefund[], orderLineId: strin
     .reduce((sum, line) => sum + line.quantity, 0);
 }
 
-export function refundableUnits(order: MathOrder, line: MathLine): number {
+export function refundableUnits(order: RefundLedger, line: MathLine): number {
   return Math.max(0, line.quantity - refundedUnits(order.refunds, line.id));
 }
 
 // "Refund delivery" is offered once: until a refund that did not fail has included it.
-export function shippingRefundable(order: MathOrder): boolean {
+export function shippingRefundable(order: RefundLedger): boolean {
   return (
     order.shippingCents > 0 &&
     !order.refunds.some((refund) => refund.status !== "failed" && refund.includesShipping)
@@ -76,7 +76,7 @@ export function lineRefundCents(
 }
 
 export function suggestedCents(
-  order: MathOrder,
+  order: RefundLedger,
   chosen: readonly ChosenLine[],
   refundShipping: boolean,
 ): number {
@@ -112,7 +112,7 @@ export type RefundFieldErrors = Readonly<Record<string, readonly string[]>>;
 // under the order row lock), or null when it may go to Stripe. Field paths match the form:
 // `lines.<orderLineId>`, `refundShipping`, `amount`.
 export function refundRequestErrors(
-  order: MathOrder,
+  order: RefundLedger,
   request: RefundRequest,
 ): RefundFieldErrors | null {
   const errors: Record<string, string[]> = {};
@@ -168,7 +168,7 @@ export type CancelPlan = {
 
 // AC-14: cancelling a paid order refunds everything left, whatever a goodwill refund took
 // before, and covers every unit still refundable; delivery counts as included.
-export function cancelPlan(order: MathOrder, restockLineIds: readonly string[]): CancelPlan {
+export function cancelPlan(order: RefundLedger, restockLineIds: readonly string[]): CancelPlan {
   return {
     amountCents: remainingCents(order),
     includesShipping: shippingRefundable(order),

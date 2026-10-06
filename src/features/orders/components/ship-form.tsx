@@ -3,8 +3,8 @@
 import { TruckIcon } from "lucide-react";
 import { useState } from "react";
 
-import { editTracking, markShipped } from "../admin-actions";
-import { TRACKING_MAX_LENGTH, trackingSchema } from "../schemas";
+import { editTracking, markShipped } from "../actions/status";
+import { pathErrors, TRACKING_MAX_LENGTH, trackingSchema } from "../schemas";
 import {
   ActionDialog,
   type FieldErrors,
@@ -59,11 +59,7 @@ export function ShipForm({
     const payload = { ...orderRef, ...values };
     const parsed = trackingSchema.safeParse(payload);
     if (!parsed.success) {
-      const fields: Record<string, string[]> = {};
-      for (const issue of parsed.error.issues) {
-        (fields[issue.path.join(".")] ??= []).push(issue.message);
-      }
-      show(fields);
+      show(pathErrors(parsed.error));
       return;
     }
     setErrors({});

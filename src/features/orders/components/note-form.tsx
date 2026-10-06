@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useHydrated } from "@/hooks/use-hydrated";
 
-import { addNote } from "../admin-actions";
+import { addNote } from "../actions/notes";
 import { NOTE_MAX_LENGTH, noteField } from "../schemas";
 import { firstErrors, focusFirst, TextField, useOrderAction } from "./action-dialog";
 

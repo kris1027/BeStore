@@ -4,7 +4,7 @@ import {
   allocateReturns,
   cancelPlan,
   lineRefundCents,
-  type MathOrder,
+  type RefundLedger,
   type MathRefund,
   refundableUnits,
   refundRequestErrors,
@@ -20,7 +20,7 @@ import {
 const lineA = { id: "a", quantity: 3, lineTotalCents: 1000 };
 const lineB = { id: "b", quantity: 1, lineTotalCents: 2500 };
 
-function order(refunds: readonly MathRefund[] = [], shippingCents = 500): MathOrder {
+function order(refunds: readonly MathRefund[] = [], shippingCents = 500): RefundLedger {
   return { totalCents: 3500 + shippingCents, shippingCents, lines: [lineA, lineB], refunds };
 }
 

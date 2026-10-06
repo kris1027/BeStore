@@ -35,8 +35,9 @@ vi.mock("@/lib/logger", async (importOriginal) =>
   }),
 );
 
-const { addNote, editTracking, markDelivered, markShipped, resolveAttention, undoStatus } =
-  await import("@/features/orders/admin-actions");
+const { addNote, resolveAttention } = await import("@/features/orders/actions/notes");
+const { editTracking, markDelivered, markShipped, undoStatus } =
+  await import("@/features/orders/actions/status");
 const { getAdminOrder } = await import("@/features/orders/admin-queries");
 
 resetDatabaseBeforeEach();

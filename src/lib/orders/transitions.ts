@@ -238,15 +238,31 @@ async function statusEvent(
   });
 }
 
+type Tracking = { readonly carrier: string | null; readonly trackingNumber: string | null };
+
+// The parts that apply, joined into one sentence; null when none does.
+function sentence(parts: readonly (string | null)[]): string | null {
+  const text = parts.filter((part) => part !== null).join(", ");
+  return text === "" ? null : text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 // AC-4: "Carrier: DHL, tracking: 123", with only the parts that were given.
 export function shippingMessage(carrier: string | null, trackingNumber: string | null) {
-  const parts = [
+  return sentence([
     carrier === null ? null : `Carrier: ${carrier}`,
     trackingNumber === null ? null : `tracking: ${trackingNumber}`,
-  ].filter((part) => part !== null);
-  if (parts.length === 0) return null;
-  const text = parts.join(", ");
-  return text.charAt(0).toUpperCase() + text.slice(1);
+  ]);
+}
+
+// AC-7: "Carrier: A → B, tracking: X → Y", only the parts that changed; null when nothing did.
+export function trackingChangeMessage(from: Tracking, to: Tracking) {
+  const show = (value: string | null) => value ?? "none";
+  return sentence([
+    from.carrier === to.carrier ? null : `Carrier: ${show(from.carrier)} → ${show(to.carrier)}`,
+    from.trackingNumber === to.trackingNumber
+      ? null
+      : `tracking: ${show(from.trackingNumber)} → ${show(to.trackingNumber)}`,
+  ]);
 }
 
 export async function markShipped(

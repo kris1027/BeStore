@@ -16,9 +16,9 @@ import { Input } from "@/components/ui/input";
 import { centsToInput, parseMoney } from "@/lib/money";
 
 import type { AdminOrderLine } from "../admin-queries";
-import { refundOrder } from "../admin-actions";
+import { refundOrder } from "../actions/refund";
 import {
-  type MathOrder,
+  type RefundLedger,
   refundRequestErrors,
   remainingCents,
   shippingRefundable,
@@ -57,7 +57,7 @@ export function RefundForm({
   readonly currency: string;
   readonly shippingCents: number;
   readonly lines: readonly AdminOrderLine[];
-  readonly math: MathOrder;
+  readonly math: RefundLedger;
 }) {
   const refundable = lines.filter((line) => line.refundableUnits > 0);
   const [open, setOpen] = useState(false);

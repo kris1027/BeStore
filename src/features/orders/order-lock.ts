@@ -1,10 +1,10 @@
 import "server-only";
 
-import type { OrderStatus } from "@/generated/prisma/client";
+import { type OrderStatus, Prisma } from "@/generated/prisma/client";
 import type { Tx } from "@/lib/db";
 
 import { isInFlight } from "./order-actions";
-import type { MathOrder } from "./refund-math";
+import type { RefundLedger } from "./refund-math";
 
 // The order row as every admin action and refund path sees it: read under FOR UPDATE, so the
 // checks that follow (spec 0010, AC-8) judge the row the guarded update will move.
@@ -59,22 +59,22 @@ function toLocked(row: Row): LockedOrder {
   };
 }
 
-export async function lockOrderByNumber(tx: Tx, number: number): Promise<LockedOrder | null> {
+// Both lookups read the same columns; only the row they pick differs.
+async function lockOrderWhere(tx: Tx, where: Prisma.Sql): Promise<LockedOrder | null> {
   const [row] = await tx.$queryRaw<Row[]>`
     SELECT id, number, status, needs_attention, updated_at, currency, total_cents, shipping_cents,
            refunded_cents, carrier, tracking_number, stripe_payment_intent_id,
            stripe_checkout_session_id
-    FROM orders WHERE number = ${number} FOR UPDATE`;
+    FROM orders WHERE ${where} FOR UPDATE`;
   return row ? toLocked(row) : null;
 }
 
-export async function lockOrderById(tx: Tx, id: string): Promise<LockedOrder | null> {
-  const [row] = await tx.$queryRaw<Row[]>`
-    SELECT id, number, status, needs_attention, updated_at, currency, total_cents, shipping_cents,
-           refunded_cents, carrier, tracking_number, stripe_payment_intent_id,
-           stripe_checkout_session_id
-    FROM orders WHERE id = ${id}::uuid FOR UPDATE`;
-  return row ? toLocked(row) : null;
+export function lockOrderByNumber(tx: Tx, number: number): Promise<LockedOrder | null> {
+  return lockOrderWhere(tx, Prisma.sql`number = ${number}`);
+}
+
+export function lockOrderById(tx: Tx, id: string): Promise<LockedOrder | null> {
+  return lockOrderWhere(tx, Prisma.sql`id = ${id}::uuid`);
 }
 
 // AC-18: a request to Stripe that has not answered yet. Read under the order lock, which every
@@ -88,7 +88,7 @@ export async function hasRefundInFlight(tx: Tx, orderId: string, nowMs: number) 
 }
 
 // The order's lines and refunds for the refund math, read under the order lock.
-export async function loadMathOrder(tx: Tx, order: LockedOrder): Promise<MathOrder> {
+export async function loadRefundLedger(tx: Tx, order: LockedOrder): Promise<RefundLedger> {
   // One after the other: an interactive transaction runs on a single connection.
   const lines = await tx.orderLine.findMany({
     where: { orderId: order.id },

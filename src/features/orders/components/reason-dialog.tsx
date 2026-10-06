@@ -4,7 +4,8 @@ import { useState } from "react";
 
 import type { OrderStatus } from "@/generated/prisma/enums";
 
-import { markDelivered, resolveAttention, undoStatus } from "../admin-actions";
+import { resolveAttention } from "../actions/notes";
+import { markDelivered, undoStatus } from "../actions/status";
 import { NOTE_MAX_LENGTH, noteField, REASON_MAX_LENGTH, reasonField } from "../schemas";
 import {
   ActionDialog,

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useHydrated } from "@/hooks/use-hydrated";
 
-import { checkRefundWithStripe } from "../admin-actions";
+import { checkRefundWithStripe } from "../actions/refund";
 import { useOrderAction } from "./action-dialog";
 
 // spec 0010, AC-17: asks Stripe now instead of waiting for the webhook or the daily sync.
