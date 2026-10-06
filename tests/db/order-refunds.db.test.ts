@@ -439,6 +439,34 @@ describe("cancelOrder (AC-14, AC-15)", () => {
     expect((await orderOf()).status).toBe("cancelled");
   });
 
+  it("refunds a payment that lands after the pending order was cancelled (AC-15)", async () => {
+    const { seedPendingOrder, sessionEvent } = await import("./stripe-support");
+    const { order } = await seedPendingOrder();
+    mocks.sessionRetrieve.mockResolvedValue({ status: "open", payment_status: "unpaid" });
+    mocks.sessionExpire.mockResolvedValue({});
+    await cancelOrder({ ...(await orderRef()), reason: "Duplicate", restockLineIds: [] });
+    expect(
+      (await post(sessionEvent("checkout.session.completed", { orderId: order.id }))).body.result,
+    ).toBe("late_payment");
+    stripeAnswers("succeeded");
+
+    const total = (await orderOf()).totalCents;
+    const result = await refundOrder({
+      ...(await orderRef()),
+      lines: [],
+      refundShipping: false,
+      amount: (total / 100).toFixed(2),
+      reason: "Paid after cancel",
+    });
+
+    expect(result).toMatchObject({ ok: true, data: { status: "succeeded" } });
+    expect(mocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_intent: "pi_test_1", amount: total }),
+      { idempotencyKey: expect.any(String) },
+    );
+    expect(await orderOf()).toMatchObject({ status: "cancelled", refundedCents: total });
+  });
+
   it.each([
     ["paid", { status: "complete", payment_status: "paid" }],
     ["processing", { status: "complete", payment_status: "unpaid" }],

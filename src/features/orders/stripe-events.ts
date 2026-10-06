@@ -58,7 +58,10 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<EventResul
     if (order.status !== "pending_payment") {
       // spec 0010, AC-15: money for an order an admin cancelled (or that expired) is never kept
       // silently. markPaid would refuse it, so the order is flagged for a refund instead.
-      if (decision.kind === "pay" && (await flagLatePayment(tx, orderId.data))) {
+      const late =
+        decision.kind === "pay" &&
+        (await flagLatePayment(tx, orderId.data, paymentIntentId(session.payment_intent)));
+      if (late) {
         return { result: "late_payment" };
       }
       return { result: "stale" };

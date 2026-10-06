@@ -225,9 +225,11 @@ describe("failed and abandoned payments", () => {
 
     // spec 0010, AC-15: still not paid and no stock taken, but flagged so the money is refunded.
     expect(late.body.result).toBe("late_payment");
+    // The payment is saved so the admin can refund it and Stripe's refund events find the order.
     expect(await testDb.order.findUniqueOrThrow({ where: { id: order.id } })).toMatchObject({
       status: "expired",
       needsAttention: true,
+      stripePaymentIntentId: "pi_test_1",
     });
     expect(await stock(variant.id)).toBe(5);
     expect((await eventsOf(order.id)).at(-1)).toMatchObject({

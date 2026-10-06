@@ -191,9 +191,16 @@ export async function markExpired(tx: Tx, orderId: string, reason: string): Prom
 // spec 0010, AC-15: a payment that lands after the order left pending (an admin cancelled it, or
 // it expired) is never silently kept. markPaid already refused it; this flags the order and
 // says why. Returns false for any other status, where the payment is the order's own.
-export async function flagLatePayment(tx: Tx, orderId: string): Promise<boolean> {
+// The payment intent is saved (never overwriting one) so the refund action and Stripe's refund
+// events can find this payment; without it the "refund it" note could not be acted on.
+export async function flagLatePayment(
+  tx: Tx,
+  orderId: string,
+  paymentIntentId: string | null,
+): Promise<boolean> {
   const flagged = await tx.$executeRaw`
-    UPDATE orders SET needs_attention = true, updated_at = now()
+    UPDATE orders SET needs_attention = true, updated_at = now(),
+      stripe_payment_intent_id = COALESCE(stripe_payment_intent_id, ${paymentIntentId})
     WHERE id = ${orderId}::uuid AND status IN ('cancelled', 'expired')`;
   if (flagged === 0) return false;
   await tx.orderEvent.create({
