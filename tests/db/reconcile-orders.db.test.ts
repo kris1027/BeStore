@@ -378,6 +378,17 @@ describe("GET /api/cron/reconcile-orders", () => {
     expect(mocks.retrieve).not.toHaveBeenCalled();
   });
 
+  it("starts no order once the run's time budget is spent", async () => {
+    const { order } = await seedPendingOrder({ sessionId: null, createdAt: twoHoursAgo() });
+
+    const counts = await reconcileOrders(Date.now(), 100, Date.now() - 1);
+
+    expect(counts).toEqual({ checked: 0, paid: 0, expired: 0, skipped: 0, unresolved: 0 });
+    expect((await testDb.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe(
+      "pending_payment",
+    );
+  });
+
   it("skips an order whose database write fails and carries on with the rest", async () => {
     const { order: broken } = await seedPendingOrder({
       suffix: "a",
