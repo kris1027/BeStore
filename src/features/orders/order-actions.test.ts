@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { OrderStatus } from "@/generated/prisma/enums";
 
 import {
-  type ActionInput,
+  type OrderFacts,
   allowedActions,
   canCheckWithStripe,
   CHECK_AFTER_MS,
@@ -13,18 +13,18 @@ import {
 
 // spec 0010, AC-8, AC-17, AC-18 and AC-21.
 
-function input(status: OrderStatus, overrides: Partial<ActionInput> = {}): ActionInput {
+function input(status: OrderStatus, overrides: Partial<OrderFacts> = {}): OrderFacts {
   return {
     status,
     needsAttention: false,
     remainingCents: 1000,
-    refundInFlight: false,
+    hasPayment: status !== "pending_payment" && status !== "expired",
     ...overrides,
   };
 }
 
-const allowedOf = (value: ActionInput) =>
-  Object.entries(allowedActions(value))
+const allowedOf = (value: OrderFacts, refundInFlight = false) =>
+  Object.entries(allowedActions(value, refundInFlight))
     .filter(([, allowed]) => allowed)
     .map(([action]) => action);
 
@@ -41,16 +41,25 @@ describe("allowedActions", () => {
   });
 
   it("offers no refund once nothing is left to refund", () => {
-    expect(allowedActions(input("delivered", { remainingCents: 0 })).refund).toBe(false);
-    expect(allowedActions(input("cancelled", { remainingCents: 0 })).refund).toBe(false);
+    expect(allowedActions(input("delivered", { remainingCents: 0 }), false).refund).toBe(false);
+    expect(allowedActions(input("cancelled", { remainingCents: 0 }), false).refund).toBe(false);
   });
 
   it("offers Mark resolved only on a flagged order", () => {
-    expect(allowedActions(input("expired", { needsAttention: true })).resolve).toBe(true);
+    expect(allowedActions(input("expired", { needsAttention: true }), false).resolve).toBe(true);
   });
 
   it("allows only notes while a refund is in flight", () => {
-    expect(allowedOf(input("paid", { refundInFlight: true, needsAttention: true }))).toEqual([
+    expect(allowedOf(input("paid", { needsAttention: true }), true)).toEqual(["note"]);
+  });
+
+  it("offers a refund on a cancelled or expired order only once it holds a payment", () => {
+    // A pending order cancelled before it was paid holds no money.
+    expect(allowedOf(input("cancelled", { hasPayment: false }))).toEqual(["note"]);
+    // AC-15: a payment that landed after the order expired is refunded from the panel.
+    expect(allowedOf(input("expired", { hasPayment: true, needsAttention: true }))).toEqual([
+      "refund",
+      "resolve",
       "note",
     ]);
   });

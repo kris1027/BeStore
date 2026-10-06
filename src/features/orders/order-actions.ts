@@ -8,11 +8,15 @@ export type OrderAction =
 
 export type AllowedActions = Readonly<Record<OrderAction, boolean>>;
 
-export type ActionInput = {
+// What the status rule reads. The in flight rule (AC-18) is separate: under the order lock the
+// actions check it first, with its own message.
+export type OrderFacts = {
   readonly status: OrderStatus;
   readonly needsAttention: boolean;
   readonly remainingCents: number;
-  readonly refundInFlight: boolean;
+  // The order holds a Stripe payment to refund: a cancelled or expired order only does after a
+  // late payment (AC-15), whose payment intent flagLatePayment saves.
+  readonly hasPayment: boolean;
 };
 
 // A request to Stripe with no answer yet: younger than this and with no Stripe refund id, it
@@ -21,7 +25,7 @@ export const IN_FLIGHT_MS = 10 * 60 * 1000;
 // "Check with Stripe" appears once a pending refund is older than this (AC-17).
 export const CHECK_AFTER_MS = 2 * 60 * 1000;
 
-export function statusAllows(action: OrderAction, input: ActionInput): boolean {
+export function statusAllows(action: OrderAction, input: OrderFacts): boolean {
   switch (action) {
     case "ship":
       return input.status === "paid";
@@ -35,7 +39,9 @@ export function statusAllows(action: OrderAction, input: ActionInput): boolean {
         (input.status === "paid" ||
           input.status === "shipped" ||
           input.status === "delivered" ||
-          input.status === "cancelled") &&
+          input.status === "cancelled" ||
+          input.status === "expired") &&
+        input.hasPayment &&
         input.remainingCents > 0
       );
     case "cancel":
@@ -47,9 +53,9 @@ export function statusAllows(action: OrderAction, input: ActionInput): boolean {
   }
 }
 
-export function allowedActions(input: ActionInput): AllowedActions {
+export function allowedActions(input: OrderFacts, refundInFlight: boolean): AllowedActions {
   const allows = (action: OrderAction) =>
-    statusAllows(action, input) && (action === "note" || !input.refundInFlight);
+    statusAllows(action, input) && (action === "note" || !refundInFlight);
   return {
     ship: allows("ship"),
     deliver: allows("deliver"),

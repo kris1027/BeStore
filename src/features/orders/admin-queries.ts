@@ -30,7 +30,7 @@ import {
 } from "./order-actions";
 import {
   allocateReturns,
-  type MathOrder,
+  type RefundLedger,
   refundableUnits,
   refundState,
   type RefundState,
@@ -236,7 +236,7 @@ export type AdminOrderDetail = {
   readonly lines: readonly AdminOrderLine[];
   // The rows the refund form's suggestion is computed from, with the same pure math the action
   // checks against.
-  readonly math: MathOrder;
+  readonly math: RefundLedger;
   readonly refunds: readonly AdminRefund[];
   readonly allowed: AllowedActions;
   readonly refundInFlight: boolean;
@@ -357,7 +357,7 @@ export async function getAdminOrder(
     throw new Error(`Order ${order.number} has no email and was never purged`);
   }
 
-  const math: MathOrder = {
+  const math: RefundLedger = {
     totalCents: order.totalCents,
     shippingCents: order.shippingCents,
     lines: order.lines.map(({ id, quantity, lineTotalCents }) => ({
@@ -452,12 +452,15 @@ export async function getAdminOrder(
         returnedQuantity: line.returnedQuantity,
       })),
     })),
-    allowed: allowedActions({
-      status: order.status,
-      needsAttention: order.needsAttention,
-      remainingCents: remaining,
+    allowed: allowedActions(
+      {
+        status: order.status,
+        needsAttention: order.needsAttention,
+        remainingCents: remaining,
+        hasPayment: paymentIntentId !== null,
+      },
       refundInFlight,
-    }),
+    ),
     refundInFlight,
     attentionReasons,
     events: order.events.map(({ admin, ...event }) => ({
@@ -488,7 +491,7 @@ function restockableUnits(
       }[];
     }[];
   },
-  math: MathOrder,
+  math: RefundLedger,
 ): ReadonlyMap<string, number> {
   const result = new Map<string, number>();
   const variants = new Set(order.lines.flatMap((line) => (line.variantId ? [line.variantId] : [])));
