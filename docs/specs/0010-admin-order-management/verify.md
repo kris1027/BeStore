@@ -1,4 +1,4 @@
-# Verify: admin order management · spec 0010 · updated 2026-10-05
+# Verify: admin order management · spec 0010 · updated 2026-10-06
 _Steps derived from spec 0010 acceptance criteria. `/check verify` runs these; `/test` locks the durable ones._
 
 ## UI / manual
@@ -16,24 +16,24 @@ Sign in as an admin at `aal2`. Seed a paid order (or pay one through checkout wi
 - [x] "Undo" without a reason → field error linked to the field; with a reason → back to Shipped; Undo again → Paid, carrier and tracking kept and prefilled in "Mark shipped" → AC-6
 - [x] "Edit tracking", save unchanged → "Nothing changed."; change the number → history "Tracking: X1 → X2" → AC-7
 - [x] Open the order in two tabs, ship in one, then "Mark shipped" in the other → "This order changed. Reload to see the latest." and nothing changes → AC-8
-- [ ] "Refund", 1 of 2 units, tick "Return to stock" → amount prefills with the line's share; Review shows amount, lines, restock and reason; Refund now → "Partly refunded", refunds section shows "1 of 1 back to stock", the product's stock history shows a "Refund return" row, the storefront stock updates → AC-9, AC-10, AC-13, AC-21
+- [ ] "Refund", 1 of 2 units, tick "Return to stock" → amount prefills with the line's share; Review shows amount, lines, restock and reason; Refund now → "Partly refunded", refunds section shows "1 of 1 back to stock", the product's stock history shows a "Refund return" row, the storefront stock updates → AC-9, AC-10, AC-13, AC-21 _(the `@stripe` e2e covers everything up to "1 of 1 back to stock" and the stock count against real test mode Stripe; the stock history row and the storefront are still to look at by hand)_
 - [x] Refund form: raise the amount above the suggestion, or above what is left on a goodwill refund → field error, nothing reaches Stripe (Stripe dashboard shows no new refund) → AC-11
 - [x] Refund an already fully refunded payment in Stripe's dashboard first, then refund it from the panel → "Stripe refused the refund: …", the refund shows Failed, the order is unchanged → AC-12
 - [x] On an order with a shortfall (stock was 1, 2 bought), refund both with restock → only 1 comes back, history notes "Returned 1 of 2 to stock for <sku>" → AC-13
 - [x] Paid order → "Cancel and refund": every line listed with "Return to stock" ticked, the full remaining amount shown; confirm → Cancelled, Fully refunded, stock back → AC-14
-- [ ] Unpaid order with an open checkout → "Cancel order" → the session expires at Stripe, the order is Cancelled; with a completed but unpaid session → "A payment is in progress for this order. Wait for it to settle." → AC-15
+- [x] Unpaid order with an open checkout → "Cancel order" → the session expires at Stripe, the order is Cancelled (`@stripe` e2e, a real session); with a completed but unpaid session → "A payment is in progress for this order. Wait for it to settle." (db test, Stripe stubbed) → AC-15
 - [x] Refund part of a paid order in the Stripe dashboard → the order shows a refund by "Stripe dashboard", counted in the refunded amount once it succeeds → AC-16
-- [ ] Refund with `stripe listen` stopped and the network to Stripe blocked → "Stripe did not answer. The refund is being checked."; "Refund pending: <amount>" shows; every action but notes is refused with "A refund is in progress for this order."; after 2 minutes "Check with Stripe" settles it → AC-12, AC-17, AC-18
+- [ ] Refund with `stripe listen` stopped and the network to Stripe blocked _(not run by hand; the db tests cover each error type, `StripeIdempotencyError` included, with Stripe stubbed)_ → "Stripe did not answer. The refund is being checked."; "Refund pending: <amount>" shows; every action but notes is refused with "A refund is in progress for this order."; after 2 minutes "Check with Stripe" settles it → AC-12, AC-17, AC-18
 - [x] Add a note on an expired order → shows in the history with your name → AC-19
 - [x] On a flagged order, "Mark resolved" with a note → the flag clears, history shows "Marked resolved" with the note → AC-20
-- [ ] Do the ship, refund and cancel steps by keyboard only: focus moves into each dialog and back to its trigger, every field is labelled, errors are announced and linked → AC-24
+- [x] Do the ship, refund and cancel steps by keyboard only: focus moves into each dialog and back to its trigger, every field is labelled, errors are announced and linked → AC-24 (e2e "the refund and cancel dialogs work by keyboard alone", desktop and phone)
 
 ## Commands
 
 - [x] `pnpm test` → refund math, allowed actions, list params, dates and refund status mapping pass → AC-1, AC-2, AC-8, AC-9, AC-11, AC-13, AC-14, AC-17, AC-18
 - [x] `pnpm test:db` → `tests/db/order-status-actions.db.test.ts`, `order-refunds.db.test.ts`, `admin-orders.db.test.ts`, `stock-movements.db.test.ts`, `orders.db.test.ts` pass → AC-1 to AC-23
 - [x] `pnpm test:e2e tests/e2e/admin/orders.spec.ts` → ship, deliver, undo, tracking, note and the filters by keyboard with zero axe violations, desktop and phone → AC-1 to AC-7, AC-19, AC-21, AC-24
-- [x] `STRIPE_E2E=1 pnpm test:e2e tests/e2e/admin/orders.spec.ts -g @stripe` → a real test mode partial refund with restock, and a real cancel and full refund → AC-10, AC-13, AC-14
+- [x] `STRIPE_E2E=1 pnpm test:e2e tests/e2e/admin/orders.spec.ts -g @stripe` → a real test mode partial refund with restock, a real cancel and full refund, and a pending order cancelled after its real open session is expired → AC-10, AC-13, AC-14, AC-15
 - [x] `curl -H "Authorization: Bearer $CRON_SECRET" localhost:3000/api/cron/reconcile-orders` with a pending refund → the body has `refundsSynced` and `refundsFailed` → AC-17
 - [x] Grep the dev server log after a refund with a reason and a note → only ids, numbers and amounts; no reason, note, email, name or tracking number → AC-23
 
