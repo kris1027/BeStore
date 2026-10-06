@@ -135,6 +135,55 @@ test("an admin ships, delivers, undoes, edits tracking and notes an order by key
   await expectNoA11yViolations(page);
 });
 
+test("the refund and cancel dialogs work by keyboard alone", async ({ page }) => {
+  const socks = await seedProduct({ stock: 5, priceCents: 1000 });
+  const order = await seedPaidOrder(socks, { quantity: 2, priceCents: 1000 });
+  const admin = await createTestUser({ enrolled: true });
+  await signInFully(page, admin);
+  await openOrder(page, order);
+
+  // AC-24: focus moves into the refund form; every field is reachable by Tab; an error is
+  // announced on its field and takes focus; Escape gives focus back to the trigger.
+  await openByKeyboard(page, "Refund");
+  await expect(dialog(page)).toContainText("Refund");
+  const units = page.getByLabel(/^Units of /);
+  await tabTo(page, units);
+  await page.keyboard.type("1");
+  await tabTo(page, page.getByRole("checkbox", { name: "Return to stock" }));
+  await page.keyboard.press("Space");
+  await expect(page.getByRole("checkbox", { name: "Return to stock" })).toBeChecked();
+  await expect(page.getByLabel(/^Amount/)).toHaveValue("10.00");
+  await expectNoA11yViolations(page);
+  await tabTo(page, dialog(page).getByRole("button", { name: "Review refund" }));
+  await page.keyboard.press("Enter");
+  await expect(page.getByLabel("Reason")).toHaveAccessibleDescription(/Give a reason\./);
+  await expect(page.getByLabel("Reason")).toBeFocused();
+  await page.keyboard.type("One pair returned");
+  await tabTo(page, dialog(page).getByRole("button", { name: "Review refund" }));
+  await page.keyboard.press("Enter");
+  // The confirm step repeats the choice before anything reaches Stripe (AC-10).
+  await expect(dialog(page).getByRole("button", { name: "Refund now" })).toBeVisible();
+  await expect(dialog(page).getByText("One pair returned")).toBeVisible();
+  await expectNoA11yViolations(page);
+  await page.keyboard.press("Escape");
+  await expect(dialog(page)).toBeHidden();
+  await expect(page.getByRole("button", { name: "Refund", exact: true })).toBeFocused();
+
+  // AC-14: the cancel dialog, the same way.
+  await openByKeyboard(page, "Cancel and refund");
+  await expect(page.getByRole("checkbox", { name: /2 × / })).toBeChecked();
+  await expectNoA11yViolations(page);
+  await tabTo(page, dialog(page).getByRole("button", { name: "Cancel and refund" }));
+  await page.keyboard.press("Enter");
+  await expect(page.getByLabel("Reason")).toHaveAccessibleDescription(/Give a reason\./);
+  await expect(page.getByLabel("Reason")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog(page)).toBeHidden();
+  await expect(page.getByRole("button", { name: "Cancel and refund" })).toBeFocused();
+  // Nothing was sent: the order is untouched.
+  await expect(page.getByText("Not refunded").first()).toBeVisible();
+});
+
 test("the orders list filters by number, keeps filters in the URL and has an empty state", async ({
   page,
 }) => {
@@ -201,6 +250,46 @@ test("@stripe a partial refund with restock goes through Stripe", async ({ page 
   await expect(page.getByText("Partly refunded").first()).toBeVisible();
   await expect(page.getByText("1 of 1 back to stock")).toBeVisible();
   expect(await stockOf(socks.variantId)).toBe(4);
+});
+
+test("@stripe cancelling a pending order closes its open checkout first", async ({ page }) => {
+  test.skip(!stripeE2e, "set STRIPE_E2E=1 with a Stripe test key");
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+  const socks = await seedProduct({ stock: 5, priceCents: 1200 });
+  const order = await seedPendingOrder(await newCart(), socks, { quantity: 1, priceCents: 1200 });
+  // A real open session stands in for the one startCheckout made.
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    line_items: [
+      {
+        quantity: 1,
+        price_data: { currency: "eur", unit_amount: 1200, product_data: { name: "Socks" } },
+      },
+    ],
+    success_url: "http://localhost:3000/checkout/complete",
+  });
+  await withDb((db) =>
+    db.query("UPDATE orders SET stripe_checkout_session_id = $2 WHERE id = $1", [
+      order.id,
+      session.id,
+    ]),
+  );
+  const admin = await createTestUser({ enrolled: true });
+  await signInFully(page, admin);
+  await openOrder(page, order);
+
+  await openByKeyboard(page, "Cancel order");
+  await tabTo(page, page.getByLabel("Reason"));
+  await page.keyboard.type("Customer ordered twice");
+  await tabTo(page, dialog(page).getByRole("button", { name: "Cancel order" }));
+  await page.keyboard.press("Enter");
+  await expect(dialog(page)).toBeHidden({ timeout: 20_000 });
+
+  // AC-15: Stripe can no longer take the money, then the order is cancelled. Without
+  // `stripe listen` no expiry event comes back, so the cancel itself writes the status.
+  expect((await stripe.checkout.sessions.retrieve(session.id)).status).toBe("expired");
+  await expect(page.getByText("Cancelled").first()).toBeVisible();
+  await expect(history(page).getByText("Customer ordered twice")).toBeVisible();
 });
 
 test("@stripe cancelling a paid order refunds it in full", async ({ page }) => {

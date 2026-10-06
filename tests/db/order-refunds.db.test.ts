@@ -64,8 +64,8 @@ vi.mock("@/lib/logger", async (importOriginal) =>
   }),
 );
 
-const { cancelOrder, checkRefundWithStripe, refundOrder } =
-  await import("@/features/orders/admin-actions");
+const { cancelOrder } = await import("@/features/orders/actions/cancel");
+const { checkRefundWithStripe, refundOrder } = await import("@/features/orders/actions/refund");
 const { stripeWebhookRequest } = await import("@/features/orders/webhook");
 const { reconcileOrdersRequest } = await import("@/features/orders/reconcile");
 const { syncRefund } = await import("@/features/orders/refund-sync");
@@ -212,40 +212,43 @@ describe("refundOrder (AC-9 to AC-13)", () => {
     );
   });
 
-  it.each(["StripeAPIError", "StripeConnectionError", "StripeRateLimitError"])(
-    "keeps the refund pending and in flight on %s",
-    async (type) => {
-      const { order, line } = await paidOrder();
-      mocks.create.mockRejectedValue(stripeError(type, "boom"));
+  it.each([
+    "StripeAPIError",
+    "StripeConnectionError",
+    "StripeRateLimitError",
+    // A 409 "key in use": our first request with this key may still create the refund.
+    "StripeIdempotencyError",
+  ])("keeps the refund pending and in flight on %s", async (type) => {
+    const { order, line } = await paidOrder();
+    mocks.create.mockRejectedValue(stripeError(type, "boom"));
 
-      const result = await refundOrder({
+    const result = await refundOrder({
+      ...(await orderRef()),
+      lines: [{ orderLineId: line.id, quantity: 1, restock: false }],
+      refundShipping: false,
+      amount: "10",
+      reason: "x",
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: { code: "stripe_unavailable", refundPending: true },
+    });
+    expect((await refundsOf(order.id))[0]).toMatchObject({
+      status: "pending",
+      stripeRefundId: null,
+    });
+    // AC-18: the next refund is refused while the first may still land.
+    expect(
+      await refundOrder({
         ...(await orderRef()),
-        lines: [{ orderLineId: line.id, quantity: 1, restock: false }],
+        lines: [],
         refundShipping: false,
-        amount: "10",
-        reason: "x",
-      });
-
-      expect(result).toEqual({
-        ok: false,
-        error: { code: "stripe_unavailable", refundPending: true },
-      });
-      expect((await refundsOf(order.id))[0]).toMatchObject({
-        status: "pending",
-        stripeRefundId: null,
-      });
-      // AC-18: the next refund is refused while the first may still land.
-      expect(
-        await refundOrder({
-          ...(await orderRef()),
-          lines: [],
-          refundShipping: false,
-          amount: "1",
-          reason: "again",
-        }),
-      ).toEqual({ ok: false, error: { code: "refund_in_progress" } });
-    },
-  );
+        amount: "1",
+        reason: "again",
+      }),
+    ).toEqual({ ok: false, error: { code: "refund_in_progress" } });
+  });
 
   it("refuses amounts outside the caps and never calls Stripe (AC-11)", async () => {
     const { line } = await paidOrder();
@@ -585,6 +588,58 @@ describe("cancelOrder (AC-14, AC-15)", () => {
       { idempotencyKey: expect.any(String) },
     );
     expect(await orderOf()).toMatchObject({ status: "cancelled", refundedCents: total });
+  });
+
+  it("keeps the order cancelled when Stripe answers that the refund key is in use", async () => {
+    const { order } = await paidOrder();
+    mocks.create.mockRejectedValue(stripeError("StripeIdempotencyError", "Key in use"));
+
+    expect(await cancelOrder({ ...(await orderRef()), reason: "x", restockLineIds: [] })).toEqual({
+      ok: false,
+      error: { code: "stripe_unavailable", refundPending: true },
+    });
+    expect((await orderOf()).status).toBe("cancelled");
+    expect((await refundsOf(order.id))[0]?.status).toBe("pending");
+  });
+
+  it("refunds a payment that lands after the pending order expired (AC-15)", async () => {
+    const { seedPendingOrder, sessionEvent } = await import("./stripe-support");
+    const { order } = await seedPendingOrder();
+    await post(sessionEvent("checkout.session.expired", { orderId: order.id }));
+    expect(
+      (await post(sessionEvent("checkout.session.completed", { orderId: order.id }))).body.result,
+    ).toBe("late_payment");
+    stripeAnswers("succeeded");
+
+    const total = (await orderOf()).totalCents;
+    const result = await refundOrder({
+      ...(await orderRef()),
+      lines: [],
+      refundShipping: false,
+      amount: (total / 100).toFixed(2),
+      reason: "Paid after expiry",
+    });
+
+    expect(result).toMatchObject({ ok: true, data: { status: "succeeded" } });
+    expect(await orderOf()).toMatchObject({ status: "expired", refundedCents: total });
+  });
+
+  it("refuses a refund on a cancelled order that was never paid", async () => {
+    const { seedPendingOrder } = await import("./stripe-support");
+    await seedPendingOrder();
+    mocks.sessionRetrieve.mockResolvedValue({ status: "expired", payment_status: "unpaid" });
+    await cancelOrder({ ...(await orderRef()), reason: "Duplicate", restockLineIds: [] });
+
+    expect(
+      await refundOrder({
+        ...(await orderRef()),
+        lines: [],
+        refundShipping: false,
+        amount: "1",
+        reason: "x",
+      }),
+    ).toEqual({ ok: false, error: { code: "invalid_transition" } });
+    expect(mocks.create).not.toHaveBeenCalled();
   });
 
   it.each([
