@@ -350,6 +350,105 @@ describe("refundOrder (AC-9 to AC-13)", () => {
   });
 });
 
+describe("refund value sourcing (spec 0010, Value sourcing)", () => {
+  it("asks Stripe for the order row's payment intent, keyed by the refund row's id", async () => {
+    const { order, line } = await paidOrder({ paymentIntentId: "pi_from_the_row" });
+    stripeAnswers("succeeded", { paymentIntent: "pi_from_the_row" });
+
+    await refundOrder({
+      ...(await orderRef()),
+      lines: [{ orderLineId: line.id, quantity: 1, restock: false }],
+      refundShipping: false,
+      amount: "25",
+      reason: "x",
+    });
+
+    const [refund] = await refundsOf(order.id);
+    expect(mocks.create).toHaveBeenCalledOnce();
+    expect(mocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payment_intent: "pi_from_the_row",
+        metadata: expect.objectContaining({ refund_id: refund?.id, order_id: order.id }),
+      }),
+      { idempotencyKey: refund?.id },
+    );
+  });
+
+  it("dates a webhook settled refund at the event's time, not at arrival", async () => {
+    const { order, line } = await paidOrder();
+    stripeAnswers("pending");
+    await refundOrder({
+      ...(await orderRef()),
+      lines: [{ orderLineId: line.id, quantity: 1, restock: false }],
+      refundShipping: false,
+      amount: "25",
+      reason: "x",
+    });
+    const [pending] = await refundsOf(order.id);
+    const eventTime = new Date("2026-10-01T08:00:00.000Z");
+    const succeeded = stripeRefund({
+      id: pending?.stripeRefundId ?? "",
+      status: "succeeded",
+      amount: 2500,
+      refundId: pending?.id ?? "",
+    });
+
+    await post({
+      ...refundEvent("refund.updated", succeeded),
+      created: eventTime.getTime() / 1000,
+    });
+
+    const [settled] = await refundsOf(order.id);
+    expect(settled).toMatchObject({ status: "succeeded", succeededAt: eventTime });
+    expect((await orderOf()).refundedCents).toBe(2500);
+  });
+
+  it("dates an action settled refund at the server's time", async () => {
+    const { order, line } = await paidOrder();
+    stripeAnswers("succeeded");
+    const before = Date.now();
+
+    await refundOrder({
+      ...(await orderRef()),
+      lines: [{ orderLineId: line.id, quantity: 1, restock: false }],
+      refundShipping: false,
+      amount: "25",
+      reason: "x",
+    });
+
+    const succeededAt = (await refundsOf(order.id))[0]?.succeededAt?.getTime() ?? 0;
+    // Database now() and the test clock can differ by a little; allow a few seconds.
+    expect(succeededAt).toBeGreaterThan(before - 5000);
+    expect(succeededAt).toBeLessThan(Date.now() + 5000);
+  });
+
+  it("restocks nothing for an order paid before stock movements existed, and notes it", async () => {
+    const { order, line, variant } = await paidOrder();
+    // An order paid before spec 0009 has no sale movement: nothing is known to have left stock.
+    await testDb.stockMovement.deleteMany({ where: { orderId: order.id, kind: "sale" } });
+    stripeAnswers("succeeded");
+
+    const result = await refundOrder({
+      ...(await orderRef()),
+      lines: [{ orderLineId: line.id, quantity: 2, restock: true }],
+      refundShipping: false,
+      amount: "50",
+      reason: "Return",
+    });
+
+    expect(result).toMatchObject({ ok: true, data: { status: "succeeded" } });
+    expect(await stock(variant.id)).toBe(3);
+    expect(await returnsOf(order.id)).toEqual([]);
+    expect((await refundsOf(order.id))[0]?.lines[0]).toMatchObject({
+      returnedQuantity: 0,
+      restocked: false,
+    });
+    expect((await eventsOf(order.id)).map((event) => event.message)).toContain(
+      `Returned 0 of 2 to stock for ${variant.sku}`,
+    );
+  });
+});
+
 describe("cancelOrder (AC-14, AC-15)", () => {
   it("cancels a paid order and refunds the rest, restocking the ticked lines", async () => {
     const { order, line, variant } = await paidOrder();
