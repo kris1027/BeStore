@@ -127,12 +127,13 @@ export type StripeAnswer =
   // Anything else: the refund may exist, so the row stays pending for the sync.
   | { readonly kind: "unknown"; readonly errorType: string };
 
+// StripeIdempotencyError is not here: a 409 "key in use" means our first request with this key
+// is still running at Stripe and may yet create the refund, so it is unknown, not refused.
 const refusedErrorTypes: ReadonlySet<string> = new Set([
   "StripeInvalidRequestError",
   "StripePermissionError",
   "StripeAuthenticationError",
   "StripeCardError",
-  "StripeIdempotencyError",
 ]);
 
 export function reportOf(refund: Stripe.Refund, at: Date | null = null): RefundReport {
@@ -193,7 +194,7 @@ export async function requestStripeRefund(input: {
 // ─── Step 3: settle ──────────────────────────────────────────────────────────
 
 // Where an outcome came from. Only a failure Stripe reported later (webhook, sync) flags the
-// order: the action's own failure is shown to the admin who is looking at the order.
+// order (AC-17).
 export type OutcomeSource = "action" | "webhook" | "sync";
 
 export type AppliedOutcome = {
@@ -263,21 +264,34 @@ export async function applyRefundOutcome(
     amountCents: row.amount_cents,
     from: row.status,
   };
-  const logFields = { orderId: order.id, refundId: row.id, amountCents: row.amount_cents };
-
-  let touched = false;
-  if (row.stripe_refund_id === null && report.stripeRefundId !== null) {
+  const savesStripeId = row.stripe_refund_id === null && report.stripeRefundId !== null;
+  if (savesStripeId) {
     await tx.refund.update({
       where: { id: row.id },
       data: { stripeRefundId: report.stripeRefundId },
     });
-    touched = true;
   }
 
-  const outcome = refundOutcome(report.status);
-  let to: RefundStatus = row.status;
-  let productSlugs: readonly string[] = [];
+  const effect = await applyOutcomeTable(tx, order, row, report, source);
+  if (savesStripeId || effect.to !== row.status) await touchOrder(tx, order.id);
+  return { ...base, ...effect };
+}
+
+type Effect = { readonly to: RefundStatus; readonly productSlugs: readonly string[] };
+
+// The rows of the Refund outcomes table. Returns where the refund ended and which products'
+// cache must expire; a repeat of the stored state changes nothing.
+async function applyOutcomeTable(
+  tx: Tx,
+  order: LockedOrder,
+  row: RefundRow,
+  report: RefundReport,
+  source: OutcomeSource,
+): Promise<Effect> {
+  const unchanged: Effect = { to: row.status, productSlugs: [] };
+  const logFields = { orderId: order.id, refundId: row.id, amountCents: row.amount_cents };
   const amount = money(row.amount_cents, order.currency);
+  const outcome = refundOutcome(report.status);
 
   if (outcome === "unknown") {
     // Kept as it is (pending stays pending) and flagged once, never guessed.
@@ -289,20 +303,30 @@ export async function applyRefundOutcome(
       await systemEvent(tx, order.id, "note", unknownStatusMessage(report.status));
       logRefundUnknownStatus({ ...logFields, stripeStatus: report.status });
     }
-  } else if (row.status === "pending" && outcome === "succeeded") {
-    productSlugs = await markSucceeded(tx, order, row, report.at, `Refund of ${amount} succeeded`);
-    to = "succeeded";
+    return unchanged;
+  }
+
+  if (row.status === "pending" && outcome === "succeeded") {
+    const productSlugs = await markSucceeded(tx, order, row, report.at, amount);
     logRefundSucceeded(logFields);
-  } else if (row.status === "pending" && outcome === "failed") {
+    return { to: "succeeded", productSlugs };
+  }
+
+  if (row.status === "pending" && outcome === "failed") {
     await setStatus(tx, row.id, "failed", null);
     const reason = report.failureMessage ?? "no reason given";
     await systemEvent(tx, order.id, "refund_failed", `Refund of ${amount} failed: ${reason}`);
-    if (source !== "action") {
+    // The action's own failure is shown to the admin who is looking at the order; one Stripe
+    // reported later (webhook, sync) needs a person to notice it.
+    if (source === "action") logRefundFailed({ ...logFields, from: "pending" });
+    else {
       await flagOrder(tx, order.id);
       logRefundLateFailure({ ...logFields, from: "pending" });
-    } else logRefundFailed({ ...logFields, from: "pending" });
-    to = "failed";
-  } else if (row.status === "succeeded" && outcome === "failed") {
+    }
+    return { to: "failed", productSlugs: [] };
+  }
+
+  if (row.status === "succeeded" && outcome === "failed") {
     // Stripe can fail a refund it already reported succeeded (a closed card). The money did
     // not go back, so it no longer counts; stock it returned stays, a person adjusts it.
     await setStatus(tx, row.id, "failed", null);
@@ -315,23 +339,16 @@ export async function applyRefundOutcome(
     );
     await flagOrder(tx, order.id);
     logRefundLateFailure({ ...logFields, from: "succeeded" });
-    to = "failed";
-  } else if (row.status === "failed" && outcome !== "failed") {
+    return { to: "failed", productSlugs: [] };
+  }
+
+  if (row.status === "failed" && outcome !== "failed") {
     // We marked it failed but Stripe processed it (a request whose answer was lost).
-    if (outcome === "succeeded") {
-      productSlugs = await markSucceeded(
-        tx,
-        order,
-        row,
-        report.at,
-        `Refund of ${amount} succeeded`,
-      );
-      to = "succeeded";
-      logRefundSucceeded(logFields);
-    } else {
-      await setStatus(tx, row.id, "pending", null);
-      to = "pending";
-    }
+    const productSlugs =
+      outcome === "succeeded"
+        ? await markSucceeded(tx, order, row, report.at, amount)
+        : await setStatus(tx, row.id, "pending", null).then(() => []);
+    if (outcome === "succeeded") logRefundSucceeded(logFields);
     await flagOrder(tx, order.id);
     await systemEvent(
       tx,
@@ -339,10 +356,10 @@ export async function applyRefundOutcome(
       "note",
       "Stripe processed a refund the store had marked failed",
     );
+    return { to: outcome, productSlugs };
   }
 
-  if (touched || to !== row.status) await touchOrder(tx, order.id);
-  return { ...base, to, productSlugs };
+  return unchanged;
 }
 
 function unknownStatusMessage(status: string | null) {
@@ -365,11 +382,11 @@ async function markSucceeded(
   order: LockedOrder,
   row: RefundRow,
   at: Date | null,
-  message: string,
+  amount: string,
 ): Promise<readonly string[]> {
   await setStatus(tx, row.id, "succeeded", at);
   await recountRefunded(tx, order);
-  await systemEvent(tx, order.id, "refund_succeeded", message);
+  await systemEvent(tx, order.id, "refund_succeeded", `Refund of ${amount} succeeded`);
   return row.admin_id === null ? [] : restockRefund(tx, order.id, row.id, row.admin_id);
 }
 
