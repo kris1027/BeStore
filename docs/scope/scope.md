@@ -23,8 +23,8 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 8 | Shipping address & flat rate | Slice 2 | done |
 | 22 | Purge PII from expired orders | Slice 2 follow up | done |
 | 9 | Admin catalog management | Slice 3 | done |
-| 10 | Admin order management | Slice 4 | in-progress |
-| 11 | Order emails | Slice 5 | planned |
+| 10 | Admin order management | Slice 4 | done |
+| 11 | Order emails | Slice 5 | in-progress |
 | 12 | Customer accounts | Slice 6 | planned |
 | 13 | Categories, search & filters | Slice 7 | planned |
 | 14 | Discounts & promo codes | Slice 8 | planned |
@@ -197,7 +197,7 @@ spec [0009](../specs/0009-admin-catalog-management/index.md) · code in `src/fea
 
 ## Slice 4: Orders
 
-### 10. Admin order management · in-progress
+### 10. Admin order management · done
 Run orders after payment: filter and search orders, move them through statuses (paid, shipped, delivered, cancelled, refunded), and issue refunds.
 **Done when:** an admin can find any order, change its status with a history of who changed what, and refund all or part of it through the payment provider; a refund returns stock when chosen.
 spec [0010](../specs/0010-admin-order-management/index.md) · code in [src/features/orders/](../../src/features/orders/), [src/lib/orders/](../../src/lib/orders/), [app/admin/(panel)/orders/](../../app/admin/(panel)/orders/), [prisma/migrations/](../../prisma/migrations/)
@@ -214,10 +214,18 @@ spec [0010](../specs/0010-admin-order-management/index.md) · code in [src/featu
 
 ## Slice 5: Emails
 
-### 11. Order emails · needs a decision
+### 11. Order emails · in-progress
 Tell customers what is happening with their order.
 **Done when:** customers get an order confirmation after payment and an email when the order ships or is refunded; emails are sent once, even if a step is retried.
-- [ ] Design it (spec): `/architect order emails`
+spec [0011](../specs/0011-order-emails/index.md) · code in [src/lib/email/](../../src/lib/email/), [emails/](../../emails/), [src/features/orders/](../../src/features/orders/), [prisma/migrations/](../../prisma/migrations/)
+- [x] Design it (spec): `/architect order emails`
+- [x] Build it: `/develop order emails`
+  - [x] Thin thread: migration, env and transports, the outbox, one confirmation email sent from the paid webhook (AC-1, AC-8, AC-10, AC-16)
+  - [x] All three emails: full confirmation layout and content, shipped, refunds with frozen cancel wording (AC-2 to AC-7, AC-18)
+  - [x] Failure handling: error sorting, in process retry, daily sweep in the reconcile cron, give up and flag, missing email (AC-9, AC-11, AC-12)
+  - [x] Admin Emails section and Send again, logs, e2e with axe (AC-13 to AC-15, AC-17, AC-18)
+- [ ] Verify it: `/check verify order emails`
+- [ ] Test it: `/test order emails`
 
 ## Slice 6: Accounts
 
@@ -284,6 +292,8 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Sweep abandoned product image uploads**: delete files in `product-images` that no image row and no order line references, older than a day, if storage cost grows · from spec 0009
 - **Trigram search indexes for admin orders**: `pg_trgm` indexes on the searched order columns, once the list is measured as slow · from spec 0010
 - **Redact customer data at Stripe**: remove the name, email and address Stripe keeps on expired Checkout Sessions, if its redaction tooling fits · needs a decision · from spec 0008
+- **Resend bounce and complaint webhooks**: record bounced and complained on `email_sends` and show "Bounced" on the order page, once live · from spec 0011
+- **Email sweep on its own 10 minute cron**: when the project moves to Vercel Pro (feature 19) · from spec 0011
 
 ## Legend
 

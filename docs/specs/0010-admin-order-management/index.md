@@ -1,7 +1,7 @@
 # 0010. Admin order management: statuses, refunds and restock
 
 **Date**: 2026-10-05 (amended 2026-10-06 after review: AC-9, AC-12, AC-15, AC-17, AC-21, *Refund outcomes*, code layout)
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 
