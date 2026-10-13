@@ -432,6 +432,67 @@ describe("delivery and retries (AC-8 to AC-10)", () => {
     });
   });
 
+  // covers: AC-8 (a 500 then success sends on the second try)
+  it("sends on the second try after a server error, and stops there", async () => {
+    const { order } = await paidOrder();
+    const id = await queued(order.id);
+    const flaky = stubTransport(refused("internal_server_error", 500), {
+      ok: true,
+      resendId: "re_email_2",
+    });
+
+    expect(await deliverWithRetry(id, { waits: [0, 0, 0], transport: flaky.transport })).toBe(
+      "sent",
+    );
+    expect(flaky.sent).toHaveLength(2);
+    expect(flaky.sent.map((email) => email.idempotencyKey)).toEqual([
+      `order_confirmation:${order.id}`,
+      `order_confirmation:${order.id}`,
+    ]);
+    expect(await testDb.emailSend.findUniqueOrThrow({ where: { id } })).toMatchObject({
+      status: "sent",
+      resendId: "re_email_2",
+      attempts: 2,
+      errorCode: null,
+    });
+  });
+
+  // covers: AC-8 (a final refusal is not tried again in process)
+  it("does not try again after a final refusal", async () => {
+    const { order } = await paidOrder();
+    const id = await queued(order.id);
+    const refusing = stubTransport(refused("validation_error", 422));
+
+    expect(await deliverWithRetry(id, { waits: [0, 0], transport: refusing.transport })).toBe(
+      "failed",
+    );
+    expect(refusing.sent).toHaveLength(1);
+  });
+
+  // covers: AC-8, AC-17 (a thrown error leaves the row for the sweep and logs no content)
+  it("keeps the row pending when a try throws, and logs only the error's name", async () => {
+    const { order } = await paidOrder();
+    const id = await queued(order.id);
+    const throwing: Transport = {
+      name: "resend",
+      send: async () => {
+        throw new TypeError("fetch failed for ada@example.com");
+      },
+    };
+
+    expect(await deliverWithRetry(id, { waits: [0, 0], transport: throwing })).toBe("retry");
+    expect(await testDb.emailSend.findUniqueOrThrow({ where: { id } })).toMatchObject({
+      status: "pending",
+      attempts: 2,
+    });
+    const errors = mocks.error.mock.calls.filter(
+      ([fields]) => (fields as { event?: string }).event === "email.retry",
+    );
+    expect(errors).toHaveLength(2);
+    expect(errors[0]![0]).toMatchObject({ emailSendId: id, errorName: "TypeError" });
+    expect(JSON.stringify(errors)).not.toContain("ada@example.com");
+  });
+
   it("fails a refused address, flags the order and notes it once", async () => {
     const { order } = await paidOrder();
     const id = await queued(order.id);
