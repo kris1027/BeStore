@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 
 import type { AdminOrderDetail as Detail } from "../admin-queries";
 import { adminOrdersPath } from "../paths";
+import { EmailsSection } from "./emails-section";
 import { NoteForm } from "./note-form";
 import { OrderActionsPanel } from "./order-actions-panel";
 import { NeedsAttentionBadge, orderStatusLabels, OrderStatusBadge } from "./order-status-badge";
@@ -275,6 +276,22 @@ export function AdminOrderDetail({
           <RefundsSection
             orderNumber={order.number}
             refunds={order.refunds}
+            currency={order.currency}
+            dateFormat={dateFormat}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            <h2>Emails</h2>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EmailsSection
+            orderNumber={order.number}
+            emails={order.emails}
             currency={order.currency}
             dateFormat={dateFormat}
           />

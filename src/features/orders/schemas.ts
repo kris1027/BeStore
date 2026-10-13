@@ -74,6 +74,12 @@ export const checkRefundSchema = z.object({
   refundId: z.uuid(),
 });
 
+// spec 0011, API surface. The order number names the order the row must belong to (AC-15).
+export const sendEmailAgainSchema = z.object({
+  orderNumber: z.number().int().min(1).max(2_147_483_647),
+  emailSendId: z.uuid(),
+});
+
 export function pathErrors(error: z.ZodError): Record<string, readonly string[]> {
   const fields: Record<string, string[]> = {};
   for (const issue of error.issues) {

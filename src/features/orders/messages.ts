@@ -10,7 +10,9 @@ export type OrderActionError =
   | { readonly code: "invalid_input"; readonly fields: Readonly<Record<string, readonly string[]>> }
   | { readonly code: "stripe_refused"; readonly message: string }
   // refundPending: a refund may exist at Stripe and stays pending for the sync to settle.
-  | { readonly code: "stripe_unavailable"; readonly refundPending: boolean };
+  | { readonly code: "stripe_unavailable"; readonly refundPending: boolean }
+  // spec 0011, AC-14: Send again on an email row that is no longer failed.
+  | { readonly code: "email_changed" };
 
 export const staleMessage = "This order changed. Reload to see the latest.";
 export const refundInProgressMessage = "A refund is in progress for this order.";
@@ -19,6 +21,7 @@ export const paymentInProgressMessage =
 export const refundCheckingMessage = "Stripe did not answer. The refund is being checked.";
 export const stripeRetryMessage = "Stripe did not answer. Try again.";
 export const nothingChangedMessage = "Nothing changed.";
+export const emailChangedMessage = "This email changed. Reload to see the latest.";
 // AC-15: expiring the checkout let Stripe's expiry event settle the order first.
 export const expiredBeforeCancelMessage =
   "The checkout expired first, so the order is expired. No payment can be taken.";
@@ -44,5 +47,7 @@ export function errorMessage(error: OrderActionError): string {
       return stripeRefusedMessage(error.message);
     case "stripe_unavailable":
       return error.refundPending ? refundCheckingMessage : stripeRetryMessage;
+    case "email_changed":
+      return emailChangedMessage;
   }
 }

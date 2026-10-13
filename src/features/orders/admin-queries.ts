@@ -21,6 +21,7 @@ import {
 } from "@/lib/shipping/address";
 import { stripeDashboardUrl } from "@/lib/stripe";
 
+import type { AdminEmailSend } from "./email-status";
 import { type AdminOrdersParams, searchNumber } from "./list-params";
 import {
   type AllowedActions,
@@ -242,6 +243,8 @@ export type AdminOrderDetail = {
   readonly refundInFlight: boolean;
   // What the attention banner lists: system notes and failures since the flag was last cleared.
   readonly attentionReasons: readonly { readonly id: string; readonly message: string }[];
+  // spec 0011, AC-13: every email row, newest first.
+  readonly emails: readonly AdminEmailSend[];
   // Newest first (spec 0010, AC-21).
   readonly events: readonly {
     readonly id: string;
@@ -335,6 +338,18 @@ export async function getAdminOrder(
       stockMovements: {
         where: { kind: { in: ["sale", "return"] } },
         select: { variantId: true, kind: true, delta: true },
+      },
+      emailSends: {
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        select: {
+          id: true,
+          kind: true,
+          status: true,
+          attempts: true,
+          errorCode: true,
+          sentAt: true,
+          refund: { select: { amountCents: true } },
+        },
       },
       events: {
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -463,6 +478,10 @@ export async function getAdminOrder(
     ),
     refundInFlight,
     attentionReasons,
+    emails: order.emailSends.map(({ refund, ...email }) => ({
+      ...email,
+      refundAmountCents: refund?.amountCents ?? null,
+    })),
     events: order.events.map(({ admin, ...event }) => ({
       ...event,
       adminName: admin?.name ?? null,
