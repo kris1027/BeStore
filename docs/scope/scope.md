@@ -24,7 +24,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 22 | Purge PII from expired orders | Slice 2 follow up | done |
 | 9 | Admin catalog management | Slice 3 | done |
 | 10 | Admin order management | Slice 4 | done |
-| 11 | Order emails | Slice 5 | in-progress |
+| 11 | Order emails | Slice 5 | done |
 | 12 | Customer accounts | Slice 6 | planned |
 | 13 | Categories, search & filters | Slice 7 | planned |
 | 14 | Discounts & promo codes | Slice 8 | planned |
@@ -214,7 +214,7 @@ spec [0010](../specs/0010-admin-order-management/index.md) · code in [src/featu
 
 ## Slice 5: Emails
 
-### 11. Order emails · in-progress
+### 11. Order emails · done
 Tell customers what is happening with their order.
 **Done when:** customers get an order confirmation after payment and an email when the order ships or is refunded; emails are sent once, even if a step is retried.
 spec [0011](../specs/0011-order-emails/index.md) · code in [src/lib/email/](../../src/lib/email/), [emails/](../../emails/), [src/features/orders/](../../src/features/orders/), [prisma/migrations/](../../prisma/migrations/)
@@ -224,8 +224,8 @@ spec [0011](../specs/0011-order-emails/index.md) · code in [src/lib/email/](../
   - [x] All three emails: full confirmation layout and content, shipped, refunds with frozen cancel wording (AC-2 to AC-7, AC-18)
   - [x] Failure handling: error sorting, in process retry, daily sweep in the reconcile cron, give up and flag, missing email (AC-9, AC-11, AC-12)
   - [x] Admin Emails section and Send again, logs, e2e with axe (AC-13 to AC-15, AC-17, AC-18)
-- [ ] Verify it: `/check verify order emails`
-- [ ] Test it: `/test order emails`
+- [x] Verify it: `/check verify order emails`
+- [x] Test it: `/test order emails`
 
 ## Slice 6: Accounts
 
