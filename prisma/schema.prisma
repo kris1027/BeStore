@@ -495,9 +495,10 @@ model Refund {
   createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  order Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  admin AdminUser?   @relation(fields: [adminId], references: [id], onDelete: Restrict)
-  lines RefundLine[]
+  order      Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  admin      AdminUser?   @relation(fields: [adminId], references: [id], onDelete: Restrict)
+  lines      RefundLine[]
+  emailSends EmailSend[]
 
   @@index([orderId])
   @@index([succeededAt])
@@ -587,21 +588,38 @@ model StripeEvent {
 }
 
 // dedupe_key: `order_confirmation:<orderId>`, `order_shipped:<orderId>` or
-// `order_refunded:<refundId>`; also sent to Resend as the idempotency key.
+// `order_refunded:<refundId>`; also sent to Resend as the idempotency key. Rows are the outbox
+// of spec 0011: inserted in the transaction of the change they report, sent after it commits.
 model EmailSend {
-  id        String          @id @default(uuid(7)) @db.Uuid
-  orderId   String          @map("order_id") @db.Uuid
-  kind      EmailKind
-  dedupeKey String          @unique @map("dedupe_key")
-  status    EmailSendStatus @default(pending)
-  resendId  String?         @map("resend_id")
-  sentAt    DateTime?       @map("sent_at") @db.Timestamptz(3)
-  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  // A DB default, because the enqueue is a raw INSERT ... ON CONFLICT DO NOTHING (spec 0011).
+  id               String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId          String          @map("order_id") @db.Uuid
+  kind             EmailKind
+  dedupeKey        String          @unique @map("dedupe_key")
+  status           EmailSendStatus @default(pending)
+  resendId         String?         @map("resend_id")
+  sentAt           DateTime?       @map("sent_at") @db.Timestamptz(3)
+  // Set exactly on refund emails (CHECK in the migration).
+  refundId         String?         @map("refund_id") @db.Uuid
+  attempts         Int             @default(0)
+  // When the last try started; the sweep leaves rows tried in the last 2 minutes alone.
+  lastAttemptAt    DateTime?       @map("last_attempt_at") @db.Timestamptz(3)
+  // Frozen at enqueue (spec 0011, AC-3): "cancelled and refunded" wording on a refund email.
+  cancelledWording Boolean         @default(false) @map("cancelled_wording")
+  // The 23 hour give up window starts here; Send again resets it.
+  queuedAt         DateTime        @default(now()) @map("queued_at") @db.Timestamptz(3)
+  // Resend's error name, or gave_up, email_missing, idempotent_conflict. Never a message.
+  errorCode        String?         @map("error_code")
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order  Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  refund Refund? @relation(fields: [refundId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([status])
+  @@index([refundId])
+  // Only rows still owed, so the sweep reads just its backlog.
+  @@index([queuedAt], map: "email_sends_pending_queued_idx", where: raw("status = 'pending'::email_send_status"))
   @@map("email_sends")
 }

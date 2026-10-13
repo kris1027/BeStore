@@ -15,6 +15,8 @@ jobs:
     env:
       # Hooks are for local commits only.
       SKIP_INSTALL_SIMPLE_GIT_HOOKS: "1"
+      # spec 0011, AC-16: nothing in CI sends a real email.
+      EMAIL_TRANSPORT: log
       # Only the db suites use a database. DIRECT_URL stays unset on purpose: the test:db
       # guard refuses a TEST_DATABASE_URL that matches it, and the runner migrates the test DB itself.
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bestore_test
@@ -76,6 +78,9 @@ jobs:
             # signed in the tests with this fixed webhook secret.
             echo "STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-sk_test_placeholder}"
             echo "STRIPE_WEBHOOK_SECRET=whsec_ci_webhook_secret"
+            # spec 0011, AC-16: emails are logged, never sent.
+            echo "EMAIL_TRANSPORT=log"
+            echo "EMAIL_FROM=BeStore <orders@example.com>"
           } >> "$GITHUB_ENV"
       - run: pnpm exec prisma migrate deploy
       - run: pnpm test:stack
