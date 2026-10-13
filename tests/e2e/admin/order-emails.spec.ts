@@ -48,6 +48,13 @@ async function paidOrderWithEmails(): Promise<SeededOrder & { failedId: string }
   return { ...order, failedId };
 }
 
+// The page's buttons stay disabled (half opacity) until it hydrates, then fade in. The text
+// checks match the server HTML before that, so axe would sample the dimmed buttons; once one is
+// enabled, the fade is a running transition that expectNoA11yViolations waits out.
+async function waitForHydration(page: Page) {
+  await expect(page.getByRole("button", { name: "Add note" })).toBeEnabled();
+}
+
 function emails(page: Page) {
   return page.getByRole("list", { name: "Emails, newest first" });
 }
@@ -72,6 +79,7 @@ test("an admin sees the order's emails and sends a failed one again by keyboard"
   ).toBeVisible();
   await expect(emails(page).getByText("3 attempts")).toBeVisible();
   await expect(emails(page).getByText(/^Sent /)).toBeVisible();
+  await waitForHydration(page);
   await expectNoA11yViolations(page);
 
   // AC-14: one Send again, on the failed row only, behind a confirm that warns about a duplicate.
@@ -116,6 +124,7 @@ test("an admin sees the order's emails and sends a failed one again by keyboard"
     await page.reload();
     await expect(emails(page).getByText(/^Sent /)).toHaveCount(2);
   }).toPass({ timeout: 15_000 });
+  await waitForHydration(page);
   await expectNoA11yViolations(page);
 
   const row = await withDb((db) =>
