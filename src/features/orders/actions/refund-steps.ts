@@ -4,6 +4,7 @@ import { revalidatePath, updateTag } from "next/cache";
 
 import { catalogTag, productTag } from "@/lib/cache-tags";
 import { db, type Tx } from "@/lib/db";
+import { scheduleDelivery } from "@/lib/email/schedule";
 
 import { logOrderAdminEvent } from "../admin-log";
 import { refundOutcome } from "../event-decision";
@@ -65,7 +66,7 @@ async function settle(
       : { stripeRefundId: null, status: "failed", failureMessage: answer.message, at: null };
   const requestFailed = answer.kind === "refused" || refundOutcome(report.status) === "failed";
 
-  return db.$transaction(async (tx) => {
+  const settled = await db.$transaction(async (tx) => {
     const applied = await applyRefundOutcome(tx, reserved.refundId, report, "action");
     // The webhook may have settled it first; the row says where it is now either way.
     const row = await tx.refund.findUniqueOrThrow({
@@ -74,8 +75,16 @@ async function settle(
     });
     const undone =
       requestFailed && row.status === "failed" && onFailure ? await onFailure(tx) : false;
-    return { status: row.status, productSlugs: applied?.productSlugs ?? [], undone };
+    return {
+      status: row.status,
+      productSlugs: applied?.productSlugs ?? [],
+      undone,
+      emailIds: applied?.emailIds ?? [],
+    };
   });
+  // spec 0011, AC-8: the refund email, once the settle committed.
+  scheduleDelivery(settled.emailIds);
+  return { status: settled.status, productSlugs: settled.productSlugs, undone: settled.undone };
 }
 
 // Stripe may already have the money moving, so a database error here must not hide that: the

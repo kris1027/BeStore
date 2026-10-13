@@ -4,6 +4,7 @@ import type Stripe from "stripe";
 
 import { isCronRequest } from "@/lib/cron-auth";
 import { db } from "@/lib/db";
+import { sweepEmails } from "@/lib/email/sweep";
 import { logOrderExpired } from "@/lib/orders/log";
 import { sessionState } from "@/lib/orders/session-state";
 import { markExpired } from "@/lib/orders/transitions";
@@ -25,8 +26,8 @@ export const RECONCILE_BATCH = 100;
 // The 31 minute session plus an hour for Stripe's own webhook retries.
 export const STALE_AFTER_MS = 90 * 60 * 1000;
 export const EVENT_SEARCH_CAP = 500;
-// The whole run, order replay and refund sync together, stops starting new work after this
-// (spec 0010, AC-17), well inside the function's time limit.
+// The whole run, email sweep, order replay and refund sync together, stops starting new work
+// after this (spec 0010, AC-17), well inside the function's time limit.
 export const RECONCILE_BUDGET_MS = 50_000;
 
 // The decisive event wins over the one that only started the story.
@@ -177,7 +178,10 @@ export async function reconcileOrdersRequest(request: Request): Promise<Response
   }
   const startedMs = Date.now();
   const deadlineMs = startedMs + RECONCILE_BUDGET_MS;
-  const counts = await reconcileOrders(startedMs, RECONCILE_BATCH, deadlineMs);
+  // spec 0011, AC-11: owed emails first, in their own 10 second slice, so a long order backlog
+  // can never starve them. Emails the replay below queues go out through this request's after().
+  await sweepEmails(deadlineMs, { nowMs: startedMs });
+  const counts = await reconcileOrders(Date.now(), RECONCILE_BATCH, deadlineMs);
   logReconcile(counts);
   // spec 0010, AC-17: then the pending refunds, oldest first, each failure isolated.
   const refunds = await syncPendingRefunds(Date.now(), { deadlineMs });

@@ -4,6 +4,7 @@ import type Stripe from "stripe";
 
 import type { RefundStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { scheduleDelivery } from "@/lib/email/schedule";
 import { stripe } from "@/lib/stripe";
 
 import { logReconcileRefundFailed, type RefundSyncCounts } from "./log";
@@ -61,7 +62,9 @@ export async function syncRefund(refundId: string, nowMs: number): Promise<SyncR
 
   const settled = report;
   const applied = await db.$transaction((tx) => applyRefundOutcome(tx, refundId, settled, "sync"));
-  return applied === null ? null : { status: applied.to, applied };
+  if (applied === null) return null;
+  scheduleDelivery(applied.emailIds);
+  return { status: applied.to, applied };
 }
 
 // A request whose answer was lost has no Stripe id on our row: find it among the payment's

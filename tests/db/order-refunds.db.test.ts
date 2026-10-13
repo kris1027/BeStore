@@ -31,6 +31,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+// spec 0011, AC-16: after() needs a request scope; tests/db/order-emails.db.test.ts covers delivery.
+vi.mock("@/lib/email/schedule", () => ({ scheduleDelivery: vi.fn() }));
 vi.mock("@/lib/db", async () => ({ db: (await import("./client")).testDb }));
 vi.mock("@/lib/env", () => ({
   env: {
