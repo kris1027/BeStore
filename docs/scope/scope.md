@@ -232,7 +232,7 @@ spec [0011](../specs/0011-order-emails/index.md) · code in [src/lib/email/](../
 ### 12. Customer accounts · in-progress · GA
 Optional accounts: guest checkout stays the default, customers who sign up see their order history and saved address.
 **Done when:** a customer can sign up, sign in, reset a password, and see past orders; guest checkout still works; a guest can later create an account with the same email and see earlier orders.
-spec [0012](../specs/0012-customer-accounts/index.md)
+spec [0012](../specs/0012-customer-accounts/index.md) · code in [src/features/account/](../../src/features/account/), [src/lib/customer/](../../src/lib/customer/), [src/lib/cart/merge.ts](../../src/lib/cart/merge.ts), [src/lib/email/](../../src/lib/email/), [emails/](../../emails/), [app/(store)/account/](../../app/(store)/account/)
 - [x] Design it (spec): `/architect customer accounts`
 - [ ] Build it: `/develop customer accounts`
   - [x] Thin thread: config, the Send Email Hook, Mailpit transport, sign up, confirm, choose password, account setup and a bare order list (AC-1 to AC-3, AC-10, AC-11, AC-13, AC-22, AC-23)
