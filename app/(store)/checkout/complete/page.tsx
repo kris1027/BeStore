@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { storeContainer } from "@/components/layout/container";
+import { OrderSignUpOffer } from "@/features/account/components/order-sign-up-offer";
 import {
   CheckoutComplete,
   CheckoutCompleteSkeleton,
@@ -21,6 +22,10 @@ export default function CheckoutCompletePage({ searchParams }: PageProps<"/check
     <div className={cn(storeContainer, "flex flex-col gap-8 py-12 md:py-16")}>
       <Suspense fallback={<CheckoutCompleteSkeleton />}>
         <CheckoutComplete searchParams={searchParams} />
+      </Suspense>
+      {/* spec 0012, AC-17: a guest may turn this order into an account. */}
+      <Suspense fallback={null}>
+        <OrderSignUpOffer searchParams={searchParams} />
       </Suspense>
     </div>
   );

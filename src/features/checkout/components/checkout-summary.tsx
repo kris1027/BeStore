@@ -9,6 +9,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { loadCart } from "@/lib/cart/load-cart";
+import { addressNeedsCheck } from "@/lib/customer/address-rules";
+import { listSavedAddresses, type SavedAddress } from "@/lib/customer/addresses";
+import { getCustomer } from "@/lib/customer/session";
 import { env } from "@/lib/env";
 import { NO_DISCOUNT_CENTS } from "@/lib/orders/snapshot";
 import { countryDisplayName } from "@/lib/shipping/address";
@@ -16,8 +19,22 @@ import { orderCharges } from "@/lib/shipping/rule";
 import { getShippingSettings } from "@/lib/shipping/settings";
 
 import { checkoutPrefill } from "../queries";
-import { emptyPrefill } from "../schemas";
-import { CheckoutForm } from "./checkout-form";
+import { type CheckoutPrefill, emptyPrefill } from "../schemas";
+import { type CheckoutAccount, CheckoutForm } from "./checkout-form";
+
+// spec 0012, AC-16: where a signed out visitor signs in and comes back.
+const signInToCheckout = "/account/sign-in?next=/checkout";
+
+function addressValues(address: SavedAddress): Omit<CheckoutPrefill, "email"> {
+  return {
+    fullName: address.fullName,
+    line1: address.line1,
+    line2: address.line2 ?? "",
+    postalCode: address.postalCode,
+    city: address.city,
+    phone: address.phone ?? "",
+  };
+}
 
 const cartPath = "/cart";
 
@@ -34,7 +51,35 @@ export async function CheckoutSummary({
   const [cart, params] = await Promise.all([loadCart(), searchParams]);
   if (!cart || !cart.canCheckout) redirect(cartPath);
   const cancelled = params.cancelled === "1";
-  const [settings, prefill] = await Promise.all([getShippingSettings(), checkoutPrefill(cart.id)]);
+  const [settings, orderPrefill, customer] = await Promise.all([
+    getShippingSettings(),
+    checkoutPrefill(cart.id),
+    getCustomer(),
+  ]);
+  // spec 0012, AC-15: a signed in customer's form starts with the pending order's address for this
+  // cart, else the default saved address; saved addresses the rules now refuse are left out.
+  const saved =
+    customer === null
+      ? []
+      : (await listSavedAddresses(customer.id)).filter(
+          (address) => !addressNeedsCheck(address, env.STORE_COUNTRY),
+        );
+  const account: CheckoutAccount | null =
+    customer === null
+      ? null
+      : {
+          email: customer.email,
+          addresses: saved.map((address) => ({
+            id: address.id,
+            label: `${address.fullName}, ${address.line1}, ${address.postalCode} ${address.city}`,
+            values: addressValues(address),
+          })),
+        };
+  const defaultAddress = saved.find((address) => address.isDefault);
+  const prefill =
+    orderPrefill ??
+    (defaultAddress ? { email: "", ...addressValues(defaultAddress) } : null) ??
+    emptyPrefill;
   const { shippingCents: shipping, totalCents } = orderCharges(
     { subtotalCents: cart.subtotalCents, discountCents: NO_DISCOUNT_CENTS },
     settings,
@@ -109,11 +154,26 @@ export async function CheckoutSummary({
               <Price cents={totalCents} />
             </span>
           </div>
+          {customer === null ? (
+            <p className="text-sm text-muted-foreground">
+              Have an account?{" "}
+              <Link
+                href={signInToCheckout}
+                className="text-foreground underline underline-offset-4 hover:text-foreground/80"
+              >
+                Sign in
+              </Link>
+            </p>
+          ) : null}
+          {/* Keyed by who is paying: signing in and coming back (a client navigation that keeps
+              the old form around) starts the form over with the account's email and address. */}
           <CheckoutForm
+            key={customer?.id ?? "guest"}
             totalCents={totalCents}
             country={env.STORE_COUNTRY}
             countryName={countryDisplayName(env.STORE_COUNTRY, env.STORE_LOCALE)}
-            prefill={prefill ?? emptyPrefill}
+            prefill={prefill}
+            account={account}
           />
         </section>
       </div>

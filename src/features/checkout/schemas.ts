@@ -17,7 +17,12 @@ const emailSchema = z
   .transform((email) => email.toLowerCase());
 
 export function checkoutSchema(country: StoreCountry) {
-  return z.object({ email: emailSchema, ...shippingAddressSchema(country).shape });
+  return z.object({
+    email: emailSchema,
+    ...shippingAddressSchema(country).shape,
+    // spec 0012, AC-15: "Save this address to my account"; only a signed in checkout reads it.
+    saveAddress: z.boolean().default(false),
+  });
 }
 
 export type CheckoutValues = z.input<ReturnType<typeof checkoutSchema>>;

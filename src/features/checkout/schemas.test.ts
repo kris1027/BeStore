@@ -25,7 +25,18 @@ describe("checkoutSchema", () => {
       postalCode: "00-950",
       city: "Warsaw",
       phone: null,
+      saveAddress: false,
     });
+  });
+
+  // spec 0012, AC-15.
+  it("carries the save address choice, false unless sent", () => {
+    expect(
+      schema.parse({ email: "a@example.com", ...address, saveAddress: true }).saveAddress,
+    ).toBe(true);
+    expect(
+      schema.safeParse({ email: "a@example.com", ...address, saveAddress: "yes" }).success,
+    ).toBe(false);
   });
 
   it("parses its own output to the same values, as the server does after the form", () => {
