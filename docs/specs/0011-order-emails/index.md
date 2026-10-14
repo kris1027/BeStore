@@ -85,7 +85,7 @@ Reasoning and options: see [rationale.md](rationale.md).
 
 Plus a partial index `(queued_at) WHERE status = 'pending'` for the sweep. The migration also gives `id` a DB default (`uuidv7()` when the local and hosted Postgres have it, else `gen_random_uuid()`) and `updated_at` a default of `now()`, because the enqueue is a raw `INSERT … ON CONFLICT (dedupe_key) DO NOTHING RETURNING id` (a Prisma `create` would abort the transaction on a duplicate key, and raw SQL skips `@updatedAt`, so every raw update also sets `updated_at = now()`). Relationships: order 1:N email_sends (at most one confirmation, one shipped, one per refund); refund 1:0..1 email_send.
 
-Dedupe keys keep spec 0002's format (`order_confirmation:<orderId>`, `order_shipped:<orderId>`, `order_refunded:<refundId>`) and are sent unchanged as Resend's idempotency key. The `emails/AGENTS.md` example (`order-confirmation/<orderId>`) predates this and should be corrected by `/sync`.
+Dedupe keys keep spec 0002's format (`order_confirmation:<orderId>`, `order_shipped:<orderId>`, `order_refunded:<refundId>`) and are sent unchanged as Resend's idempotency key. `emails/AGENTS.md` uses the same format.
 
 **State transitions** (`email_sends.status`):
 
