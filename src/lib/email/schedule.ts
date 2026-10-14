@@ -15,6 +15,6 @@ export function scheduleDelivery(ids: readonly (string | null)[]): void {
   try {
     after(() => deliverAll(queued));
   } catch (error) {
-    for (const id of queued) logEmailDeliveryError(id, error);
+    for (const id of queued) logEmailDeliveryError({ emailSendId: id }, error);
   }
 }

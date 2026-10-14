@@ -48,21 +48,26 @@ export function logEmailResendRequested(fields: EmailLogFields & { readonly admi
 }
 
 // Reused from spec 0008: the order's email was purged before a late email was due (AC-12).
-export function logOrderEmailMissing(orderId: string, emailSendId: string) {
-  logger.warn({ event: "order.email_missing", orderId, emailSendId }, "order.email_missing");
+export function logOrderEmailMissing(fields: EmailLogFields) {
+  logger.warn({ event: "order.email_missing", ...fields }, "order.email_missing");
 }
 
-// A delivery that threw (a database error, a template bug). The row stays pending for the sweep.
-// The error's name and SQLSTATE only: a Postgres message can quote the row.
-export function logEmailDeliveryError(emailSendId: string, error: unknown) {
+// A delivery that threw (a database error, a template bug), apart from email.retry, which is
+// Resend asking for a later try. The row stays pending for the sweep. A throw before the row was
+// read carries its id only. The error's name and SQLSTATE only: a Postgres message can quote the
+// row.
+export function logEmailDeliveryError(
+  fields: Pick<EmailLogFields, "emailSendId"> & Partial<EmailLogFields>,
+  error: unknown,
+) {
   logger.error(
     {
-      event: "email.retry",
-      emailSendId,
+      event: "email.delivery_error",
+      ...fields,
       errorName: error instanceof Error ? error.name : typeof error,
       pgCode: pgErrorCode(error),
     },
-    "email.retry",
+    "email.delivery_error",
   );
 }
 

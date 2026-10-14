@@ -86,10 +86,26 @@ export async function deliver(
     attempts: row.attempts,
   };
 
+  // A throw from here on (a database error, a template bug) leaves the row pending for the
+  // sweep, logged with the row's fields. One before this point is logged by the caller.
+  try {
+    return await sendClaimed(row, order.email, fields, transport);
+  } catch (error) {
+    logEmailDeliveryError(fields, error);
+    return done("retry");
+  }
+}
+
+async function sendClaimed(
+  row: ClaimedRow,
+  email: string | null,
+  fields: EmailLogFields,
+  transport: Transport,
+): Promise<DeliverResult> {
   // AC-12: checked before any content is loaded.
-  if (order.email === null) {
+  if (email === null) {
     const moved = await failRow(row, "email_missing", { flag: false });
-    if (moved) logOrderEmailMissing(row.order_id, row.id);
+    if (moved) logOrderEmailMissing(fields);
     return done(moved ? "failed" : "skipped");
   }
 
@@ -101,7 +117,7 @@ export async function deliver(
   });
   const rendered = await renderEmail(content);
   const result = await transport.send({
-    to: order.email,
+    to: email,
     subject: rendered.subject,
     html: rendered.html,
     text: rendered.text,
@@ -184,24 +200,23 @@ export async function failRow(
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // AC-8: what scheduleDelivery runs after the response. A row still pending after both tries
-// waits for the daily sweep. A thrown error (a database error, a template bug) is logged and
-// leaves the row pending too.
+// waits for the daily sweep. A thrown error is logged and leaves the row pending too.
 export async function deliverWithRetry(
   id: string,
   options: { readonly waits?: readonly number[]; readonly transport?: Transport } = {},
 ): Promise<DeliverOutcome> {
-  let outcome: DeliverOutcome = "retry";
   for (const wait of options.waits ?? EMAIL_RETRY_WAITS_MS) {
     if (wait > 0) await sleep(wait);
-    try {
-      outcome = (await deliver(id, options.transport)).outcome;
-    } catch (error) {
-      logEmailDeliveryError(id, error);
-      outcome = "retry";
-    }
+    const outcome = await deliver(id, options.transport).then(
+      (result) => result.outcome,
+      (error: unknown) => {
+        logEmailDeliveryError({ emailSendId: id }, error);
+        return "retry" as const;
+      },
+    );
     if (outcome !== "retry") return outcome;
   }
-  return outcome;
+  return "retry";
 }
 
 export async function deliverAll(ids: readonly string[]): Promise<void> {

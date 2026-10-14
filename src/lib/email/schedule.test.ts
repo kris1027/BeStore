@@ -52,8 +52,8 @@ describe("scheduleDelivery", () => {
 
     expect(() => scheduleDelivery(["a", null, "b"])).not.toThrow();
     expect(mocks.logEmailDeliveryError.mock.calls).toEqual([
-      ["a", outsideRequest],
-      ["b", outsideRequest],
+      [{ emailSendId: "a" }, outsideRequest],
+      [{ emailSendId: "b" }, outsideRequest],
     ]);
   });
 });

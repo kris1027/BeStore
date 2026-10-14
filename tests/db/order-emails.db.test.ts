@@ -486,10 +486,17 @@ describe("delivery and retries (AC-8 to AC-10)", () => {
       attempts: 2,
     });
     const errors = mocks.error.mock.calls.filter(
-      ([fields]) => (fields as { event?: string }).event === "email.retry",
+      ([fields]) => (fields as { event?: string }).event === "email.delivery_error",
     );
     expect(errors).toHaveLength(2);
-    expect(errors[0]![0]).toMatchObject({ emailSendId: id, errorName: "TypeError" });
+    expect(errors[0]![0]).toMatchObject({
+      emailSendId: id,
+      kind: "order_confirmation",
+      orderId: order.id,
+      orderNumber: order.number,
+      attempts: 1,
+      errorName: "TypeError",
+    });
     expect(JSON.stringify(errors)).not.toContain("ada@example.com");
   });
 
@@ -580,9 +587,16 @@ describe("delivery and retries (AC-8 to AC-10)", () => {
     });
     expect((await orderOf()).needsAttention).toBe(false);
     expect((await eventsOf(order.id)).at(-1)).toMatchObject({ type: "note", actorType: "system" });
-    expect(mocks.warn.mock.calls.some(([entry]) => entry.event === "order.email_missing")).toBe(
-      true,
-    );
+    // AC-17: the same fields as every other email event.
+    expect(
+      mocks.warn.mock.calls.find(([entry]) => entry.event === "order.email_missing")?.[0],
+    ).toMatchObject({
+      emailSendId: id,
+      kind: "order_confirmation",
+      orderId: order.id,
+      orderNumber: order.number,
+      attempts: 1,
+    });
   });
 });
 
@@ -600,6 +614,17 @@ describe("the daily sweep (AC-11)", () => {
       errorCode: "gave_up",
     });
     expect((await orderOf()).needsAttention).toBe(true);
+    // AC-17: the order number and attempts too.
+    expect(
+      mocks.error.mock.calls.find(([entry]) => entry.event === "email.gave_up")?.[0],
+    ).toMatchObject({
+      emailSendId: id,
+      kind: "order_confirmation",
+      orderId: order.id,
+      orderNumber: order.number,
+      refundId: null,
+      attempts: 0,
+    });
 
     expect(await sweepEmails(Number.POSITIVE_INFINITY, { nowMs: now })).toMatchObject({
       gaveUp: 0,
