@@ -10,21 +10,13 @@ The production auth settings live in the Supabase dashboard, not in code, so the
 
 ### Supabase project: Authentication settings
 
-- **Sign ups**: turn off "Allow new users to sign up". Keep the Email provider itself on (turning it off also blocks password sign in).
-- **Passwords**: minimum length 8, required characters "lowercase, uppercase, digits and symbols". `passwordSchema` in `src/features/admin-auth/schemas.ts` mirrors this; keep the two in step.
+- **Sign ups**: on since customer accounts (spec 0012); see [customer-accounts.md](customer-accounts.md). Signing up never makes an admin: only `admin:create` adds an `admin_users` row. Keep the Email provider itself on (turning it off also blocks password sign in).
+- **Passwords**: minimum length 8, required characters "lowercase, uppercase, digits and symbols". `passwordSchema` in `src/lib/auth/password.ts` mirrors this; keep the two in step.
 - **MFA**: TOTP enroll and verify both on.
 - **Site URL**: the production domain, the same value as `NEXT_PUBLIC_SITE_URL` (for example `https://shop.example.com`). Reset links always point here, so a reset started from a preview deploy lands on production. Test password reset locally, not on previews.
 - **Redirect URLs**: `https://<production domain>/**`.
 - **JWT signing keys**: switch to asymmetric keys, so `getClaims()` in the proxy verifies tokens locally without a network call.
-- **Email template, "Reset password"**: subject `Reset your admin password`, body copied from [supabase/templates/recovery.html](../../supabase/templates/recovery.html). The link must stay `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery`.
-
-### Supabase project: custom SMTP through Resend
-
-Supabase's built in mailer is for testing only, so password reset emails go through Resend.
-
-1. In Resend, verify the sending domain (feature 11 reuses it for order emails).
-2. In Supabase, Authentication, SMTP settings: host `smtp.resend.com`, port `465`, user `resend`, password a Resend API key with sending access, sender an address on the verified domain.
-3. Until this is done, only the scripts can recover an admin.
+- **Auth emails**: since spec 0012, Supabase hands every auth email to the app's Send Email Hook, which sends the admin reset email (`emails/admin-reset-password.tsx`, link `/auth/confirm?token_hash=...&type=recovery`) to anyone with an `admin_users` row or an authenticator, whatever page asked. The hook setup is in [customer-accounts.md](customer-accounts.md). Until it is done, only the scripts can recover an admin.
 
 ### Vercel Firewall rule (AC-15)
 

@@ -239,7 +239,7 @@ spec [0012](../specs/0012-customer-accounts/index.md)
   - [x] Sign in, sign out, cart merge and password reset through the hook (AC-4 to AC-9)
   - [x] Account area: order history and detail, address book (AC-11 to AC-14)
   - [ ] Checkout integration, settings, delete account and the admin badge (AC-15 to AC-21)
-  - [ ] Safety net: logs, axe, header link, production runbook (AC-22, AC-24 to AC-26)
+  - [x] Safety net: logs, axe, header link, production runbook (AC-22, AC-24 to AC-26)
 - [ ] Verify it: `/check verify customer accounts`
 - [ ] Test it: `/test customer accounts`
 - [ ] Review it (fresh model): `/check review customer accounts`
