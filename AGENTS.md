@@ -51,7 +51,7 @@ Stored in `docs/specs/`. Format: `docs/specs/NNNN-title/index.md`. Scope lives i
 - **Expected failures are values**: server actions return a typed `{ ok: true, data } | { ok: false, error }` result; `throw` only for bugs and broken invariants.
 - **Types**: strict plus `noUncheckedIndexedAccess`; no `any` (use `unknown` and narrow). Validate every external input with Zod.
 - **Layout**: route files in `app/` stay thin and call `src/features/<domain>/` (actions, queries, components, schemas). A feature never imports another feature's internals; shared code goes in `src/lib/`. Import via `@/`.
-- **Named exports only**, except where Next.js needs a default (page, layout, route, config files).
+- **Named exports only**, except where a tool needs a default: Next.js (page, layout, route, config files) and the React Email preview server (each template in `emails/`).
 - **Data access**: Prisma only, server only (`import "server-only"`); never `supabase.from(...)`. Every new table's migration enables RLS with no policies.
 - **Security**: every admin page, action and route handler calls `requireAdmin()` itself; the proxy is only a first gate. Prices always come from the DB, never the client. Only the Stripe webhook marks an order paid, idempotently.
 - **Money and time**: integer minor units (cents) in `Int` columns, never floats; timestamps in UTC `timestamptz`, shown in `STORE_TIMEZONE`.
