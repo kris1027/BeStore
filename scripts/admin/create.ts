@@ -1,4 +1,4 @@
-import { passwordSchema } from "../../src/features/admin-auth/schemas";
+import { passwordSchema } from "../../src/lib/auth/password";
 import { createPrompter, readFlags, run } from "./cli";
 import { connect, createAdmin, findAuthUserId } from "./lib";
 

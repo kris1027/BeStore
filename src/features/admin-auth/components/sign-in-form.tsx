@@ -14,7 +14,7 @@ import { signIn } from "../actions/sign-in";
 import { authMessages, type SignInReason } from "../messages";
 import { signInSchema } from "../schemas";
 import { FormNotice } from "@/components/form-notice";
-import { applyFieldErrors } from "./form-errors";
+import { applyFieldErrors } from "@/lib/form-errors";
 
 type SignInFormProps = {
   readonly next: string | null;

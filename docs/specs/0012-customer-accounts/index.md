@@ -1,7 +1,7 @@
 # 0012. Customer accounts
 
 **Date**: 2026-10-14 (amended the same day after a cross check: AC-1 to AC-5, AC-7 to AC-11, AC-13 to AC-15, AC-17, AC-19, AC-20, AC-23, AC-24, AC-26)
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 
@@ -250,7 +250,7 @@ Reasoning and options: see [rationale.md](rationale.md).
 
 Tracer Bullet: the first task drives one real customer from sign up to their account page through every layer: Supabase config, the hook, the transport via Mailpit, the confirm and set password pages, the session, the DB and the proxy. Each later task thickens one segment end to end, with its own Vitest and Playwright coverage.
 
-1. [ ] Thin thread:
+1. [x] Thin thread:
    * `supabase/config.toml`: sign up on, confirmations on, redirect URLs, the hook block via `env()`, `max_frequency`.
    * `SEND_EMAIL_HOOK_SECRET` and `MAILPIT_URL` in `src/lib/env.ts` and `.env.example`; the `mailpit` transport and its env rules; Playwright and CI switched to `mailpit`.
    * `standardwebhooks`, and the hook route with the confirm template only.

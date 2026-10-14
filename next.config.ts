@@ -20,6 +20,14 @@ const nextConfig: NextConfig = {
           { key: "X-Robots-Tag", value: "noindex" },
         ],
       },
+      // The same for the account confirm link, which carries a one time token (spec 0012, AC-2).
+      {
+        source: "/account/confirm",
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "X-Robots-Tag", value: "noindex" },
+        ],
+      },
     ];
   },
 };

@@ -18,6 +18,7 @@ export const validEnv = {
   STORE_LOCALE: "en",
   EMAIL_TRANSPORT: "log",
   EMAIL_FROM: "BeStore <orders@example.com>",
+  SEND_EMAIL_HOOK_SECRET: "v1,whsec_dGVzdC1ob29rLXNlY3JldC0wMTIzNDU2Nzg5",
 } as const;
 
 // What env.ts derives from the values above.
@@ -34,6 +35,7 @@ export function stubEnv(overrides: Partial<Record<EnvKey, string | undefined>> =
   vi.stubEnv("TEST_DATABASE_URL", undefined);
   vi.stubEnv("VERCEL_ENV", undefined);
   vi.stubEnv("RESEND_API_KEY", undefined);
+  vi.stubEnv("MAILPIT_URL", undefined);
   const values = { ...validEnv, ...overrides };
   for (const key of Object.keys(values) as EnvKey[]) {
     vi.stubEnv(key, values[key]);

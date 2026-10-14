@@ -15,8 +15,14 @@ jobs:
     env:
       # Hooks are for local commits only.
       SKIP_INSTALL_SIMPLE_GIT_HOOKS: "1"
-      # spec 0011, AC-16: nothing in CI sends a real email.
+      # spec 0011, AC-16: nothing in CI sends a real email. Unit and db tests log them; the e2e app
+      # hands them to the stack's Mailpit (spec 0012, AC-23, set in playwright.config.ts).
       EMAIL_TRANSPORT: log
+      MAILPIT_URL: http://127.0.0.1:55324
+      # spec 0012, AC-8: the Send Email Hook. `supabase start` reads both through env() in
+      # supabase/config.toml, and the app checks the signature with the secret. A CI only value.
+      SEND_EMAIL_HOOK_SECRET: v1,whsec_Y2ktb25seS1zZW5kLWVtYWlsLWhvb2stc2VjcmV0LTAx
+      SEND_EMAIL_HOOK_URI: http://host.docker.internal:3000/api/auth/send-email
       # Only the db suites use a database. DIRECT_URL stays unset on purpose: the test:db
       # guard refuses a TEST_DATABASE_URL that matches it, and the runner migrates the test DB itself.
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bestore_test
@@ -49,8 +55,9 @@ jobs:
       - run: pnpm test:db
       - run: pnpm exec playwright install --with-deps chromium
       # Admin sign in e2e runs against a real local Supabase stack (spec 0004), never a mock.
-      # Services the app does not use stay off; Mailpit stays on for the password reset test and
-      # Storage for the product image upload (spec 0005).
+      # Services the app does not use stay off; Mailpit stays on for the password reset and
+      # account tests (spec 0012) and Storage for the product image upload (spec 0005). On Linux
+      # the CLI maps host.docker.internal to the runner, so the auth container reaches the hook.
       - name: Start local Supabase
         run: pnpm exec supabase start -x studio,realtime,imgproxy,edge-runtime,logflare,vector,supavisor
       # `supabase start` does not apply Prisma migrations. NEXT_PUBLIC_* values are baked in at
@@ -78,7 +85,7 @@ jobs:
             # signed in the tests with this fixed webhook secret.
             echo "STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-sk_test_placeholder}"
             echo "STRIPE_WEBHOOK_SECRET=whsec_ci_webhook_secret"
-            # spec 0011, AC-16: emails are logged, never sent.
+            # spec 0011, AC-16: emails are logged, never sent (the e2e app uses Mailpit instead).
             echo "EMAIL_TRANSPORT=log"
             echo "EMAIL_FROM=BeStore <orders@example.com>"
           } >> "$GITHUB_ENV"

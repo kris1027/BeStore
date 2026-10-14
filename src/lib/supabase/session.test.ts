@@ -1,13 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { z } from "zod";
 
-import { endLocalSession, fieldErrors } from "./session";
+import { endLocalSession } from "./session";
 
 const { clearAuthCookies } = vi.hoisted(() => ({ clearAuthCookies: vi.fn() }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/supabase/server", () => ({ clearAuthCookies }));
+vi.mock("./server", () => ({ clearAuthCookies }));
 
 function clientSigningOut(result: { error: unknown }) {
   const signOut = vi.fn().mockResolvedValue(result);
@@ -34,18 +33,5 @@ describe("endLocalSession", () => {
     await endLocalSession(client);
 
     expect(clearAuthCookies).toHaveBeenCalledOnce();
-  });
-});
-
-describe("fieldErrors", () => {
-  it("keys every message by its field", () => {
-    const schema = z.object({ email: z.string().min(1, "Enter it"), code: z.string() });
-    const parsed = schema.safeParse({ email: "", code: 1 });
-    if (parsed.success) throw new Error("expected a failed parse");
-
-    const errors = fieldErrors<"email" | "code">(parsed.error);
-
-    expect(errors.email).toEqual(["Enter it"]);
-    expect(errors.code).toHaveLength(1);
   });
 });

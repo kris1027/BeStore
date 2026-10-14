@@ -15,19 +15,20 @@ export default defineConfig({
   ],
   // CI tests what ships: a production build. Locally the dev server is faster to iterate on.
   // spec 0011, AC-16: the app under test never sends a real email (Playwright merges this env
-  // over its own).
+  // over its own). spec 0012, AC-23: every email lands in the local stack's Mailpit, where the
+  // account and admin reset tests read it.
   webServer: isCI
     ? {
         command: "pnpm build && pnpm start",
         url: "http://localhost:3000",
         reuseExistingServer: false,
         timeout: 300_000,
-        env: { EMAIL_TRANSPORT: "log" },
+        env: { EMAIL_TRANSPORT: "mailpit", MAILPIT_URL: "http://127.0.0.1:55324" },
       }
     : {
         command: "pnpm dev",
         url: "http://localhost:3000",
         reuseExistingServer: true,
-        env: { EMAIL_TRANSPORT: "log" },
+        env: { EMAIL_TRANSPORT: "mailpit", MAILPIT_URL: "http://127.0.0.1:55324" },
       },
 });

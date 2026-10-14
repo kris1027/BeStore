@@ -12,6 +12,7 @@ import {
 
 // The matcher is all this test reads from proxy.ts; its handler needs the full env.
 vi.mock("@/features/admin-auth/proxy", () => ({ adminAuthProxy: vi.fn() }));
+vi.mock("@/features/account/proxy", () => ({ accountProxy: vi.fn() }));
 
 const signedInAt = 1_790_000_000;
 const fresh = { amr: [{ method: "password", timestamp: signedInAt }] };
@@ -178,7 +179,13 @@ describe("decideAdminGate", () => {
 });
 
 describe("proxy matcher", () => {
-  it("runs only on admin and auth routes, so the storefront never calls Supabase", () => {
-    expect(config.matcher).toEqual(["/admin/:path*", "/auth/:path*"]);
+  // spec 0012, AC-22: the account pages and checkout join; catalog pages never call Supabase.
+  it("runs only on admin, auth, account and checkout routes", () => {
+    expect(config.matcher).toEqual([
+      "/admin/:path*",
+      "/auth/:path*",
+      "/account/:path*",
+      "/checkout/:path*",
+    ]);
   });
 });

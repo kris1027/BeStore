@@ -39,3 +39,9 @@ export async function setCartCookie(cartId: string, expiresAt: Date): Promise<vo
     expires: expiresAt,
   });
 }
+
+// Sign out and account deletion (spec 0012, AC-6 and AC-20): this browser forgets the cart; an
+// account cart stays in the database for the next sign in.
+export async function clearCartCookie(): Promise<void> {
+  (await cookies()).delete(CART_COOKIE);
+}

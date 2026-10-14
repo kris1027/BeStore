@@ -1,5 +1,5 @@
-// Maps a Supabase Auth error to the fixed message keys of spec 0004. Pure, so the mapping is
-// unit tested without a network.
+// Maps a Supabase Auth error to the fixed message keys of spec 0004 and spec 0012. Pure, so the
+// mapping is unit tested without a network.
 
 export type AuthErrorLike = {
   readonly code?: string | undefined;

@@ -1,35 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  emailSchema,
-  missingPasswordRules,
-  passwordSchema,
-  resetPasswordSchema,
-  signInSchema,
-  totpCodeSchema,
-} from "./schemas";
-
-describe("passwordSchema (AC-10)", () => {
-  it("accepts a password with all four classes and 8 characters", () => {
-    expect(passwordSchema.safeParse("Abcdef1!").success).toBe(true);
-  });
-
-  it("names every missing part", () => {
-    expect(missingPasswordRules("")).toEqual(["length", "lower", "upper", "digit", "symbol"]);
-    expect(missingPasswordRules("short")).toEqual(["length", "upper", "digit", "symbol"]);
-    const result = passwordSchema.safeParse("abcdefgh");
-    expect(result.error?.issues.map((issue) => issue.message)).toEqual([
-      "An upper case letter",
-      "A digit",
-      "A symbol",
-    ]);
-  });
-
-  it("counts only the symbols Supabase counts", () => {
-    expect(missingPasswordRules("Abcdefg1€")).toEqual(["symbol"]);
-    expect(missingPasswordRules("Abcdefg1~")).toEqual([]);
-  });
-});
+import { emailSchema, resetPasswordSchema, signInSchema, totpCodeSchema } from "./schemas";
 
 describe("form schemas", () => {
   it("lower cases and trims the email", () => {

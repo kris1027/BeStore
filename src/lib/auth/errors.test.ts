@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { classifyAuthError } from "./auth-errors";
+import { classifyAuthError } from "./errors";
 
 describe("classifyAuthError", () => {
   it("maps Supabase rate limits", () => {

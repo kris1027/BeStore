@@ -6,7 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { logAuthEvent, requestIp } from "./log";
 import { signInPath } from "./safe-admin-path";
-import { endLocalSession } from "./session";
+import { endLocalSession } from "@/lib/supabase/session";
 
 // The one admin route without requireAdmin(): it only ends the caller's own session on this
 // device, so it must work from any state (aal1, expired, disabled) and grants nothing.

@@ -10,17 +10,21 @@ describe("next config", () => {
 });
 
 describe("confirmation page headers", () => {
-  it("sends no referrer and noindex on /checkout/complete (spec 0006, AC-11)", async () => {
-    const rules = (await nextConfig.headers?.()) ?? [];
-    const rule = rules.find((entry) => entry.source === "/checkout/complete");
+  // spec 0006, AC-11 and spec 0012, AC-2: both URLs carry a key.
+  it.each(["/checkout/complete", "/account/confirm"])(
+    "sends no referrer and noindex on %s",
+    async (source) => {
+      const rules = (await nextConfig.headers?.()) ?? [];
+      const rule = rules.find((entry) => entry.source === source);
 
-    expect(rule?.headers).toEqual(
-      expect.arrayContaining([
-        { key: "Referrer-Policy", value: "no-referrer" },
-        { key: "X-Robots-Tag", value: "noindex" },
-      ]),
-    );
-  });
+      expect(rule?.headers).toEqual(
+        expect.arrayContaining([
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "X-Robots-Tag", value: "noindex" },
+        ]),
+      );
+    },
+  );
 });
 
 describe("productImagesConfig", () => {

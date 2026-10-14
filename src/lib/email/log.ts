@@ -2,6 +2,8 @@ import type { EmailKind } from "@/generated/prisma/client";
 import { pgErrorCode } from "@/lib/db-errors";
 import { logger } from "@/lib/logger";
 
+import type { TransportName } from "./transport";
+
 // spec 0011, AC-17: the row id, kind, order id and number, refund id, attempts and Resend's
 // error name. Never a recipient address, a subject, a body, a name, an address or a tracking
 // number. `errorName`, never `code`: the logger redacts any key named code.
@@ -19,7 +21,7 @@ export function logEmailQueued(fields: EmailLogFields) {
   logger.info({ event: "email.queued", ...fields }, "email.queued");
 }
 
-export function logEmailSent(fields: EmailLogFields & { readonly transport: "log" | "resend" }) {
+export function logEmailSent(fields: EmailLogFields & { readonly transport: TransportName }) {
   logger.info({ event: "email.sent", ...fields }, "email.sent");
 }
 
