@@ -265,7 +265,7 @@ Tracer Bullet: the first task drives one real customer from sign up to their acc
 5. [x] Address book: `src/lib/customer/addresses.ts` (save, dedupe with null and empty treated alike, cap, default rules under the lock, "Check this address"), the page and its actions, DB tests for the default and cap races. Satisfies **AC-14**
 6. [ ] Checkout: signed in prefill (pending order first) and address list, read only email, `saveAddress` and profile fill in `startCheckout`, the merge with `cart_changed`, the sign in link, and the confirmation page button with `signUpFromOrder` and its eligibility rules. Satisfies **AC-15**, **AC-16**, **AC-17**
 7. [x] Settings: profile, change password with the admin refusal, delete account with the admin refusal, the open order warning and the single transaction delete. Satisfies **AC-18**, **AC-19**, **AC-20**
-8. [ ] Admin badge on the order list and detail. Satisfies **AC-21**
+8. [x] Admin badge on the order list and detail. Satisfies **AC-21**
 9. [ ] Safety net: the `account.*` and `auth_email.*` log events with a redaction test, axe on every account page (desktop and phone), the header Account link, the runbook additions for production (Supabase settings, redirect URLs, hook URL and secret, Firewall rule), and the account `AGENTS.md` facts handed to `/sync`. Satisfies **AC-22**, **AC-24**, **AC-25**, **AC-26**
 
 ## Consequences

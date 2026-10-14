@@ -97,6 +97,7 @@ export function AdminOrdersList({
                   <TableHead>Order</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Email</TableHead>
+                  <TableHead>Customer</TableHead>
                   <TableHead>Ship to</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Items</TableHead>
@@ -118,6 +119,7 @@ export function AdminOrdersList({
                     <TableCell className="max-w-64 truncate">
                       <OrderEmail order={order} placement="list" />
                     </TableCell>
+                    <TableCell>{order.hasAccount ? "Account" : "Guest"}</TableCell>
                     <TableCell className="max-w-64 truncate">
                       <PersonalDataField purgedAt={order.piiPurgedAt} placement="list">
                         {order.shipTo ?? (

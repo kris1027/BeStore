@@ -223,6 +223,8 @@ export function AdminOrderDetail({
               <DetailRow label="Email">
                 <OrderEmail order={order} placement="detail" dateFormat={dateFormat} />
               </DetailRow>
+              {/* spec 0012, AC-21: whether the customer can look the order up themselves. */}
+              <DetailRow label="Customer">{order.hasAccount ? "Account" : "Guest"}</DetailRow>
               <DetailRow label="Delivery address">
                 <PersonalDataField
                   purgedAt={order.piiPurgedAt}

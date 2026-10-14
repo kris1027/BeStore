@@ -64,6 +64,8 @@ export type AdminOrderRow = {
   readonly refundedCents: number;
   // "<full name>, <city>", or null for an order with no address (spec 0007, AC-12).
   readonly shipTo: string | null;
+  // spec 0012, AC-21: the order belongs to a customer account (else a guest's).
+  readonly hasAccount: boolean;
 };
 
 export type AdminOrdersPage = {
@@ -97,6 +99,7 @@ export async function getAdminOrders(params: AdminOrdersParams): Promise<AdminOr
       refundedCents: true,
       shipFullName: true,
       shipCity: true,
+      customerId: true,
       lines: { select: { quantity: true } },
     },
   });
@@ -107,8 +110,9 @@ export async function getAdminOrders(params: AdminOrdersParams): Promise<AdminOr
     if (order.email === null && order.piiPurgedAt === null) logEmailMissing(order.id);
   }
   return {
-    rows: page.map(({ lines, shipFullName, shipCity, ...order }) => ({
+    rows: page.map(({ lines, shipFullName, shipCity, customerId, ...order }) => ({
       ...order,
+      hasAccount: customerId !== null,
       itemCount: lines.reduce((sum, line) => sum + line.quantity, 0),
       shipTo: shipFullName !== null && shipCity !== null ? `${shipFullName}, ${shipCity}` : null,
     })),
@@ -209,6 +213,8 @@ export type AdminOrderDetail = {
   // null only when piiPurgedAt is set: the query throws otherwise (spec 0008, AC-9).
   readonly email: string | null;
   readonly piiPurgedAt: Date | null;
+  // spec 0012, AC-21: the order belongs to a customer account (else a guest's).
+  readonly hasAccount: boolean;
   readonly currency: string;
   readonly subtotalCents: number;
   readonly discountCents: number;
@@ -295,6 +301,7 @@ export async function getAdminOrder(
       phone: true,
       ...deliveryAddressColumns,
       stripeCheckoutSessionId: true,
+      customerId: true,
       stripePaymentIntentId: true,
       lines: {
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
@@ -410,6 +417,7 @@ export async function getAdminOrder(
     needsAttention: order.needsAttention,
     updatedAt: order.updatedAt.toISOString(),
     email: order.email,
+    hasAccount: order.customerId !== null,
     piiPurgedAt: order.piiPurgedAt,
     currency: order.currency,
     subtotalCents: order.subtotalCents,

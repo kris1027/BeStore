@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resetDatabaseBeforeEach, testDb } from "./client";
-import { createOrder } from "./fixtures";
+import { createCustomer, createOrder } from "./fixtures";
 import { seedPendingOrder } from "./stripe-support";
 
 // The admin order list and detail queries (spec 0006, AC-12 and AC-13). The pages' requireAdmin()
@@ -117,6 +117,23 @@ describe("getAdminOrders", () => {
     const [row] = (await getAdminOrders(view())).rows;
 
     expect(row?.itemCount).toBe(5);
+  });
+});
+
+// spec 0012, AC-21.
+describe("the Account or Guest badge", () => {
+  it("tells account orders from guest orders on the list and the order page", async () => {
+    const customer = await createCustomer();
+    const mine = await createOrder({ status: "paid", customerId: customer.id });
+    const guest = await createOrder({ status: "paid" });
+
+    const { rows } = await getAdminOrders(view());
+    const byNumber = new Map(rows.map((row) => [row.number, row.hasAccount]));
+
+    expect(byNumber.get(mine.number)).toBe(true);
+    expect(byNumber.get(guest.number)).toBe(false);
+    expect((await getAdminOrder(String(mine.number)))?.hasAccount).toBe(true);
+    expect((await getAdminOrder(String(guest.number)))?.hasAccount).toBe(false);
   });
 });
 

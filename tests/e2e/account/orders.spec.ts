@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { createTestUser, testPassword } from "../admin/support";
+import { createTestUser, signInFully, testPassword } from "../admin/support";
 import { seedPaidOrder, signInAsCustomer } from "./support";
 
 // spec 0012: order history and one order (AC-10, AC-11, AC-12, AC-13).
@@ -47,4 +47,28 @@ test("a new account with no orders sees the empty state", async ({ page }) => {
   await expect(page.getByText("No orders yet.")).toBeVisible();
   await page.getByRole("link", { name: "Go to the shop" }).click();
   await expect(page).toHaveURL("/");
+});
+
+// AC-21: the admin sees whether an order belongs to an account.
+test("the admin order pages show Account for a linked order and Guest for the rest", async ({
+  page,
+  browser,
+}) => {
+  const customer = await createTestUser({ admin: false });
+  const linked = await seedPaidOrder(customer.email);
+  const guest = await seedPaidOrder(`e2e-guest-${Date.now()}@example.com`);
+  const customerPage = await (await browser.newContext()).newPage();
+  await signInAsCustomer(customerPage, customer.email, testPassword);
+  await expect(customerPage).toHaveURL("/account");
+
+  const admin = await createTestUser({ enrolled: true });
+  await signInFully(page, admin);
+  for (const [order, label] of [
+    [linked, "Account"],
+    [guest, "Guest"],
+  ] as const) {
+    await page.goto(`/admin/orders/${order.number}`);
+    const row = page.getByRole("term").filter({ hasText: /^Customer$/ });
+    await expect(row.locator("xpath=following-sibling::dd[1]")).toHaveText(label);
+  }
 });
