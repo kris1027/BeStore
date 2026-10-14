@@ -5,7 +5,7 @@
 export type SendFailure = { readonly name: string; readonly statusCode: number | null };
 
 export type FailureVerdict =
-  // Resend refused it for good (an invalid recipient, any other 400 or 422 or 4xx): failed.
+  // Resend refused it for good (an invalid recipient, any 4xx not named here): failed.
   | { readonly kind: "final"; readonly errorCode: string }
   // A bad key or an unverified domain: stays pending until the config is fixed.
   | { readonly kind: "config"; readonly errorCode: string }

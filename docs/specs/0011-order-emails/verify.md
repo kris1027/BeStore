@@ -1,4 +1,4 @@
-# Verify: Order emails · spec 0011 · updated 2026-10-13
+# Verify: Order emails · spec 0011 · updated 2026-10-14
 _Steps derived from spec 0011 acceptance criteria. `/check verify` runs these; `/test` locks the durable ones._
 
 ## UI / manual
@@ -37,7 +37,7 @@ _Steps derived from spec 0011 acceptance criteria. `/check verify` runs these; `
 - [x] Recipient: change `orders.email` after paying but before delivery → the email goes to the new address (read at send time) → AC-12
 - [x] Sender: set `EMAIL_FROM=Shop Name <hi@shop.test>` → From shows it and the footer shows `hi@shop.test` → AC-7
 - [x] Idempotency key: the Resend request carries `Idempotency-Key: <dedupe_key>` → AC-8
-- [ ] Store name: change `brand.name` → the wordmark changes → AC-7
+- [x] Store name: change `brand.name` → the wordmark changes → AC-7
 - [x] Date paid: pay at 23:30 UTC with `STORE_TIMEZONE=Europe/Warsaw` → the email shows the next day → AC-4
 - [x] Lines: edit the product's name after paying → the email shows the order line snapshot, not the new name → AC-4
 - [x] Money: set `STORE_LOCALE=pl-PL` and a PLN order → amounts read "10,00 zł" and `<html lang="pl-PL">` → AC-4, AC-7
@@ -52,6 +52,9 @@ _Steps derived from spec 0011 acceptance criteria. `/check verify` runs these; `
 - [x] Send again: the history note names the signed in admin → AC-14
 - [x] Sweep constants: a row queued 1 minute ago is left alone; a 429 stops the run after one try → AC-11
 - [x] In process retry: a 500 then success sends on the second try about 5 seconds later → AC-8
+
+## Before launch
+- [ ] Resend dashboard → Domains → the sending domain → Configuration: open tracking and click tracking both off → AC-7
 
 ## Acceptance criteria coverage
 - AC-1 webhook steps, db tests · AC-2 ship steps · AC-3 refund steps · AC-4 to AC-7 preview and render tests · AC-8 webhook, in process retry, Resend key · AC-9 classify tests, Resend test key · AC-10 db race test · AC-11 cron steps · AC-12 purged email step · AC-13 Emails section · AC-14 Send again · AC-15 auth step · AC-16 env steps and transports · AC-17 log grep · AC-18 e2e with axe
