@@ -3,12 +3,12 @@ import { Heading, Section, Text } from "react-email";
 import {
   AddressSection,
   bodyCellStyle,
+  DataTable,
   type EmailAddressLines,
   type EmailFrame,
   EmailLayout,
   headerCellStyle,
   itemLabel,
-  mutedStyle,
   subheadingStyle,
   textStyle,
 } from "./components/layout";
@@ -54,10 +54,7 @@ export function OrderConfirmationEmail(props: OrderConfirmationProps) {
         <Heading as="h2" style={subheadingStyle}>
           Order #{props.orderNumber}
         </Heading>
-        <table width="100%" cellPadding={0} cellSpacing={0} style={{ borderCollapse: "collapse" }}>
-          <caption style={{ ...mutedStyle, textAlign: "left", margin: "0 0 4px" }}>
-            Items in your order
-          </caption>
+        <DataTable caption="Items in your order">
           <thead>
             <tr>
               <th scope="col" align="left" style={headerCellStyle}>
@@ -90,16 +87,8 @@ export function OrderConfirmationEmail(props: OrderConfirmationProps) {
               </tr>
             ))}
           </tbody>
-        </table>
-        <table
-          width="100%"
-          cellPadding={0}
-          cellSpacing={0}
-          style={{ borderCollapse: "collapse", marginTop: "8px" }}
-        >
-          <caption style={{ ...mutedStyle, textAlign: "left", margin: "8px 0 4px" }}>
-            Order summary
-          </caption>
+        </DataTable>
+        <DataTable caption="Order summary" spaced>
           <tbody>
             <SummaryRow label="Subtotal" value={props.subtotal} />
             {props.discount === null ? null : (
@@ -108,7 +97,7 @@ export function OrderConfirmationEmail(props: OrderConfirmationProps) {
             <SummaryRow label="Delivery" value={props.delivery} />
             <SummaryRow label="Total" value={props.total} strong />
           </tbody>
-        </table>
+        </DataTable>
       </Section>
       <AddressSection address={props.address} />
       <Text style={{ ...textStyle, marginTop: "24px" }}>

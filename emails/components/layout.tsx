@@ -159,7 +159,35 @@ const cellStyle = {
 export const headerCellStyle = { ...cellStyle, color: colors.muted, fontWeight: 600 } as const;
 export const bodyCellStyle = cellStyle;
 
-// Items without prices (shipped, refund): a real data table with header cells (AC-18).
+// A real data table with a caption and header cells (AC-18); the caller gives the rows.
+// `spaced` sets it apart from a table just above it.
+export function DataTable({
+  caption,
+  spaced = false,
+  children,
+}: {
+  readonly caption: string;
+  readonly spaced?: boolean;
+  readonly children: React.ReactNode;
+}) {
+  return (
+    <table
+      width="100%"
+      cellPadding={0}
+      cellSpacing={0}
+      style={{ borderCollapse: "collapse", marginTop: spaced ? "8px" : undefined }}
+    >
+      <caption
+        style={{ ...mutedStyle, textAlign: "left", margin: spaced ? "8px 0 4px" : "0 0 4px" }}
+      >
+        {caption}
+      </caption>
+      {children}
+    </table>
+  );
+}
+
+// Items without prices (shipped, refund).
 export function ItemsTable({
   caption,
   items,
@@ -168,8 +196,7 @@ export function ItemsTable({
   readonly items: readonly EmailItem[];
 }) {
   return (
-    <table width="100%" cellPadding={0} cellSpacing={0} style={{ borderCollapse: "collapse" }}>
-      <caption style={{ ...mutedStyle, textAlign: "left", margin: "0 0 4px" }}>{caption}</caption>
+    <DataTable caption={caption}>
       <thead>
         <tr>
           <th scope="col" align="left" style={headerCellStyle}>
@@ -190,6 +217,6 @@ export function ItemsTable({
           </tr>
         ))}
       </tbody>
-    </table>
+    </DataTable>
   );
 }

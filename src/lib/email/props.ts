@@ -36,6 +36,19 @@ function frameOf(customerName: string | null, format: EmailFormat): EmailFrame {
   };
 }
 
+// An order line as the three templates list it.
+type SourceItem = {
+  readonly productName: string;
+  readonly variantLabel: string | null;
+  readonly quantity: number;
+};
+
+const itemOf = (line: SourceItem) => ({
+  name: line.productName,
+  variant: line.variantLabel,
+  quantity: line.quantity,
+});
+
 type OrderBasics = {
   readonly number: number;
   readonly customerName: string | null;
@@ -49,13 +62,10 @@ export type ConfirmationSource = OrderBasics & {
   readonly discountCents: number;
   readonly shippingCents: number;
   readonly totalCents: number;
-  readonly lines: readonly {
-    readonly productName: string;
-    readonly variantLabel: string | null;
-    readonly quantity: number;
+  readonly lines: readonly (SourceItem & {
     readonly unitPriceCents: number;
     readonly lineTotalCents: number;
-  }[];
+  })[];
 };
 
 export function confirmationProps(
@@ -69,9 +79,7 @@ export function confirmationProps(
     orderNumber: order.number,
     paidDate: formatDate(order.paidAt, format),
     lines: order.lines.map((line) => ({
-      name: line.productName,
-      variant: line.variantLabel,
-      quantity: line.quantity,
+      ...itemOf(line),
       unitPrice: money(line.unitPriceCents),
       lineTotal: money(line.lineTotalCents),
     })),
@@ -86,11 +94,7 @@ export function confirmationProps(
 export type ShippedSource = OrderBasics & {
   readonly carrier: string | null;
   readonly trackingNumber: string | null;
-  readonly lines: readonly {
-    readonly productName: string;
-    readonly variantLabel: string | null;
-    readonly quantity: number;
-  }[];
+  readonly lines: readonly SourceItem[];
 };
 
 export function shippedProps(order: ShippedSource, format: EmailFormat): OrderShippedProps {
@@ -99,11 +103,7 @@ export function shippedProps(order: ShippedSource, format: EmailFormat): OrderSh
     orderNumber: order.number,
     carrier: order.carrier,
     trackingNumber: order.trackingNumber,
-    items: order.lines.map((line) => ({
-      name: line.productName,
-      variant: line.variantLabel,
-      quantity: line.quantity,
-    })),
+    items: order.lines.map(itemOf),
     address: order.address,
   };
 }
@@ -114,11 +114,7 @@ export type RefundSource = {
   readonly includesShipping: boolean;
   // Frozen on the email row when it was queued (AC-3).
   readonly cancelledWording: boolean;
-  readonly lines: readonly {
-    readonly productName: string;
-    readonly variantLabel: string | null;
-    readonly quantity: number;
-  }[];
+  readonly lines: readonly SourceItem[];
 };
 
 export function refundedProps(refund: RefundSource, format: EmailFormat): OrderRefundedProps {
@@ -129,11 +125,7 @@ export function refundedProps(refund: RefundSource, format: EmailFormat): OrderR
       currency: refund.order.currency,
       locale: format.locale,
     }),
-    items: refund.lines.map((line) => ({
-      name: line.productName,
-      variant: line.variantLabel,
-      quantity: line.quantity,
-    })),
+    items: refund.lines.map(itemOf),
     includesShipping: refund.includesShipping,
     cancelled: refund.cancelledWording,
   };
