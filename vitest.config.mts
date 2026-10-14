@@ -7,6 +7,8 @@ export default defineConfig({
   resolve: { tsconfigPaths: true },
   test: {
     environment: "node",
+    // spec 0011, AC-16: no test ever sends a real email.
+    env: { EMAIL_TRANSPORT: "log" },
     projects: [
       {
         extends: true,

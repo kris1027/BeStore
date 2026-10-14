@@ -16,7 +16,12 @@ export const validEnv = {
   STORE_COUNTRY: "PL",
   STORE_TIMEZONE: "Europe/Warsaw",
   STORE_LOCALE: "en",
+  EMAIL_TRANSPORT: "log",
+  EMAIL_FROM: "BeStore <orders@example.com>",
 } as const;
+
+// What env.ts derives from the values above.
+export const derivedEnv = { EMAIL_FROM_ADDRESS: "orders@example.com" } as const;
 
 // Variables with a default, so leaving them out is valid.
 export const optionalEnvKeys = ["STORE_LOCALE"] as const;
@@ -28,6 +33,7 @@ export function stubEnv(overrides: Partial<Record<EnvKey, string | undefined>> =
   // wide, Vercel sets VERCEL_ENV) cannot leak into the parsed env.
   vi.stubEnv("TEST_DATABASE_URL", undefined);
   vi.stubEnv("VERCEL_ENV", undefined);
+  vi.stubEnv("RESEND_API_KEY", undefined);
   const values = { ...validEnv, ...overrides };
   for (const key of Object.keys(values) as EnvKey[]) {
     vi.stubEnv(key, values[key]);

@@ -5,8 +5,10 @@ import { z } from "zod";
 
 import type { RefundStatus } from "@/generated/prisma/client";
 import type { Tx } from "@/lib/db";
+import { enqueueEmail } from "@/lib/email/enqueue";
 import { env } from "@/lib/env";
 import { formatMoney } from "@/lib/money";
+import { flagOrder, type LockedOrder, lockOrderById } from "@/lib/orders/lock";
 import { recordMovements } from "@/lib/stock-movements";
 import { stripe } from "@/lib/stripe";
 
@@ -20,7 +22,6 @@ import {
   logRefundUnknownStatus,
   logSystemRefundRecorded,
 } from "./log";
-import { type LockedOrder, lockOrderById } from "./order-lock";
 import { allocateReturns } from "./refund-math";
 
 // Refunds in three steps (spec 0010, Refund flow): reserveRefund records a pending refund under
@@ -37,12 +38,6 @@ function money(cents: number, currency: string): string {
 
 async function touchOrder(tx: Tx, orderId: string) {
   await tx.$executeRaw`UPDATE orders SET updated_at = now() WHERE id = ${orderId}::uuid`;
-}
-
-async function flagOrder(tx: Tx, orderId: string) {
-  await tx.$executeRaw`
-    UPDATE orders SET needs_attention = true, updated_at = now()
-    WHERE id = ${orderId}::uuid AND NOT needs_attention`;
 }
 
 async function systemEvent(
@@ -206,6 +201,9 @@ export type AppliedOutcome = {
   readonly to: RefundStatus;
   // Product slugs whose storefront cache must expire once the transaction commits.
   readonly productSlugs: readonly string[];
+  // spec 0011, AC-3: the refund email this settle queued, for the caller to schedule after
+  // its commit. Empty unless the refund just reached succeeded for the first time.
+  readonly emailIds: readonly string[];
 };
 
 type RefundRow = {
@@ -277,7 +275,11 @@ export async function applyRefundOutcome(
   return { ...base, ...effect };
 }
 
-type Effect = { readonly to: RefundStatus; readonly productSlugs: readonly string[] };
+type Effect = {
+  readonly to: RefundStatus;
+  readonly productSlugs: readonly string[];
+  readonly emailIds: readonly string[];
+};
 
 // The rows of the Refund outcomes table. Returns where the refund ended and which products'
 // cache must expire; a repeat of the stored state changes nothing.
@@ -288,7 +290,7 @@ async function applyOutcomeTable(
   report: RefundReport,
   source: OutcomeSource,
 ): Promise<Effect> {
-  const unchanged: Effect = { to: row.status, productSlugs: [] };
+  const unchanged: Effect = { to: row.status, productSlugs: [], emailIds: [] };
   const logFields = { orderId: order.id, refundId: row.id, amountCents: row.amount_cents };
   const amount = money(row.amount_cents, order.currency);
   const outcome = refundOutcome(report.status);
@@ -307,9 +309,9 @@ async function applyOutcomeTable(
   }
 
   if (row.status === "pending" && outcome === "succeeded") {
-    const productSlugs = await markSucceeded(tx, order, row, report.at, amount);
+    const succeeded = await markSucceeded(tx, order, row, report.at, amount);
     logRefundSucceeded(logFields);
-    return { to: "succeeded", productSlugs };
+    return { to: "succeeded", ...succeeded };
   }
 
   if (row.status === "pending" && outcome === "failed") {
@@ -323,7 +325,7 @@ async function applyOutcomeTable(
       await flagOrder(tx, order.id);
       logRefundLateFailure({ ...logFields, from: "pending" });
     }
-    return { to: "failed", productSlugs: [] };
+    return { to: "failed", productSlugs: [], emailIds: [] };
   }
 
   if (row.status === "succeeded" && outcome === "failed") {
@@ -339,15 +341,18 @@ async function applyOutcomeTable(
     );
     await flagOrder(tx, order.id);
     logRefundLateFailure({ ...logFields, from: "succeeded" });
-    return { to: "failed", productSlugs: [] };
+    return { to: "failed", productSlugs: [], emailIds: [] };
   }
 
   if (row.status === "failed" && outcome !== "failed") {
     // We marked it failed but Stripe processed it (a request whose answer was lost).
-    const productSlugs =
+    const effect =
       outcome === "succeeded"
         ? await markSucceeded(tx, order, row, report.at, amount)
-        : await setStatus(tx, row.id, "pending", null).then(() => []);
+        : await setStatus(tx, row.id, "pending", null).then(() => ({
+            productSlugs: [],
+            emailIds: [],
+          }));
     if (outcome === "succeeded") logRefundSucceeded(logFields);
     await flagOrder(tx, order.id);
     await systemEvent(
@@ -356,7 +361,7 @@ async function applyOutcomeTable(
       "note",
       "Stripe processed a refund the store had marked failed",
     );
-    return { to: outcome, productSlugs };
+    return { to: outcome, ...effect };
   }
 
   return unchanged;
@@ -383,11 +388,20 @@ async function markSucceeded(
   row: RefundRow,
   at: Date | null,
   amount: string,
-): Promise<readonly string[]> {
+): Promise<Omit<Effect, "to">> {
   await setStatus(tx, row.id, "succeeded", at);
   await recountRefunded(tx, order);
   await systemEvent(tx, order.id, "refund_succeeded", `Refund of ${amount} succeeded`);
-  return row.admin_id === null ? [] : restockRefund(tx, order.id, row.id, row.admin_id);
+  const productSlugs =
+    row.admin_id === null ? [] : await restockRefund(tx, order.id, row.id, row.admin_id);
+  // spec 0011, AC-3: after the recount, so the frozen wording sees this refund counted. A
+  // refund that comes back to succeeded after a lost answer finds its row and queues nothing.
+  const emailId = await enqueueEmail(tx, {
+    orderId: order.id,
+    kind: "order_refunded",
+    refundId: row.id,
+  });
+  return { productSlugs, emailIds: emailId === null ? [] : [emailId] };
 }
 
 // refunded_cents is the sum of succeeded refunds, capped at the total by its CHECK. Over the
@@ -559,10 +573,8 @@ export async function recordSystemRefund(
   });
   const amount = money(refund.amount, order.currency);
   await systemEvent(tx, order.id, "refund_created", `Refund of ${amount} made in Stripe`);
-  if (status === "succeeded") {
-    await recountRefunded(tx, order);
-    await systemEvent(tx, order.id, "refund_succeeded", `Refund of ${amount} succeeded`);
-  }
+  const emailId =
+    status === "succeeded" ? await countSystemRefund(tx, order, created.id, amount) : null;
   if (status === "failed") {
     await systemEvent(
       tx,
@@ -595,5 +607,19 @@ export async function recordSystemRefund(
     from: status,
     to: status,
     productSlugs: [],
+    emailIds: emailId === null ? [] : [emailId],
   };
+}
+
+// A dashboard refund that succeeded: counted, noted, and (spec 0011, AC-3) emailed to the
+// customer too. Returns the email row id, or null when it was already queued.
+async function countSystemRefund(
+  tx: Tx,
+  order: LockedOrder,
+  refundId: string,
+  amount: string,
+): Promise<string | null> {
+  await recountRefunded(tx, order);
+  await systemEvent(tx, order.id, "refund_succeeded", `Refund of ${amount} succeeded`);
+  return enqueueEmail(tx, { orderId: order.id, kind: "order_refunded", refundId });
 }

@@ -4,17 +4,12 @@ import type { z } from "zod";
 
 import type { Tx } from "@/lib/db";
 import type { ActionResult } from "@/lib/result";
+import { type LockedOrder, lockOrderByNumber } from "@/lib/orders/lock";
 
 import { logOrderAdminEvent } from "../admin-log";
 import type { OrderActionError } from "../messages";
 import { type OrderAction, statusAllows } from "../order-actions";
-import {
-  hasRefundInFlight,
-  isStale,
-  loadRefundLedger,
-  type LockedOrder,
-  lockOrderByNumber,
-} from "../order-lock";
+import { hasRefundInFlight, isStale, loadRefundLedger } from "../order-lock";
 import { type RefundLedger, remainingCents } from "../refund-math";
 import { pathErrors } from "../schemas";
 

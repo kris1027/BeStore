@@ -3,6 +3,8 @@
 import { requireAdmin } from "@/features/admin-auth/require-admin";
 import type { OrderStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { enqueueEmail } from "@/lib/email/enqueue";
+import { scheduleDelivery } from "@/lib/email/schedule";
 import * as transitions from "@/lib/orders/transitions";
 
 import { logOrderAdminEvent } from "../admin-log";
@@ -28,14 +30,18 @@ export async function markShipped(input: unknown): Result<{ readonly status: Ord
       carrier,
       trackingNumber,
     });
-    return moved ? guarded.order : ({ code: "invalid_transition" } as const);
+    if (!moved) return { code: "invalid_transition" } as const;
+    // spec 0011, AC-2: once per order. Undo then ship again finds the row and queues nothing.
+    const emailId = await enqueueEmail(tx, { orderId: guarded.order.id, kind: "order_shipped" });
+    return { order: guarded.order, emailId };
   });
   if (isError(outcome)) return refused(admin.id, orderNumber, "ship", outcome);
 
+  scheduleDelivery([outcome.emailId]);
   logOrderAdminEvent("order.shipped", {
     adminId: admin.id,
-    orderId: outcome.id,
-    number: outcome.number,
+    orderId: outcome.order.id,
+    number: outcome.order.number,
   });
   return { ok: true, data: { status: "shipped" } };
 }

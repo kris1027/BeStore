@@ -6,13 +6,13 @@ import type { z } from "zod";
 import { requireAdmin } from "@/features/admin-auth/require-admin";
 import type { OrderStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { type LockedOrder, lockOrderByNumber } from "@/lib/orders/lock";
 import { sessionState } from "@/lib/orders/session-state";
 import * as transitions from "@/lib/orders/transitions";
 import { stripe } from "@/lib/stripe";
 
 import { logOrderAdminEvent } from "../admin-log";
 import type { OrderActionError } from "../messages";
-import { type LockedOrder, lockOrderByNumber } from "../order-lock";
 import { cancelPlan } from "../refund-math";
 import { reserveRefund } from "../refunds";
 import { cancelSchema } from "../schemas";

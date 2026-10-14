@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { type EnvKey, optionalEnvKeys, stubEnv, validEnv } from "../../tests/valid-env";
+import { derivedEnv, type EnvKey, optionalEnvKeys, stubEnv, validEnv } from "../../tests/valid-env";
 
 const requiredEnvKeys = (Object.keys(validEnv) as EnvKey[]).filter(
   (key) => !(optionalEnvKeys as readonly string[]).includes(key),
@@ -20,14 +20,14 @@ describe("env", () => {
   it("exports the parsed values when every variable is valid", async () => {
     stubEnv();
 
-    await expect(loadEnv()).resolves.toEqual(validEnv);
+    await expect(loadEnv()).resolves.toEqual({ ...validEnv, ...derivedEnv });
   });
 
   it("stays hermetic when the shell sets TEST_DATABASE_URL, as CI does", async () => {
     vi.stubEnv("TEST_DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/bestore_test");
     stubEnv();
 
-    await expect(loadEnv()).resolves.toEqual(validEnv);
+    await expect(loadEnv()).resolves.toEqual({ ...validEnv, ...derivedEnv });
   });
 
   describe("TEST_DATABASE_URL", () => {
@@ -268,7 +268,8 @@ describe("env", () => {
     });
 
     it.each(["production", "preview", "development"])("accepts %s", async (value) => {
-      stubEnv();
+      stubEnv({ EMAIL_TRANSPORT: "resend" });
+      vi.stubEnv("RESEND_API_KEY", "re_valid123");
       vi.stubEnv("VERCEL_ENV", value);
 
       await expect(loadEnv()).resolves.toMatchObject({ VERCEL_ENV: value });
@@ -280,5 +281,74 @@ describe("env", () => {
 
       await expect(loadEnv()).rejects.toThrow("VERCEL_ENV");
     });
+  });
+
+  // spec 0011, AC-16.
+  describe("email", () => {
+    it("refuses the log transport in production", async () => {
+      stubEnv();
+      vi.stubEnv("VERCEL_ENV", "production");
+
+      await expect(loadEnv()).rejects.toThrow("EMAIL_TRANSPORT");
+    });
+
+    it.each(["preview", "development"])("allows the log transport on %s", async (value) => {
+      stubEnv();
+      vi.stubEnv("VERCEL_ENV", value);
+
+      await expect(loadEnv()).resolves.toMatchObject({ EMAIL_TRANSPORT: "log" });
+    });
+
+    it.each([undefined, ""])("requires RESEND_API_KEY for resend (%j)", async (key) => {
+      stubEnv({ EMAIL_TRANSPORT: "resend" });
+      vi.stubEnv("RESEND_API_KEY", key);
+
+      await expect(loadEnv()).rejects.toThrow("RESEND_API_KEY");
+    });
+
+    it("accepts resend with a key", async () => {
+      stubEnv({ EMAIL_TRANSPORT: "resend" });
+      vi.stubEnv("RESEND_API_KEY", "re_valid123");
+
+      await expect(loadEnv()).resolves.toMatchObject({
+        EMAIL_TRANSPORT: "resend",
+        RESEND_API_KEY: "re_valid123",
+      });
+    });
+
+    it("rejects a key that is not a Resend key, without printing it", async () => {
+      stubEnv({ EMAIL_TRANSPORT: "resend" });
+      vi.stubEnv("RESEND_API_KEY", "sk_test_not_resend");
+
+      const error = await loadEnv().catch((caught: unknown) => caught);
+
+      expect(String(error)).toContain("RESEND_API_KEY");
+      expect(String(error)).not.toContain("sk_test_not_resend");
+    });
+
+    it("rejects an unknown transport", async () => {
+      stubEnv({ EMAIL_TRANSPORT: "smtp" });
+
+      await expect(loadEnv()).rejects.toThrow("EMAIL_TRANSPORT");
+    });
+
+    it.each([
+      ["BeStore <orders@example.com>", "orders@example.com"],
+      ["orders@example.com", "orders@example.com"],
+      ["  The Shop, Ltd <hello@shop.pl>  ", "hello@shop.pl"],
+    ])("parses the address from %j", async (from, address) => {
+      stubEnv({ EMAIL_FROM: from });
+
+      await expect(loadEnv()).resolves.toMatchObject({ EMAIL_FROM_ADDRESS: address });
+    });
+
+    it.each(["", "BeStore", "BeStore <not-an-address>", "a@b.pl, c@d.pl"])(
+      "rejects EMAIL_FROM %j",
+      async (from) => {
+        stubEnv({ EMAIL_FROM: from });
+
+        await expect(loadEnv()).rejects.toThrow("EMAIL_FROM");
+      },
+    );
   });
 });

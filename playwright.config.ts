@@ -14,16 +14,20 @@ export default defineConfig({
     { name: "mobile", use: { ...devices["Pixel 7"] } },
   ],
   // CI tests what ships: a production build. Locally the dev server is faster to iterate on.
+  // spec 0011, AC-16: the app under test never sends a real email (Playwright merges this env
+  // over its own).
   webServer: isCI
     ? {
         command: "pnpm build && pnpm start",
         url: "http://localhost:3000",
         reuseExistingServer: false,
         timeout: 300_000,
+        env: { EMAIL_TRANSPORT: "log" },
       }
     : {
         command: "pnpm dev",
         url: "http://localhost:3000",
         reuseExistingServer: true,
+        env: { EMAIL_TRANSPORT: "log" },
       },
 });

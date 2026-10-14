@@ -8,12 +8,14 @@ import type { OrderStatus } from "@/generated/prisma/client";
 import { catalogTag, productTag } from "@/lib/cache-tags";
 import { db } from "@/lib/db";
 import type { Tx } from "@/lib/db";
+import { enqueueEmail } from "@/lib/email/enqueue";
+import { scheduleDelivery } from "@/lib/email/schedule";
+import { lockOrderById } from "@/lib/orders/lock";
 import { logOrderExpired, logOrderPaid } from "@/lib/orders/log";
 import { flagLatePayment, markExpired, markPaid, type PaidOrder } from "@/lib/orders/transitions";
 
 import { decideEvent, isHandledEventType, isRefundEventType } from "./event-decision";
 import { type EventResult, logEventProcessed, logTagExpiryFailed } from "./log";
-import { lockOrderById } from "./order-lock";
 import {
   type AppliedOutcome,
   applyRefundOutcome,
@@ -26,7 +28,7 @@ const orderIdSchema = z.uuid();
 
 type Outcome =
   | { readonly result: Exclude<EventResult, "paid" | "expired" | "refund"> }
-  | { readonly result: "paid"; readonly order: PaidOrder }
+  | { readonly result: "paid"; readonly order: PaidOrder; readonly emailId: string | null }
   | { readonly result: "expired"; readonly orderId: string; readonly reason: string }
   | { readonly result: "refund"; readonly applied: AppliedOutcome };
 
@@ -84,7 +86,14 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<EventResul
           amountTotal: session.amount_total,
           currency: session.currency,
         });
-        return paid ? { result: "paid", order: paid } : { result: "stale" };
+        if (!paid) return { result: "stale" };
+        // spec 0011, AC-1: in this transaction, also for an order flagged on payment. A late
+        // payment (flagLatePayment above) queues nothing.
+        const emailId = await enqueueEmail(tx, {
+          orderId: orderId.data,
+          kind: "order_confirmation",
+        });
+        return { result: "paid", order: paid, emailId };
       }
     }
   });
@@ -92,10 +101,12 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<EventResul
   if (outcome.result === "paid") {
     logOrderPaid(outcome.order);
     expireCatalogTags(outcome.order.productSlugs);
+    scheduleDelivery([outcome.emailId]);
   }
   if (outcome.result === "expired") logOrderExpired(outcome.orderId, outcome.reason);
-  if (outcome.result === "refund" && outcome.applied.productSlugs.length > 0) {
-    expireCatalogTags(outcome.applied.productSlugs);
+  if (outcome.result === "refund") {
+    if (outcome.applied.productSlugs.length > 0) expireCatalogTags(outcome.applied.productSlugs);
+    scheduleDelivery(outcome.applied.emailIds);
   }
   logEventProcessed(event.id, event.type, outcome.result);
   return outcome.result;

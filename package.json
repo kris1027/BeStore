@@ -20,6 +20,7 @@
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:seed": "prisma db seed",
+    "email:dev": "email dev --dir emails --port 3001",
     "admin:create": "tsx scripts/admin/create.ts",
     "admin:disable": "tsx scripts/admin/disable.ts",
     "admin:reset-mfa": "tsx scripts/admin/reset-mfa.ts"
@@ -43,8 +44,10 @@
     "pino": "10.3.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "react-email": "^6.11.1",
     "react-hook-form": "7.88.0",
     "react-markdown": "^10.1.0",
+    "resend": "^6.32.1",
     "server-only": "^0.0.1",
     "shadcn": "^4.21.0",
     "stripe": "^22.6.2",
@@ -54,6 +57,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.63.0",
+    "@react-email/ui": "^6.11.1",
     "@tailwindcss/postcss": "^4",
     "@types/culori": "^4.0.1",
     "@types/node": "^24.13.6",
