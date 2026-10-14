@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 
 import { classifySendFailure, stopsSweep } from "./classify";
 import { loadEmailContent } from "./content";
+import { emailKindNames } from "./kinds";
 import {
   type EmailLogFields,
   logEmailConfigError,
@@ -44,18 +45,12 @@ type ClaimedRow = {
   attempts: number;
 };
 
-const kindWords: Record<EmailKind, string> = {
-  order_confirmation: "confirmation",
-  order_shipped: "shipped",
-  order_refunded: "refund",
-};
-
 export function failureNote(kind: EmailKind): string {
-  return `The ${kindWords[kind]} email could not be sent. Use Send again on the order page.`;
+  return `The ${emailKindNames[kind].word} email could not be sent. Use Send again on the order page.`;
 }
 
 export function missingEmailNote(kind: EmailKind): string {
-  return `The ${kindWords[kind]} email was not sent: the order has no email address.`;
+  return `The ${emailKindNames[kind].word} email was not sent: the order has no email address.`;
 }
 
 const done = (outcome: DeliverOutcome, stopSweep = false): DeliverResult => ({

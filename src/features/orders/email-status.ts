@@ -1,5 +1,6 @@
 import type { EmailKind, EmailSendStatus } from "@/generated/prisma/enums";
 import { type DateFormat, formatDateTime } from "@/lib/dates";
+import { emailKindNames } from "@/lib/email/kinds";
 import { formatMoney } from "@/lib/money";
 
 // Pure: the words the order page's Emails section shows for an email row (spec 0011, AC-13 and
@@ -20,26 +21,15 @@ export function emailKindLabel(
   email: Pick<AdminEmailSend, "kind" | "refundAmountCents">,
   money: { readonly currency: string; readonly locale: string },
 ): string {
-  switch (email.kind) {
-    case "order_confirmation":
-      return "Order confirmation";
-    case "order_shipped":
-      return "Shipped";
-    case "order_refunded":
-      return email.refundAmountCents === null
-        ? "Refund"
-        : `Refund ${formatMoney(email.refundAmountCents, money)}`;
-  }
+  const label = emailKindNames[email.kind].label;
+  return email.kind !== "order_refunded" || email.refundAmountCents === null
+    ? label
+    : `${label} ${formatMoney(email.refundAmountCents, money)}`;
 }
 
 // The history note Send again writes (AC-14): "Order confirmation email queued again".
 export function queuedAgainNote(kind: EmailKind): string {
-  const words: Record<EmailKind, string> = {
-    order_confirmation: "Order confirmation",
-    order_shipped: "Shipped",
-    order_refunded: "Refund",
-  };
-  return `${words[kind]} email queued again`;
+  return `${emailKindNames[kind].label} email queued again`;
 }
 
 export function failureReason(errorCode: string | null): string {
