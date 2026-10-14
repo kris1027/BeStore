@@ -236,7 +236,7 @@ spec [0012](../specs/0012-customer-accounts/index.md)
 - [x] Design it (spec): `/architect customer accounts`
 - [ ] Build it: `/develop customer accounts`
   - [x] Thin thread: config, the Send Email Hook, Mailpit transport, sign up, confirm, choose password, account setup and a bare order list (AC-1 to AC-3, AC-10, AC-11, AC-13, AC-22, AC-23)
-  - [ ] Sign in, sign out, cart merge and password reset through the hook (AC-4 to AC-9)
+  - [x] Sign in, sign out, cart merge and password reset through the hook (AC-4 to AC-9)
   - [ ] Account area: order history and detail, address book (AC-11 to AC-14)
   - [ ] Checkout integration, settings, delete account and the admin badge (AC-15 to AC-21)
   - [ ] Safety net: logs, axe, header link, production runbook (AC-22, AC-24 to AC-26)

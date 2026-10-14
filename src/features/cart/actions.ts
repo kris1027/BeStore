@@ -5,6 +5,9 @@ import { z } from "zod";
 
 import { lineCap, MAX_LINE_QUANTITY } from "@/lib/availability";
 import { cartExpiry, readCartId, setCartCookie } from "@/lib/cart/cookie";
+import { lockAccountCart } from "@/lib/cart/merge";
+import { lockCustomer } from "@/lib/customer/lock";
+import { getCustomerId } from "@/lib/customer/session";
 import { db } from "@/lib/db";
 import type { ActionResult } from "@/lib/result";
 
@@ -33,6 +36,20 @@ async function lockLiveCart(tx: Tx, cartId: string): Promise<string | null> {
   return rows[0]?.id ?? null;
 }
 
+// Whether the cookie names a cart that still exists and has not expired. Read without a lock: the
+// transaction locks it again and falls back if it expired in between.
+async function hasLiveCart(cartId: string | null): Promise<boolean> {
+  if (cartId === null) return false;
+  return (await db.cart.count({ where: { id: cartId, expiresAt: { gt: new Date() } } })) > 0;
+}
+
+// spec 0012, AC-7: a signed in customer with no cookie cart adds to their account cart, under the
+// customer lock so a sign in merging at the same moment cannot make a second one.
+async function accountCart(tx: Tx, customerId: string): Promise<string | null> {
+  await lockCustomer(tx, customerId);
+  return lockAccountCart(tx, customerId);
+}
+
 // spec 0005, AC-8 and AC-9: the first add creates the cart and sets the cookie; later adds
 // grow the line up to the variant's stock or 10.
 export async function addToCart(
@@ -45,6 +62,9 @@ export async function addToCart(
   const cookieCartId = await readCartId();
   const nowMs = Date.now();
   const expiresAt = cartExpiry(nowMs);
+  // spec 0012, AC-7: only an add that must create a cart reads the session (one call to the Auth
+  // server), and it does so before the transaction, so no lock waits on the network.
+  const customerId = (await hasLiveCart(cookieCartId)) ? null : await getCustomerId();
 
   const result = await db.$transaction(
     async (
@@ -64,7 +84,9 @@ export async function addToCart(
       // each create a cart and the last Set-Cookie wins; the other cart expires unseen. Two
       // cookieless requests look like two visitors, so no server check can merge them. One tab
       // cannot race itself: Next dispatches a client's Server Functions one at a time.
-      const liveCartId = cookieCartId === null ? null : await lockLiveCart(tx, cookieCartId);
+      const liveCartId =
+        (cookieCartId === null ? null : await lockLiveCart(tx, cookieCartId)) ??
+        (customerId === null ? null : await accountCart(tx, customerId));
       const cartId = liveCartId
         ? (
             await tx.cart.update({
@@ -73,7 +95,12 @@ export async function addToCart(
               select: { id: true },
             })
           ).id
-        : (await tx.cart.create({ data: { expiresAt }, select: { id: true } })).id;
+        : (
+            await tx.cart.create({
+              data: { expiresAt, ...(customerId === null ? {} : { customerId }) },
+              select: { id: true },
+            })
+          ).id;
 
       const existing = await tx.cartItem.findUnique({
         where: { cartId_variantId: { cartId, variantId } },

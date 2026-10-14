@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { signCartId } from "@/lib/cart/signature";
 
 import { testDb, resetDatabaseBeforeEach } from "./client";
-import { createSimpleProduct } from "./fixtures";
+import { createCustomer, createSimpleProduct } from "./fixtures";
 
 // addToCart against a real Postgres (spec 0005, AC-8, AC-9, AC-15).
 
@@ -13,12 +13,21 @@ const mocks = vi.hoisted(() => ({
   jar: new Map<string, { value: string; options?: unknown }>(),
   refresh: vi.fn(),
   warn: vi.fn(),
+  customerId: null as string | null,
+  sessionReads: 0,
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", async () => ({ db: (await import("./client")).testDb }));
 vi.mock("@/lib/env", () => ({ env: { CART_COOKIE_SECRET: "c".repeat(32) } }));
 vi.mock("next/cache", () => ({ refresh: mocks.refresh }));
+// spec 0012, AC-7: the signed in customer, when an add must create a cart.
+vi.mock("@/lib/customer/session", () => ({
+  getCustomerId: async () => {
+    mocks.sessionReads += 1;
+    return mocks.customerId;
+  },
+}));
 vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), warn: mocks.warn } }));
 vi.mock("next/headers", () => ({
   cookies: async () => ({
@@ -38,6 +47,8 @@ resetDatabaseBeforeEach();
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.jar.clear();
+  mocks.customerId = null;
+  mocks.sessionReads = 0;
 });
 
 function cookieCartId(): string | undefined {
@@ -181,6 +192,52 @@ describe("addToCart", () => {
 
     expect(cookieCartId()).not.toBe(expired.id);
     expect(await testDb.cartItem.count({ where: { cartId: expired.id } })).toBe(0);
+  });
+
+  // spec 0012, AC-7.
+  describe("for a signed in customer", () => {
+    it("adds to their account cart when there is no cookie cart, and points the cookie at it", async () => {
+      const { variant } = await createSimpleProduct("a", 5);
+      const customer = await createCustomer();
+      const account = await testDb.cart.create({
+        data: { customerId: customer.id, expiresAt: new Date(Date.now() + 86_400_000) },
+      });
+      mocks.customerId = customer.id;
+
+      await addToCart({ variantId: variant.id, quantity: 2 });
+
+      expect(cookieCartId()).toBe(account.id);
+      expect(await testDb.cart.count()).toBe(1);
+      expect(await testDb.cartItem.count({ where: { cartId: account.id } })).toBe(1);
+    });
+
+    it("creates the cart with their id when they have none", async () => {
+      const { variant } = await createSimpleProduct("a", 5);
+      const customer = await createCustomer();
+      mocks.customerId = customer.id;
+
+      await addToCart({ variantId: variant.id, quantity: 1 });
+
+      const cart = await testDb.cart.findFirstOrThrow();
+      expect(cart.customerId).toBe(customer.id);
+      expect(cookieCartId()).toBe(cart.id);
+    });
+
+    it("reads the session only when the add must create a cart", async () => {
+      const { variant } = await createSimpleProduct("a", 5);
+      await addToCart({ variantId: variant.id, quantity: 1 });
+      await addToCart({ variantId: variant.id, quantity: 1 });
+
+      expect(mocks.sessionReads).toBe(1);
+    });
+
+    it("gives a visitor with no valid session a guest cart as before", async () => {
+      const { variant } = await createSimpleProduct("a", 5);
+
+      await addToCart({ variantId: variant.id, quantity: 1 });
+
+      expect((await testDb.cart.findFirstOrThrow()).customerId).toBeNull();
+    });
   });
 
   it("logs a bad signature without the cookie value", async () => {

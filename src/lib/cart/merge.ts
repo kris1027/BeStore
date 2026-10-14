@@ -80,9 +80,9 @@ export async function mergeCarts(
   return done(account, guestLines.length, accountLines.length > 0);
 }
 
-// The customer's cart, locked. One that has expired but not been swept yet is deleted, so the
-// customer starts a fresh one (carts.customer_id is unique).
-async function lockAccountCart(tx: Tx, customerId: string): Promise<string | null> {
+// The customer's cart, locked; the caller holds the customer lock. One that has expired but not
+// been swept yet is deleted, so the customer starts a fresh one (carts.customer_id is unique).
+export async function lockAccountCart(tx: Tx, customerId: string): Promise<string | null> {
   const [row] = await tx.$queryRaw<{ id: string; live: boolean }[]>`
     SELECT id, expires_at > now() AS live FROM carts
     WHERE customer_id = ${customerId}::uuid FOR UPDATE`;
