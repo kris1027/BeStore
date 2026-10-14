@@ -5,12 +5,12 @@ import { revalidatePath, updateTag } from "next/cache";
 import { catalogTag, productTag } from "@/lib/cache-tags";
 import { db, type Tx } from "@/lib/db";
 import { scheduleDelivery } from "@/lib/email/schedule";
+import type { LockedOrder } from "@/lib/orders/lock";
 
 import { logOrderAdminEvent } from "../admin-log";
 import { refundOutcome } from "../event-decision";
 import { logRefundStripeRefused, logRefundStripeUnavailable } from "../log";
 import type { OrderActionError } from "../messages";
-import type { LockedOrder } from "../order-lock";
 import { adminOrderPath } from "../paths";
 import { applyRefundOutcome, requestStripeRefund, type StripeAnswer } from "../refunds";
 

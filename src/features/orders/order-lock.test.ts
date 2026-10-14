@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { isStale, type LockedOrder } from "./order-lock";
+import type { LockedOrder } from "@/lib/orders/lock";
+
+import { isStale } from "./order-lock";
 
 vi.mock("server-only", () => ({}));
 

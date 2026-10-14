@@ -2,6 +2,7 @@ import "server-only";
 
 import type { EmailKind } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { flagOrder, lockOrderById } from "@/lib/orders/lock";
 
 import { classifySendFailure, stopsSweep } from "./classify";
 import { loadEmailContent } from "./content";
@@ -162,16 +163,12 @@ export async function failRow(
   options: { readonly flag: boolean },
 ): Promise<boolean> {
   return db.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM orders WHERE id = ${row.order_id}::uuid FOR UPDATE`;
+    await lockOrderById(tx, row.order_id);
     const moved = await tx.$executeRaw`
       UPDATE email_sends SET status = 'failed', error_code = ${errorCode}, updated_at = now()
       WHERE id = ${row.id}::uuid AND status = 'pending'`;
     if (moved === 0) return false;
-    if (options.flag) {
-      await tx.$executeRaw`
-        UPDATE orders SET needs_attention = true, updated_at = now()
-        WHERE id = ${row.order_id}::uuid AND NOT needs_attention`;
-    }
+    if (options.flag) await flagOrder(tx, row.order_id);
     await tx.orderEvent.create({
       data: {
         orderId: row.order_id,

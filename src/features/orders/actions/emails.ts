@@ -7,10 +7,10 @@ import type { EmailKind, EmailSendStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { logEmailResendRequested } from "@/lib/email/log";
 import { scheduleDelivery } from "@/lib/email/schedule";
+import { lockOrderByNumber } from "@/lib/orders/lock";
 
 import { canSendAgain, queuedAgainNote } from "../email-status";
 import type { OrderActionError } from "../messages";
-import { lockOrderByNumber } from "../order-lock";
 import { adminOrderPath } from "../paths";
 import { sendEmailAgainSchema } from "../schemas";
 import { invalidInput, isError, type Result } from "./guard";

@@ -8,6 +8,7 @@ import type { Tx } from "@/lib/db";
 import { enqueueEmail } from "@/lib/email/enqueue";
 import { env } from "@/lib/env";
 import { formatMoney } from "@/lib/money";
+import { flagOrder, type LockedOrder, lockOrderById } from "@/lib/orders/lock";
 import { recordMovements } from "@/lib/stock-movements";
 import { stripe } from "@/lib/stripe";
 
@@ -21,7 +22,6 @@ import {
   logRefundUnknownStatus,
   logSystemRefundRecorded,
 } from "./log";
-import { type LockedOrder, lockOrderById } from "./order-lock";
 import { allocateReturns } from "./refund-math";
 
 // Refunds in three steps (spec 0010, Refund flow): reserveRefund records a pending refund under
@@ -38,12 +38,6 @@ function money(cents: number, currency: string): string {
 
 async function touchOrder(tx: Tx, orderId: string) {
   await tx.$executeRaw`UPDATE orders SET updated_at = now() WHERE id = ${orderId}::uuid`;
-}
-
-async function flagOrder(tx: Tx, orderId: string) {
-  await tx.$executeRaw`
-    UPDATE orders SET needs_attention = true, updated_at = now()
-    WHERE id = ${orderId}::uuid AND NOT needs_attention`;
 }
 
 async function systemEvent(

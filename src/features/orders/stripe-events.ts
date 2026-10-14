@@ -10,12 +10,12 @@ import { db } from "@/lib/db";
 import type { Tx } from "@/lib/db";
 import { enqueueEmail } from "@/lib/email/enqueue";
 import { scheduleDelivery } from "@/lib/email/schedule";
+import { lockOrderById } from "@/lib/orders/lock";
 import { logOrderExpired, logOrderPaid } from "@/lib/orders/log";
 import { flagLatePayment, markExpired, markPaid, type PaidOrder } from "@/lib/orders/transitions";
 
 import { decideEvent, isHandledEventType, isRefundEventType } from "./event-decision";
 import { type EventResult, logEventProcessed, logTagExpiryFailed } from "./log";
-import { lockOrderById } from "./order-lock";
 import {
   type AppliedOutcome,
   applyRefundOutcome,
