@@ -2,13 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { addAuthUser, addVerifiedFactor, resetAuthStub } from "./auth-stub";
 import { resetDatabaseBeforeEach, testDb } from "./client";
-import {
-  createAdmin,
-  createCustomer,
-  createOrder,
-  createSimpleProduct,
-  inThirtyDays,
-} from "./fixtures";
+import { createCustomer, createOrder, createSimpleProduct, inThirtyDays } from "./fixtures";
 
 // Settings (spec 0012, AC-18 to AC-20) against a real Postgres; Supabase is mocked at the edge.
 

@@ -127,11 +127,10 @@ export async function deleteAccount(
     );
   } catch (error) {
     if (!authDeleted) {
+      // Supabase's error name, or the SQLSTATE of a database failure; never a message, which can
+      // quote the row.
       logger.error(
-        {
-          customerId: customer.id,
-          errorName: error instanceof Error ? error.message : typeof error,
-        },
+        { customerId: customer.id, errorName: authError, pgCode: pgErrorCode(error) },
         "account.delete_failed",
       );
       return { ok: false, error: { form: "delete_failed" } };
