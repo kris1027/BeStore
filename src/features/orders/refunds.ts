@@ -573,18 +573,8 @@ export async function recordSystemRefund(
   });
   const amount = money(refund.amount, order.currency);
   await systemEvent(tx, order.id, "refund_created", `Refund of ${amount} made in Stripe`);
-  const emailIds: string[] = [];
-  if (status === "succeeded") {
-    await recountRefunded(tx, order);
-    await systemEvent(tx, order.id, "refund_succeeded", `Refund of ${amount} succeeded`);
-    // spec 0011, AC-3: a dashboard refund emails the customer too.
-    const emailId = await enqueueEmail(tx, {
-      orderId: order.id,
-      kind: "order_refunded",
-      refundId: created.id,
-    });
-    if (emailId !== null) emailIds.push(emailId);
-  }
+  const emailId =
+    status === "succeeded" ? await countSystemRefund(tx, order, created.id, amount) : null;
   if (status === "failed") {
     await systemEvent(
       tx,
@@ -617,6 +607,19 @@ export async function recordSystemRefund(
     from: status,
     to: status,
     productSlugs: [],
-    emailIds,
+    emailIds: emailId === null ? [] : [emailId],
   };
+}
+
+// A dashboard refund that succeeded: counted, noted, and (spec 0011, AC-3) emailed to the
+// customer too. Returns the email row id, or null when it was already queued.
+async function countSystemRefund(
+  tx: Tx,
+  order: LockedOrder,
+  refundId: string,
+  amount: string,
+): Promise<string | null> {
+  await recountRefunded(tx, order);
+  await systemEvent(tx, order.id, "refund_succeeded", `Refund of ${amount} succeeded`);
+  return enqueueEmail(tx, { orderId: order.id, kind: "order_refunded", refundId });
 }
