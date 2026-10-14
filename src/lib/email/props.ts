@@ -2,9 +2,9 @@ import type { EmailFrame } from "../../../emails/components/layout";
 import type { OrderConfirmationProps } from "../../../emails/order-confirmation";
 import type { OrderRefundedProps } from "../../../emails/order-refunded";
 import type { OrderShippedProps } from "../../../emails/order-shipped";
-import { formatDate } from "../dates";
-import { formatMoney } from "../money";
-import type { DeliveryAddress } from "../shipping/address";
+import { formatDate } from "@/lib/dates";
+import { formatMoney } from "@/lib/money";
+import type { DeliveryAddress } from "@/lib/shipping/address";
 
 // Pure: an order's rows to the plain props a template renders (spec 0011, Value sourcing).
 // Every amount and date is formatted here, so templates never read env.
