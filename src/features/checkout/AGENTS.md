@@ -21,6 +21,7 @@ Everything from `/checkout` to the order confirmation. The customer types their 
 
 - `startCheckout` takes only what the customer typed. The cart comes from the signed cookie, and prices and the delivery fee come from the database inside the transaction that locks the cart (`SELECT ... FOR UPDATE`), never from the browser or the cache.
 - Expected failures are `StartCheckoutError` codes. A validation refusal returns a `fields` map with the same messages the form shows, and the form focuses the first invalid field. Every field missing or of the wrong type still gets its own message.
+- A signed in checkout (spec 0012, AC-15) uses the account email, whatever was typed, first merges a guest cookie cart into the account cart (`cart_changed` with `merged` when the account cart already held lines), and takes the customer lock before the cart lock. Saving the address goes through `src/lib/customer/addresses.ts`.
 - Every schema transform must be safe to run twice: `handleSubmit` sends the parsed output and the server parses it again.
 - The address travels as one `ShipTo` value, saved with `deliveryColumns` and sent to Stripe as `payment_intent_data.shipping`. Empty optional keys are left out, never sent as `""`.
 - `orders.email` can be null on an order purged under spec 0008. `checkoutPrefill` never reaches one (the purge clears `cart_id`) and returns null with `order.email_missing` if it ever sees a null email; `getCompletion` throws on a paid order without one.
