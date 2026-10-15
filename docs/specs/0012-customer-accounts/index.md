@@ -1,7 +1,7 @@
 # 0012. Customer accounts
 
 **Date**: 2026-10-14 (amended the same day after a cross check: AC-1 to AC-5, AC-7 to AC-11, AC-13 to AC-15, AC-17, AC-19, AC-20, AC-23, AC-24, AC-26; amended 2026-10-14 again: AC-15 now names where the order's `customer_name` comes from; amended 2026-10-15 after the code review: AC-2, AC-3, AC-5, AC-7, AC-13, AC-24, the template choice, and the leftover account cart cookie)
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 

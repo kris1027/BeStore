@@ -25,7 +25,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 9 | Admin catalog management | Slice 3 | done |
 | 10 | Admin order management | Slice 4 | done |
 | 11 | Order emails | Slice 5 | done |
-| 12 | Customer accounts | Slice 6 | in-progress |
+| 12 | Customer accounts | Slice 6 | done |
 | 13 | Categories, search & filters | Slice 7 | planned |
 | 14 | Discounts & promo codes | Slice 8 | planned |
 | 15 | Admin sales dashboard | Slice 9 | planned |
@@ -229,7 +229,7 @@ spec [0011](../specs/0011-order-emails/index.md) · code in [src/lib/email/](../
 
 ## Slice 6: Accounts
 
-### 12. Customer accounts · in-progress · GA
+### 12. Customer accounts · done · GA
 Optional accounts: guest checkout stays the default, customers who sign up see their order history and saved address.
 **Done when:** a customer can sign up, sign in, reset a password, and see past orders; guest checkout still works; a guest can later create an account with the same email and see earlier orders.
 spec [0012](../specs/0012-customer-accounts/index.md) · code in [src/features/account/](../../src/features/account/), [src/lib/customer/](../../src/lib/customer/), [src/lib/cart/merge.ts](../../src/lib/cart/merge.ts), [src/lib/email/](../../src/lib/email/), [emails/](../../emails/), [app/(store)/account/](../../app/(store)/account/)
