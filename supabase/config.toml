@@ -232,7 +232,8 @@ web3 = 30
 [auth.email]
 # Allow/disallow new user signups via email to your project.
 # Stays true: in the CLI this switch turns the whole email provider off, password sign in
-# included. `[auth] enable_signup = false` above is what blocks public sign up.
+# included. `[auth] enable_signup` above is the public sign up switch, on for customer accounts
+# (spec 0012, AC-23).
 enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.

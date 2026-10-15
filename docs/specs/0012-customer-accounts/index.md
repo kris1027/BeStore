@@ -105,7 +105,7 @@ Customers can make an optional account. They give their email, click the link we
 - **AC-21**: The admin order list and order detail select `customer_id` and show "Account" when it is set and "Guest" when it is null. No other admin change.
 
 *Platform, logs, accessibility*
-- **AC-22**: The store header has a plain "Account" link to `/account`, the same for everyone. Catalog pages stay cached and never call Supabase. The proxy matcher becomes `/admin/:path*`, `/auth/:path*`, `/account/:path*`, `/checkout/:path*`. On `/account` and `/checkout` the proxy refreshes the session, and the admin check stays independent of it.
+- **AC-22**: The store header has a plain "Account" link to `/account`, the same for everyone: an icon link whose accessible name is "Account", like the cart link beside it. Catalog pages stay cached and never call Supabase. The proxy matcher becomes `/admin/:path*`, `/auth/:path*`, `/account/:path*`, `/checkout/:path*`. On `/account` and `/checkout` the proxy refreshes the session, and the admin check stays independent of it.
 - **AC-23**: `EMAIL_TRANSPORT` gains `mailpit`, which posts every email to Mailpit's send API at `MAILPIT_URL` (with no idempotency; every call lands). The env schema refuses `mailpit` when `VERCEL_ENV` is `production` and requires `MAILPIT_URL` with it. Playwright and CI use `mailpit` (Vitest stays on `log`), so e2e reads the confirm and reset emails from Mailpit as the admin reset test does today. `supabase/config.toml` changes:
   * public sign up on (`[auth] enable_signup = true`);
   * `[auth.email] enable_confirmations = true` kept;
