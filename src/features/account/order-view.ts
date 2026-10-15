@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import type { OrderStatus } from "@/generated/prisma/enums";
 
 // Pure: which orders an account shows and how their status reads (spec 0012, AC-11). Only orders
@@ -20,15 +22,25 @@ export function isVisibleStatus(status: OrderStatus): status is VisibleStatus {
 
 export const ORDERS_PER_PAGE = 20;
 
+const pageSchema = z
+  .string()
+  .regex(/^[1-9][0-9]{0,5}$/)
+  .transform(Number)
+  .catch(1);
+
 // `?page=N` from the URL: a whole number from 1, anything else is page 1.
 export function pageNumber(value: unknown): number {
-  if (typeof value !== "string" || !/^[1-9][0-9]{0,5}$/.test(value)) return 1;
-  return Number(value);
+  return pageSchema.parse(value);
 }
+
+const orderNumberSchema = z
+  .string()
+  .regex(/^[1-9][0-9]{0,9}$/)
+  .transform(Number)
+  .pipe(z.number().max(2_147_483_647));
 
 // `/account/orders/<number>`: digits only, within Postgres int range, else null (not found).
 export function orderNumberParam(value: string): number | null {
-  if (!/^[1-9][0-9]{0,9}$/.test(value)) return null;
-  const number = Number(value);
-  return number <= 2_147_483_647 ? number : null;
+  const parsed = orderNumberSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
 }
