@@ -234,6 +234,34 @@ describe("addToCart", () => {
       expect(mocks.sessionReads).toBe(1);
     });
 
+    it("still gets their own cart when the cookie cart expires between the read and the lock", async () => {
+      const { variant } = await createSimpleProduct("a", 5);
+      const customer = await createCustomer();
+      mocks.customerId = customer.id;
+      const guest = await testDb.cart.create({
+        data: { expiresAt: new Date(Date.now() + 86_400_000) },
+      });
+      mocks.jar.set("bestore_cart", { value: signCartId(guest.id, secret) });
+      // The cookie read sees the cart live; it expires before the transaction locks it.
+      const read = testDb.cart.findFirst.bind(testDb.cart);
+      vi.spyOn(testDb.cart, "findFirst").mockImplementationOnce((async (
+        args: Parameters<typeof read>[0],
+      ) => {
+        const found = await read(args);
+        await testDb.cart.update({
+          where: { id: guest.id },
+          data: { expiresAt: new Date(Date.now() - 1000) },
+        });
+        return found;
+      }) as unknown as typeof testDb.cart.findFirst);
+
+      expect(await addToCart({ variantId: variant.id, quantity: 1 })).toMatchObject({ ok: true });
+
+      const cart = await testDb.cart.findUniqueOrThrow({ where: { id: cookieCartId()! } });
+      expect(cart.id).not.toBe(guest.id);
+      expect(cart.customerId).toBe(customer.id);
+    });
+
     it("gives a visitor with no valid session a guest cart as before", async () => {
       const { variant } = await createSimpleProduct("a", 5);
 
