@@ -26,13 +26,14 @@ import {
 import { type DateFormat, formatDateTime } from "@/lib/dates";
 import { deliveryLabel } from "@/lib/shipping/rule";
 import { cn } from "@/lib/utils";
+import { orderStatusLabels } from "@/lib/orders/status-labels";
 
 import type { AdminOrderDetail as Detail } from "../admin-queries";
 import { adminOrdersPath } from "../paths";
 import { EmailsSection } from "./emails-section";
 import { NoteForm } from "./note-form";
 import { OrderActionsPanel } from "./order-actions-panel";
-import { NeedsAttentionBadge, orderStatusLabels, OrderStatusBadge } from "./order-status-badge";
+import { NeedsAttentionBadge, OrderStatusBadge } from "./order-status-badge";
 import { OrderEmail, PersonalDataField } from "./personal-data";
 import { RefundStateBadge } from "./refund-state-badge";
 import { RefundsSection } from "./refunds-section";

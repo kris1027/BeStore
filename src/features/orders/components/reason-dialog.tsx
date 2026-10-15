@@ -15,7 +15,8 @@ import {
   TextField,
   useOrderAction,
 } from "./action-dialog";
-import { orderStatusLabels } from "./order-status-badge";
+
+import { orderStatusLabels } from "@/lib/orders/status-labels";
 
 type Kind = "undo" | "resolve";
 

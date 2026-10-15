@@ -20,6 +20,7 @@ import {
   withDeliveryAddress,
 } from "@/lib/shipping/address";
 import { stripeDashboardUrl } from "@/lib/stripe";
+import { maxOrderNumber } from "@/lib/orders/order-number";
 
 import type { AdminEmailSend } from "./email-status";
 import { type AdminOrdersParams, searchNumber } from "./list-params";
@@ -264,7 +265,7 @@ export type AdminOrderDetail = {
   }[];
 };
 
-const orderNumberSchema = z.coerce.number().int().min(1001).max(2_147_483_647);
+const orderNumberSchema = z.coerce.number().int().min(1001).max(maxOrderNumber);
 
 // spec 0006, AC-13 and spec 0010, AC-21: null for a malformed or unknown number (the page shows
 // its not found state).

@@ -16,9 +16,10 @@ import { requireCustomer } from "@/lib/customer/session";
 import { formatDate } from "@/lib/dates";
 import { env } from "@/lib/env";
 import { formatMoney } from "@/lib/money";
+import { orderStatusLabels } from "@/lib/orders/status-labels";
 
 import { accountNotice } from "../messages";
-import { pageNumber, statusWords } from "../order-view";
+import { pageNumber } from "../order-view";
 import { accountOrderPath, accountPaths } from "../paths";
 import { listAccountOrders } from "../queries";
 
@@ -70,7 +71,7 @@ export async function OrdersList({
                   </span>
                 </span>
                 <span className="justify-self-end text-sm sm:justify-self-start">
-                  {statusWords[order.status]}
+                  {orderStatusLabels[order.status]}
                 </span>
                 <span className="text-sm text-muted-foreground">
                   {order.itemCount === 1 ? "1 item" : `${order.itemCount} items`}

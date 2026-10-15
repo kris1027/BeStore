@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { OrderStatus } from "@/generated/prisma/enums";
 import { firstValue, searchQuerySchema } from "@/lib/admin-search";
 import { parseCalendarDay } from "@/lib/dates";
+import { maxOrderNumber } from "@/lib/orders/order-number";
 
 import { adminOrdersPath } from "./paths";
 import type { RefundState } from "./refund-math";
@@ -41,7 +42,7 @@ const schema = z.object({
   refund: z.enum(["none", "partial", "full"]).optional().catch(undefined),
   from: z.string().optional().catch(undefined),
   to: z.string().optional().catch(undefined),
-  before: z.coerce.number().int().min(1).max(2_147_483_647).optional().catch(undefined),
+  before: z.coerce.number().int().min(1).max(maxOrderNumber).optional().catch(undefined),
 });
 
 function day(text: string | undefined): string | null {
@@ -105,5 +106,5 @@ export function adminOrdersHref(params: AdminOrdersParams, before: number | null
 export function searchNumber(q: string): number | null {
   if (!/^\d+$/.test(q)) return null;
   const number = Number(q);
-  return number >= 1 && number <= 2_147_483_647 ? number : null;
+  return number >= 1 && number <= maxOrderNumber ? number : null;
 }

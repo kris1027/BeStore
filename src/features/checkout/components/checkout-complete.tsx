@@ -8,16 +8,10 @@ import { ProductImage } from "@/components/product-image";
 import { buttonVariants } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { orderStatusLabels } from "@/lib/orders/status-labels";
 
 import { type CompletedOrder, type Completion, getCompletion } from "../queries";
 import { CompleteRefresher } from "./complete-refresher";
-
-const statusLabels: Record<CompletedOrder["status"], string> = {
-  paid: "Paid",
-  shipped: "Shipped",
-  delivered: "Delivered",
-  cancelled: "Cancelled",
-};
 
 const announcements: Record<Completion["state"], string> = {
   paid: "Payment received. Thank you for your order.",
@@ -103,7 +97,7 @@ function PaidOrder({ order }: { readonly order: CompletedOrder }) {
         <div className="flex flex-col gap-3">
           <p className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
             <CircleCheckIcon aria-hidden="true" className="size-4" />
-            {statusLabels[order.status]}
+            {orderStatusLabels[order.status]}
           </p>
           <h1 className="font-heading text-4xl md:text-5xl">Thank you for your order</h1>
           <p className="text-lg text-muted-foreground">

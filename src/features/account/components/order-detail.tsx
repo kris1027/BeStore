@@ -10,8 +10,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { requireCustomer } from "@/lib/customer/session";
 import { formatDate } from "@/lib/dates";
 import { env } from "@/lib/env";
+import { orderStatusLabels } from "@/lib/orders/status-labels";
 
-import { orderNumberParam, statusWords } from "../order-view";
+import { orderNumberParam } from "../order-view";
 import { accountPaths } from "../paths";
 import { getAccountOrder } from "../queries";
 
@@ -41,7 +42,7 @@ export async function OrderDetail({ params }: { readonly params: Promise<{ numbe
       <div className="flex flex-col gap-1">
         <h2 className="font-heading text-3xl">Order #{order.number}</h2>
         <p className="text-muted-foreground">
-          Paid {formatDate(order.paidAt, format)} · {statusWords[order.status]}
+          Paid {formatDate(order.paidAt, format)} · {orderStatusLabels[order.status]}
         </p>
       </div>
       <div className="grid items-start gap-10 lg:grid-cols-3">
