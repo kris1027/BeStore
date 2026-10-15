@@ -36,6 +36,13 @@ describe("safeAccountNext (AC-4)", () => {
     "/account/javascript:alert(1)",
     "/account\n/orders",
     "%E0%A4%A",
+    "/account/../admin",
+    "/account/./sign-in",
+    "/account/%2e%2e/admin",
+    "%2Faccount%2F%252e%252e%2Fadmin",
+    "/account/orders/..",
+    "/account/sign-in/",
+    "/account/",
   ])("refuses %j", (next) => {
     expect(safeAccountNext(next)).toBeNull();
   });

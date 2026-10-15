@@ -53,6 +53,10 @@ export function safeAccountNext(next: unknown): string | null {
   if (/[\u0000-\u001f\u007f]/.test(decoded)) return null;
   const pathname = decoded.split(/[?#]/)[0] ?? "";
   if (pathname.includes(":")) return null;
+  // The path must already be in the form the browser and Next.js will land on: a dot segment
+  // (also %2e, which URL parsing reads as a dot) or a trailing slash would move it after this
+  // check, e.g. /account/../admin or /account/sign-in/.
+  if (pathname.endsWith("/") || new URL(pathname, "http://n").pathname !== pathname) return null;
   if (pathname === "/checkout") return decoded;
   if (isAccountPath(pathname) && !isAccountAuthPage(pathname)) return decoded;
   return null;
