@@ -97,7 +97,7 @@ Customers can make an optional account. They give their email, click the link we
 - **AC-19**: Change password asks for the current password and a new one under the AC-3 rule. A user with an `admin_users` row or a verified factor is refused: "This account also runs the store. Use Forgot password on the admin sign in page." A wrong current password shows "Your current password is not right." On success every other session of the user is signed out and this one stays.
 - **AC-20**: "Delete my account" asks for the password.
   * If the customer has orders with status `paid`, the dialog first says "You have <n> order(s) not shipped yet. They will still be delivered, and emails about them still go to <email>."
-  * A user with an `admin_users` row (any state) is refused: "This account also runs the store, so it cannot be deleted here."
+  * A user who runs the store (an `admin_users` row in any state, or a verified factor, the AC-19 check) is refused: "This account also runs the store, so it cannot be deleted here."
   * Otherwise, in one transaction under the customer lock: the `customers` row is deleted (its addresses and cart cascade, and its orders keep their snapshot with `customer_id` null, spec 0002 AC-7). Then `auth.admin.deleteUser(id)` runs through the service role client, then the transaction commits. If the API call fails, the transaction rolls back and the form shows "We could not delete your account. Try again." In the rare case where the commit fails after the API call, `account.delete_incomplete` is logged (error). The leftover row has no login, and AC-10 removes it if the email signs up again.
   * The auth and cart cookies are cleared, and the visitor lands on the home page with "Your account is deleted."
 
@@ -219,7 +219,7 @@ Reasoning and options: see [rationale.md](rationale.md).
 | checkout page | prefill | pending order for this cart (spec 0007), else default `customer_addresses` row |
 | address book | country | the store's country from `src/lib/shipping` (spec 0007) |
 | `signUpFromOrder` | email, eligibility | the order found by `stripe_checkout_session_id`: `email`, `status`, `customer_id`; the visitor's session |
-| AC-20 | open order count, admin refusal | count of the customer's `orders` with status `paid`; `admin_users` row by id |
+| AC-20 | open order count, admin refusal | count of the customer's `orders` with status `paid`; `admin_users` row by id or a verified `auth.mfa_factors` row |
 | AC-21 | Account or Guest | `orders.customer_id` null or not |
 
 **Key invariants**:

@@ -215,6 +215,17 @@ describe("deleteAccount (AC-20)", () => {
     );
   });
 
+  it("refuses anyone with an authenticator, like change password", async () => {
+    await addVerifiedFactor(mocks.customer.id);
+
+    expect(await deleteAccount({ password: "Pass-word-1" })).toEqual({
+      ok: false,
+      error: { form: "runs_the_store" },
+    });
+    expect(mocks.statelessSignIn).not.toHaveBeenCalled();
+    expect(mocks.deleteUser).not.toHaveBeenCalled();
+  });
+
   it("needs the right password", async () => {
     mocks.statelessSignIn.mockResolvedValue({
       data: { user: null },

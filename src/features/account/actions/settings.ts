@@ -93,8 +93,7 @@ export async function deleteAccount(
   const parsed = deleteAccountSchema.safeParse(values);
   if (!parsed.success) return { ok: false, error: { fields: fieldErrors(parsed.error) } };
 
-  const admin = await db.adminUser.findUnique({ where: { id: customer.id }, select: { id: true } });
-  if (admin) {
+  if (await runsTheStore(customer.id)) {
     logAccountEvent("account.delete_refused_admin", { customerId: customer.id });
     return { ok: false, error: { form: "runs_the_store" } };
   }
