@@ -7,13 +7,9 @@ import { fieldErrors } from "@/lib/form-errors";
 import type { ActionResult } from "@/lib/result";
 import { createSupabaseStatelessClient } from "@/lib/supabase/server";
 
-import { emailFormSchema } from "../schemas";
+import { type EmailFormError, emailFormSchema } from "../schemas";
 import { settle } from "../settle";
 import { sendSignUp } from "../sign-up-email";
-
-export type EmailFormError = {
-  readonly fields?: Partial<Record<"email", readonly string[]>>;
-};
 
 // spec 0012, AC-1: always the same "Check your email" answer, for a new email, an existing
 // account (confirmed or not) and an admin's email. Supabase runs in after(), so neither the reply

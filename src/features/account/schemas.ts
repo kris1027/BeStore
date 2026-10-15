@@ -19,6 +19,11 @@ export const emailSchema = z
 
 export const emailFormSchema = z.object({ email: emailSchema });
 
+// What sign up, resend and forgot password answer when the email is refused.
+export type EmailFormError = {
+  readonly fields?: Partial<Record<"email", readonly string[]>>;
+};
+
 export type EmailFormValues = z.input<typeof emailFormSchema>;
 
 export const newPasswordSchema = z

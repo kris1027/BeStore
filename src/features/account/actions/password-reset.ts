@@ -9,9 +9,8 @@ import type { ActionResult } from "@/lib/result";
 import { createSupabaseStatelessClient } from "@/lib/supabase/server";
 
 import { accountPaths } from "../paths";
-import { emailFormSchema } from "../schemas";
+import { type EmailFormError, emailFormSchema } from "../schemas";
 import { settle } from "../settle";
-import type { EmailFormError } from "./sign-up";
 
 // spec 0012, AC-9: the same reply for any email, at the same speed: Supabase runs in after(). The
 // Send Email Hook picks the email (AC-8): an admin, or a user with an authenticator, gets the
