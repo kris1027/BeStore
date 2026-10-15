@@ -1,7 +1,5 @@
-import { Text } from "react-email";
-
-import { ActionLink } from "./components/action-link";
-import { type EmailFrame, EmailLayout, textStyle } from "./components/layout";
+import { AuthLinkEmail } from "./components/auth-link-email";
+import type { EmailFrame } from "./components/layout";
 import { fixtureFrame } from "./fixtures";
 
 // spec 0004, AC-9, sent by the Send Email Hook since spec 0012 (AC-8): the wording of the old
@@ -17,21 +15,14 @@ export const adminResetPasswordSubject = "Reset your admin password";
 
 export function AdminResetPasswordEmail(props: AdminResetPasswordProps) {
   return (
-    <EmailLayout
+    <AuthLinkEmail
       frame={props.frame}
-      preview={adminResetPasswordSubject}
-      heading={adminResetPasswordSubject}
-    >
-      <Text style={textStyle}>
-        Someone asked to reset the password for this admin account. If it was you, open the link
-        below and follow the steps. You will need your authenticator app.
-      </Text>
-      <ActionLink href={props.resetUrl} label="Reset your password" />
-      <Text style={textStyle}>
-        The link works once and expires in one hour. If you did not ask for this, you can ignore
-        this email; your password stays the same.
-      </Text>
-    </EmailLayout>
+      subject={adminResetPasswordSubject}
+      intro={`Someone asked to reset the password for this admin account. If it was you, open the link below and follow the steps. You will need your authenticator app.`}
+      href={props.resetUrl}
+      label="Reset your password"
+      outro="The link works once and expires in one hour. If you did not ask for this, you can ignore this email; your password stays the same."
+    />
   );
 }
 

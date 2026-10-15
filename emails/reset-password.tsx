@@ -1,7 +1,5 @@
-import { Text } from "react-email";
-
-import { ActionLink } from "./components/action-link";
-import { type EmailFrame, EmailLayout, textStyle } from "./components/layout";
+import { AuthLinkEmail } from "./components/auth-link-email";
+import type { EmailFrame } from "./components/layout";
 import { fixtureFrame } from "./fixtures";
 
 // spec 0012, AC-8 and AC-9: a customer's password reset, sent by the Send Email Hook. Users who
@@ -16,17 +14,14 @@ export const resetPasswordSubject = "Reset your password";
 
 export function ResetPasswordEmail(props: ResetPasswordProps) {
   return (
-    <EmailLayout frame={props.frame} preview={resetPasswordSubject} heading={resetPasswordSubject}>
-      <Text style={textStyle}>
-        Someone asked to reset the password for your {props.frame.storeName} account. If it was you,
-        open the link and choose a new password.
-      </Text>
-      <ActionLink href={props.resetUrl} label="Choose a new password" />
-      <Text style={textStyle}>
-        The link works once and expires in one hour. If you did not ask for this, ignore this email;
-        your password stays the same.
-      </Text>
-    </EmailLayout>
+    <AuthLinkEmail
+      frame={props.frame}
+      subject={resetPasswordSubject}
+      intro={`Someone asked to reset the password for your ${props.frame.storeName} account. If it was you, open the link and choose a new password.`}
+      href={props.resetUrl}
+      label="Choose a new password"
+      outro="The link works once and expires in one hour. If you did not ask for this, ignore this email; your password stays the same."
+    />
   );
 }
 
