@@ -88,6 +88,17 @@ describe("signUpFromOrder", () => {
     expect(mocks.signUp).toHaveBeenCalledWith("guest@example.com");
   });
 
+  // covers: AC-17 (value sourcing): a tampered request body cannot choose the email.
+  it("ignores an email added to the request, signing up no one", async () => {
+    const sessionId = await orderWithSession();
+
+    expect(await signUpFromOrder({ sessionId, email: "attacker@example.com" })).toEqual({
+      ok: false,
+      error: "not_eligible",
+    });
+    expect(mocks.after).not.toHaveBeenCalled();
+  });
+
   it("answers not_eligible and signs up no one otherwise", async () => {
     const sessionId = await orderWithSession({ status: "pending_payment" });
 

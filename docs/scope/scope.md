@@ -241,7 +241,7 @@ spec [0012](../specs/0012-customer-accounts/index.md) · code in [src/features/a
   - [x] Checkout integration, settings, delete account and the admin badge (AC-15 to AC-21)
   - [x] Safety net: logs, axe, header link, production runbook (AC-22, AC-24 to AC-26)
 - [x] Verify it: `/check verify customer accounts`
-- [ ] Test it: `/test customer accounts`
+- [x] Test it: `/test customer accounts`
 - [x] Review it (fresh model): `/check review customer accounts`
 - [ ] Document it: `/document customer accounts`
 

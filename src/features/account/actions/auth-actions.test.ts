@@ -343,6 +343,34 @@ describe("signInCustomer (AC-4)", () => {
     expect(logged()).not.toContain("ada@example.com");
   });
 
+  // covers: AC-10 (value sourcing): a stale cookie of another account reads as no session, and
+  // setup runs for the user Supabase signed in, never for the typed email.
+  it("runs account setup for the user Supabase returned", async () => {
+    const grace = {
+      id: "44444444-4444-4444-4444-444444444444",
+      email: "Grace@Example.com",
+      email_confirmed_at: "2026-10-14T10:00:00Z",
+    };
+    mocks.signInWithPassword.mockResolvedValue({ data: { user: grace }, error: null });
+
+    expect(await outcome(() => signInCustomer(values, null))).toBe("redirect:/account");
+    expect(mocks.accountSetup).toHaveBeenCalledWith({ id: grace.id, email: "grace@example.com" });
+  });
+
+  it("ends the session of an unconfirmed user and answers with the usual message", async () => {
+    mocks.signInWithPassword.mockResolvedValue({
+      data: { user: { ...confirmedUser, email_confirmed_at: undefined } },
+      error: null,
+    });
+
+    expect(await signInCustomer(values, null)).toEqual({
+      ok: false,
+      error: { form: "invalid_credentials" },
+    });
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(mocks.accountSetup).not.toHaveBeenCalled();
+  });
+
   it("ends the session when account setup fails", async () => {
     mocks.signInWithPassword.mockResolvedValue({ data: { user: confirmedUser }, error: null });
     mocks.accountSetup.mockResolvedValue({ ok: false, error: "email_conflict" });
