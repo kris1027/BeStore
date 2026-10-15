@@ -56,8 +56,15 @@ export async function handleSendEmailHook(request: Request): Promise<Response> {
   }
 
   const parsed = hookPayloadSchema.safeParse(verified);
-  const type = parsed.success ? usedActionType(parsed.data.email_data.email_action_type) : null;
-  if (!parsed.success || type === null) {
+  if (!parsed.success) {
+    // A signed payload that breaks Supabase's contract, not a type we refuse: the field paths
+    // only, never their values.
+    const fields = parsed.error.issues.map((issue) => issue.path.join("."));
+    logger.warn({ event: "auth_email.bad_payload", fields }, "auth_email.bad_payload");
+    return json(400, hookErrorBody(400, "invalid payload"));
+  }
+  const type = usedActionType(parsed.data.email_data.email_action_type);
+  if (type === null) {
     logger.warn({ event: "auth_email.unexpected_type" }, "auth_email.unexpected_type");
     return json(400, hookErrorBody(400, "unsupported email type"));
   }

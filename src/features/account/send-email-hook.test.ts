@@ -176,6 +176,23 @@ describe("handleSendEmailHook", () => {
     },
   );
 
+  it("answers 400 to a signed payload that breaks the contract and logs only the field paths", async () => {
+    const body = JSON.stringify({
+      user: { id: userId, email: "not an email" },
+      email_data: { token_hash: "pkce_token_hash", email_action_type: "signup" },
+    });
+
+    const response = await handleSendEmailHook(signedRequest(body));
+
+    expect(response.status).toBe(400);
+    expect(mocks.send).not.toHaveBeenCalled();
+    expect(mocks.warn).toHaveBeenCalledWith(
+      { event: "auth_email.bad_payload", fields: ["user.email"] },
+      "auth_email.bad_payload",
+    );
+    expect(JSON.stringify(mocks.warn.mock.calls)).not.toContain("not an email");
+  });
+
   it("answers 500 in Supabase's error shape when the send fails, and logs it as an error", async () => {
     mocks.send.mockResolvedValue({
       ok: false,
