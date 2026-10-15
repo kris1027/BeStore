@@ -243,7 +243,7 @@ spec [0012](../specs/0012-customer-accounts/index.md) · code in [src/features/a
 - [x] Verify it: `/check verify customer accounts`
 - [x] Test it: `/test customer accounts`
 - [x] Review it (fresh model): `/check review customer accounts`
-- [ ] Document it: `/document customer accounts`
+- [x] Document it: `/document customer accounts`
 
 ## Slice 7: Discovery
 
