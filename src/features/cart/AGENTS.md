@@ -11,6 +11,7 @@ The guest cart: add to cart, `/cart` with quantity and remove, the header count,
 - `src/lib/cart/signature.ts`, `cookie.ts`: the `bestore_cart` cookie, `<cartId>.<HMAC SHA 256>` signed with `CART_COOKIE_SECRET`.
 - `src/lib/cart/merge.ts`: `mergeCarts` and `lockAccountCart`, the guest cart joining a customer's cart at sign in and checkout (spec 0012, AC-5). The caller holds the customer lock.
 - `src/lib/cart/load-cart.ts`: loads the cart with live variant data; `cart-lines.ts`: pure line flags, totals and `canCheckout`.
+- `src/lib/cart/owned.ts`: `readOwnedCartId` and `loadOwnedCart`, the cookie cart only when this visitor may use it (spec 0012, AC-7).
 
 ## Conventions
 
@@ -20,6 +21,7 @@ The guest cart: add to cart, `/cart` with quantity and remove, the header count,
 - Writes lock the cart row (`SELECT ... FOR UPDATE`) so concurrent adds cannot pass a line's cap: the variant's stock or 10 (`lineCap` in `src/lib/availability.ts`).
 - A signed in customer with no live cookie cart adds to their account cart, under the customer lock (`src/lib/customer/lock.ts`) taken before the cart lock (spec 0012, AC-7). Only an add that must create a cart reads the session, before the transaction.
 - A line action only touches lines of the cart named by the verified cookie; a line id from another cart answers `not_found`.
+- An account cart belongs to its customer's session only: cart actions, `/cart` and checkout read the cookie through `readOwnedCartId` / `loadOwnedCart`, so a leftover account cart cookie reads as no cart. The header count keeps the raw `loadCart` so catalog pages never call Supabase.
 - `/cart` never prices delivery itself: the delivery row, total and free delivery nudge come from `getShippingSettings()` (cached, `storeSettingsTag`) through `orderCharges` and `freeDeliveryGapCents` in `src/lib/shipping/rule.ts` (spec 0007).
 - Rendering a cart never writes. Line flags ("No longer available", "Sold out", "Only N left") are computed at read time, never stored.
 - The cron deletes in batches of 1000 until a batch deletes nothing; lines cascade, orders keep their row with `cart_id` null.

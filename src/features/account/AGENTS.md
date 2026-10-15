@@ -24,7 +24,7 @@ Optional customer accounts under `/account`: sign up, confirm, choose a password
 - One advisory lock per customer (`lockCustomer`) guards every write to their cart, addresses or order links. Take it before any cart or order row lock.
 - Sign up never sets the real password: Supabase gets a throwaway one and the customer chooses theirs after confirming. Sign up and forgot password answer the same whatever the email, and the Supabase call runs in `after()`.
 - Email links use the token hash pattern: the GET shows Continue, only the POST calls `verifyOtp`. `/account/confirm` sends `no-referrer` (set in `next.config.ts`).
-- A user who runs the store (an `admin_users` row in any state, or a verified TOTP factor) always gets the admin reset email and cannot delete their account here. `auth.users` and `auth.mfa_factors` are read only, through `$queryRaw`.
+- A user who runs the store (an `admin_users` row in any state, or a verified TOTP factor) always gets the admin reset email, keeps their password when a sign up link is confirmed, and cannot delete their account here. `auth.users` and `auth.mfa_factors` are read only, through `$queryRaw`.
 - Signed in checkout uses the account email, whatever was typed. An order number that is missing, someone else's or hidden renders the same not found content.
 - Logs carry the customer id, order ids and numbers, counts and reason codes only, never an email, name, address, password or token.
 
