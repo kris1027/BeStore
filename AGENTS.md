@@ -58,7 +58,7 @@ Stored in `docs/specs/`. Format: `docs/specs/NNNN-title/index.md`. Scope lives i
 - **Caching**: `cacheComponents` is on. Catalog reads are `'use cache'` functions tagged from `src/lib/cache-tags.ts`; whatever changes what they return must expire the tag (`updateTag` in a server action, `revalidateTag(tag, { expire: 0 })` in a route handler). Request data (cookies, the cart) sits behind Suspense.
 - **Status codes**: under Cache Components a page's `notFound()` / `redirect()` answer 200 (the shell streams first). Where the real status matters, decide it in the proxy before rendering (the admin gate does this).
 - **Cron**: handlers under `app/api/cron/` refuse anything but `Authorization: Bearer ${CRON_SECRET}` (constant time compare); schedules live in `vercel.json`.
-- **Env**: every variable is added to the Zod schema in `src/lib/env.ts` and to `.env.example`.
+- **Env**: every variable the app reads is added to the Zod schema in `src/lib/env.ts` and to `.env.example`. A variable only a CLI reads (e.g. `SEND_EMAIL_HOOK_URI`, read by the Supabase CLI through `env()` in `supabase/config.toml`) goes in `.env.example` alone, marked as such.
 - **UI**: WCAG AA baseline on storefront and admin (labels, keyboard use, visible focus, contrast).
 - **Comments**: explain the why (invariants, gotchas), not the what.
 - **Tests**: each feature ships Vitest tests for its logic and server actions plus Playwright for its user flows.
