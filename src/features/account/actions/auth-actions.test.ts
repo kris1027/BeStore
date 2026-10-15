@@ -165,6 +165,10 @@ describe("signUp (AC-1)", () => {
 });
 
 describe("confirmEmail (AC-2)", () => {
+  beforeEach(() => {
+    mocks.updateUser.mockResolvedValue({ data: { user: confirmedUser }, error: null });
+  });
+
   it("spends the token and sends a sign up to choose a password", async () => {
     mocks.verifyOtp.mockResolvedValue({ data: { user: confirmedUser }, error: null });
 
@@ -174,12 +178,39 @@ describe("confirmEmail (AC-2)", () => {
     expect(result).toBe("redirect:/account/set-password");
   });
 
+  // A password planted by a direct Supabase sign up must not survive a customer who confirms and
+  // then leaves set password without choosing one.
+  it("replaces the sign up password with a throwaway and ends other sessions", async () => {
+    mocks.verifyOtp.mockResolvedValue({ data: { user: confirmedUser }, error: null });
+
+    await outcome(() => confirmEmail(form({ token_hash: "abc", type: "signup" })));
+
+    const [call] = mocks.updateUser.mock.calls[0]!;
+    expect(call.password).toMatch(/^[A-Za-z0-9_-]{43}aA1!$/);
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: "others" });
+  });
+
+  it("still sends the customer to choose a password when the replace fails, and logs a code", async () => {
+    mocks.verifyOtp.mockResolvedValue({ data: { user: confirmedUser }, error: null });
+    mocks.updateUser.mockResolvedValue({ data: { user: null }, error: { status: 500 } });
+
+    const result = await outcome(() => confirmEmail(form({ token_hash: "abc", type: "signup" })));
+
+    expect(result).toBe("redirect:/account/set-password");
+    expect(mocks.error).toHaveBeenCalledWith(
+      expect.objectContaining({ customerId: USER_ID }),
+      "account.confirm.password_replace_failed",
+    );
+    expect(mocks.signOut).not.toHaveBeenCalled();
+  });
+
   it("sends a recovery to the new password page with the reset wording", async () => {
     mocks.verifyOtp.mockResolvedValue({ data: { user: confirmedUser }, error: null });
 
     const result = await outcome(() => confirmEmail(form({ token_hash: "abc", type: "recovery" })));
 
     expect(result).toBe("redirect:/account/set-password?from=reset");
+    expect(mocks.updateUser).not.toHaveBeenCalled();
   });
 
   it("sends anyone who runs the store to the authenticator step instead", async () => {

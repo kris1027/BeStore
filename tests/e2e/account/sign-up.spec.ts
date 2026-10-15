@@ -100,6 +100,27 @@ test("a password planted before the confirm never survives it", async ({ page })
   await expect(page).toHaveURL("/account");
 });
 
+test("a planted password stays dead when the owner confirms and leaves without choosing one", async ({
+  page,
+}) => {
+  const email = uniqueEmail("abandoned");
+  await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/signup`, {
+    method: "POST",
+    headers: {
+      apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ email, password: "Planted-pass-1" }),
+  });
+  await page.goto(await accountLinkFor(email));
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page).toHaveURL("/account/set-password");
+
+  await page.context().clearCookies();
+  await signInAsCustomer(page, email, "Planted-pass-1");
+  await expect(page.getByText("That email and password do not match.")).toBeVisible();
+});
+
 test("a signed out visitor on an account page is sent to sign in, never from a cache", async ({
   page,
   request,
