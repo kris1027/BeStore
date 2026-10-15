@@ -1,31 +1,8 @@
 import { z } from "zod";
 
-import { authMessages, fieldMessages, passwordRuleMessages, type PasswordRule } from "./messages";
+import { passwordSchema } from "@/lib/auth/password";
 
-// Pure (no server-only imports): the admin scripts share passwordSchema with the app.
-
-// Supabase's `lower_upper_letters_digits_symbols` policy counts only these as symbols, so the
-// schema uses the same set; a password that passes here also passes the Auth server (AC-10).
-const symbols = "!@#$%^&*()_+-=[]{};'\\:\"|<>?,./`~";
-
-const passwordRules: readonly (readonly [PasswordRule, (value: string) => boolean])[] = [
-  ["length", (value) => value.length >= 8],
-  ["lower", (value) => /[a-z]/.test(value)],
-  ["upper", (value) => /[A-Z]/.test(value)],
-  ["digit", (value) => /[0-9]/.test(value)],
-  ["symbol", (value) => [...value].some((char) => symbols.includes(char))],
-];
-
-export function missingPasswordRules(value: string): PasswordRule[] {
-  return passwordRules.filter(([, passes]) => !passes(value)).map(([rule]) => rule);
-}
-
-// One issue per missing part, so the form can name each of them.
-export const passwordSchema = z.string().superRefine((value, ctx) => {
-  for (const rule of missingPasswordRules(value)) {
-    ctx.addIssue({ code: "custom", message: passwordRuleMessages[rule] });
-  }
-});
+import { authMessages, fieldMessages } from "./messages";
 
 export const emailSchema = z
   .string()

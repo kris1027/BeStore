@@ -2,7 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { type AuthFailure, classifyAuthError } from "./auth-errors";
+import { type AuthFailure, classifyAuthError } from "@/lib/auth/errors";
 
 export type TotpFactors = {
   readonly verified: { readonly id: string } | null;

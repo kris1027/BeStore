@@ -3,7 +3,10 @@
 import type Stripe from "stripe";
 
 import { canCheckout } from "@/lib/cart/cart-lines";
-import { readCartId } from "@/lib/cart/cookie";
+import { readOwnedCartId } from "@/lib/cart/owned";
+import { logAccountEvent } from "@/lib/customer/log";
+import { getCustomer } from "@/lib/customer/session";
+import { type CustomerIdentity, mergeCartForCustomer } from "@/lib/customer/setup";
 import { db, type Tx } from "@/lib/db";
 import { uniqueViolation } from "@/lib/db-errors";
 import { env } from "@/lib/env";
@@ -21,13 +24,16 @@ import { stripe } from "@/lib/stripe";
 import { uuidv7 } from "@/lib/uuid";
 import { variantLabel } from "@/lib/variant-label";
 
+import { type CheckoutAccount, lockAccount, orderCustomerName, saveToAccount } from "../account";
 import { logCheckoutRefused, logCheckoutStarted, logStripeFailed, stripeErrorCode } from "../log";
 import { type CheckoutFieldErrors, checkoutFieldErrors, checkoutSchema } from "../schemas";
 import { checkoutSessionParams } from "../stripe-session";
 
 export type StartCheckoutError =
   | { readonly code: "validation"; readonly fields: CheckoutFieldErrors }
-  | { readonly code: "cart_changed" }
+  // `merged`: signing in brought lines from the account cart into this one (spec 0012, AC-15), so
+  // the form reloads instead of leaving for the cart page.
+  | { readonly code: "cart_changed"; readonly merged?: true }
   | { readonly code: "below_minimum"; readonly minimumCents: number }
   | { readonly code: "payment_processing" }
   | { readonly code: "already_paid"; readonly confirmationUrl: string }
@@ -59,16 +65,22 @@ async function run(input: unknown): Promise<Result<{ readonly url: string }>> {
   if (!parsed.success) {
     return fail({ code: "validation", fields: checkoutFieldErrors(parsed.error) });
   }
-  const { email, ...address } = parsed.data;
+  const { email: typedEmail, saveAddress: saveRequested, ...address } = parsed.data;
   const shipTo: ShipTo = { ...address, countryCode: env.STORE_COUNTRY };
 
-  const cartId = await readCartId();
-  if (cartId === null) return fail({ code: "cart_changed" });
+  // spec 0012, AC-15: a signed in checkout uses the account email, whatever was typed, and a
+  // guest cookie cart first joins the account cart. A guest pays only for a guest cart (AC-7).
+  const customer = await getCustomer();
+  const cart = await checkoutCartId(customer);
+  if (!cart.ok) return cart;
+  const cartId = cart.data;
+  const email = customer?.email ?? typedEmail;
+  const account = customer === null ? null : { customer, saveAddress: saveRequested };
 
   const cleared = await clearPendingOrder(cartId);
   if (!cleared.ok) return cleared;
 
-  const created = await createPendingOrder(cartId, email, shipTo);
+  const created = await createPendingOrder(cartId, email, shipTo, account);
   if (!created.ok) return created;
   const order = created.data;
 
@@ -205,6 +217,15 @@ async function keepEarlierOrder(orderId: string, sessionId: string): Promise<Res
   });
 }
 
+// spec 0012, AC-7 and AC-15: a guest pays only for a guest cart; a signed in customer's guest
+// cookie cart first joins the account cart, and lines already there send the form back to reload.
+async function checkoutCartId(customer: CustomerIdentity | null): Promise<Result<string>> {
+  const merge = customer === null ? null : await mergeCartForCustomer(customer.id);
+  if (merge?.accountHadLines) return fail({ code: "cart_changed", merged: true });
+  const cartId = merge === null ? await readOwnedCartId() : merge.cartId;
+  return cartId === null ? fail({ code: "cart_changed" }) : { ok: true, data: cartId };
+}
+
 type CreatedOrder = {
   readonly id: string;
   readonly number: number;
@@ -218,76 +239,93 @@ async function createPendingOrder(
   cartId: string,
   email: string,
   shipTo: ShipTo,
+  account: CheckoutAccount | null,
 ): Promise<Result<CreatedOrder>> {
   try {
-    return await db.$transaction(async (tx): Promise<Result<CreatedOrder>> => {
-      const [cart] = await tx.$queryRaw<{ id: string }[]>`
+    const created = await db.$transaction(
+      async (tx): Promise<Result<CreatedOrder & { readonly addressSaved: boolean }>> => {
+        // The customer lock comes before the cart lock, the order every account write takes.
+        const profileName = account === null ? null : await lockAccount(tx, account);
+        const [cart] = await tx.$queryRaw<{ id: string }[]>`
         SELECT id FROM carts WHERE id = ${cartId}::uuid AND expires_at > now() FOR UPDATE`;
-      if (!cart) return fail({ code: "cart_changed" });
+        if (!cart) return fail({ code: "cart_changed" });
 
-      // spec 0009, Key invariants: a product delete locks its variants before checking for
-      // order lines, so holding these until commit means it either waits and then sees this
-      // order, or already deleted them and this cart no longer reads them.
-      await tx.$queryRaw`
+        // spec 0009, Key invariants: a product delete locks its variants before checking for
+        // order lines, so holding these until commit means it either waits and then sees this
+        // order, or already deleted them and this cart no longer reads them.
+        await tx.$queryRaw`
         SELECT v.id FROM product_variants v
         JOIN cart_items ci ON ci.variant_id = v.id
         WHERE ci.cart_id = ${cartId}::uuid
         ORDER BY v.id FOR KEY SHARE OF v`;
-      const sources = await loadLockedCart(tx, cartId);
-      if (!canCheckout(sources.map((source) => source.facts))) {
-        return fail({ code: "cart_changed" });
-      }
+        const sources = await loadLockedCart(tx, cartId);
+        if (!canCheckout(sources.map((source) => source.facts))) {
+          return fail({ code: "cart_changed" });
+        }
 
-      // Another tab got here first, between our step 2 and this lock.
-      const racing = await tx.order.findFirst({
-        where: { cartId, status: "pending_payment" },
-        select: { id: true },
-      });
-      if (racing) return fail({ code: "checkout_in_progress" });
+        // Another tab got here first, between our step 2 and this lock.
+        const racing = await tx.order.findFirst({
+          where: { cartId, status: "pending_payment" },
+          select: { id: true },
+        });
+        if (racing) return fail({ code: "checkout_in_progress" });
 
-      // Read here, never from the cache: an admin change made while the customer sat on
-      // /checkout applies to this Pay (AC-7), and Stripe's page shows that total.
-      const settings = await readShippingSettings(tx);
-      const snapshot = snapshotOrder(
-        sources.map((source) => source.snapshot),
-        settings,
-      );
-      const minimumCents = minimumChargeCents(env.STORE_CURRENCY);
-      if (snapshot.totalCents < minimumCents) return fail({ code: "below_minimum", minimumCents });
+        // Read here, never from the cache: an admin change made while the customer sat on
+        // /checkout applies to this Pay (AC-7), and Stripe's page shows that total.
+        const settings = await readShippingSettings(tx);
+        const snapshot = snapshotOrder(
+          sources.map((source) => source.snapshot),
+          settings,
+        );
+        const minimumCents = minimumChargeCents(env.STORE_CURRENCY);
+        if (snapshot.totalCents < minimumCents)
+          return fail({ code: "below_minimum", minimumCents });
 
-      const order = await tx.order.create({
-        data: {
-          id: uuidv7(),
-          cartId,
-          email,
-          ...deliveryColumns(shipTo),
-          currency: env.STORE_CURRENCY,
-          subtotalCents: snapshot.subtotalCents,
-          discountCents: snapshot.discountCents,
-          shippingCents: snapshot.shippingCents,
-          totalCents: snapshot.totalCents,
-          lines: {
-            create: snapshot.lines.map((line) => ({
-              variantId: line.variantId,
-              productId: line.productId,
-              productName: line.productName,
-              variantLabel: line.variantLabel,
-              sku: line.sku,
-              imagePath: line.imagePath,
-              unitPriceCents: line.unitPriceCents,
-              quantity: line.quantity,
-              discountCents: line.discountCents,
-              lineTotalCents: line.lineTotalCents,
-            })),
+        const customerName = orderCustomerName(profileName, shipTo.fullName);
+        const order = await tx.order.create({
+          data: {
+            id: uuidv7(),
+            cartId,
+            customerId: account?.customer.id ?? null,
+            email,
+            customerName,
+            ...deliveryColumns(shipTo),
+            currency: env.STORE_CURRENCY,
+            subtotalCents: snapshot.subtotalCents,
+            discountCents: snapshot.discountCents,
+            shippingCents: snapshot.shippingCents,
+            totalCents: snapshot.totalCents,
+            lines: {
+              create: snapshot.lines.map((line) => ({
+                variantId: line.variantId,
+                productId: line.productId,
+                productName: line.productName,
+                variantLabel: line.variantLabel,
+                sku: line.sku,
+                imagePath: line.imagePath,
+                unitPriceCents: line.unitPriceCents,
+                quantity: line.quantity,
+                discountCents: line.discountCents,
+                lineTotalCents: line.lineTotalCents,
+              })),
+            },
+            events: {
+              create: { type: "created", toStatus: "pending_payment", actorType: "customer" },
+            },
           },
-          events: {
-            create: { type: "created", toStatus: "pending_payment", actorType: "customer" },
-          },
-        },
-        select: { id: true, number: true, totalCents: true },
-      });
-      return { ok: true, data: { ...order, snapshot } };
-    });
+          select: { id: true, number: true, totalCents: true },
+        });
+        const addressSaved =
+          account === null ? false : await saveToAccount(tx, account, shipTo, customerName);
+        return { ok: true, data: { ...order, snapshot, addressSaved } };
+      },
+    );
+    if (!created.ok) return created;
+    const { addressSaved, ...order } = created.data;
+    if (addressSaved && account !== null) {
+      logAccountEvent("account.address_saved", { customerId: account.customer.id });
+    }
+    return { ok: true, data: order };
   } catch (error) {
     // The partial unique index is the backstop for two submits racing past the check above.
     if (uniqueViolation(error) === pendingOrderIndex) return fail({ code: "checkout_in_progress" });

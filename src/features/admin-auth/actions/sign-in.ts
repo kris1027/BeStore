@@ -7,11 +7,12 @@ import { db } from "@/lib/db";
 import type { ActionResult } from "@/lib/result";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-import { classifyAuthError } from "../auth-errors";
+import { classifyAuthError } from "@/lib/auth/errors";
 import { logAuthEvent, requestIp } from "../log";
 import { mfaPath } from "../safe-admin-path";
 import { signInSchema } from "../schemas";
-import { endLocalSession, fieldErrors } from "../session";
+import { fieldErrors } from "@/lib/form-errors";
+import { endLocalSession } from "@/lib/supabase/session";
 
 export type SignInError = {
   readonly form?: "invalid_credentials" | "rate_limited" | "unavailable";

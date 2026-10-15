@@ -45,7 +45,14 @@ const envSchema = z
     // A blank line (as copied from .env.example) means unset, not an invalid URL.
     TEST_DATABASE_URL: z.preprocess((v) => (v === "" ? undefined : v), postgresUrl().optional()),
     // spec 0011, AC-16: `log` sends nothing (local, tests, CI); production must use `resend`.
-    EMAIL_TRANSPORT: z.enum(["log", "resend"]),
+    // spec 0012, AC-23: `mailpit` hands every email to the local stack's Mailpit (e2e, CI).
+    EMAIL_TRANSPORT: z.enum(["log", "resend", "mailpit"]),
+    // Mailpit's base URL; required when EMAIL_TRANSPORT is mailpit.
+    MAILPIT_URL: z.preprocess((v) => (v === "" ? undefined : v), z.url().optional()),
+    // spec 0012, AC-8: the Standard Webhooks secret Supabase signs the Send Email Hook with.
+    SEND_EMAIL_HOOK_SECRET: z
+      .string()
+      .regex(/^v1,whsec_[A-Za-z0-9+/]+={0,2}$/, "Standard Webhooks secret, e.g. v1,whsec_..."),
     // A sending only key; required when EMAIL_TRANSPORT is resend.
     RESEND_API_KEY: z.preprocess(
       (v) => (v === "" ? undefined : v),
@@ -60,11 +67,18 @@ const envSchema = z
     }),
   })
   .superRefine((value, ctx) => {
-    if (value.EMAIL_TRANSPORT === "log" && value.VERCEL_ENV === "production") {
+    if (value.EMAIL_TRANSPORT !== "resend" && value.VERCEL_ENV === "production") {
       ctx.addIssue({
         code: "custom",
         path: ["EMAIL_TRANSPORT"],
         message: "Must be resend in production, or customers get no email",
+      });
+    }
+    if (value.EMAIL_TRANSPORT === "mailpit" && value.MAILPIT_URL === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["MAILPIT_URL"],
+        message: "Required when EMAIL_TRANSPORT is mailpit",
       });
     }
     if (value.EMAIL_TRANSPORT === "resend" && value.RESEND_API_KEY === undefined) {

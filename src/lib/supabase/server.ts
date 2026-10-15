@@ -20,7 +20,10 @@ export async function createSupabaseServerClient() {
           }
         } catch {
           // Server components cannot write cookies. The proxy has already refreshed the
-          // session for this request, so a render never needs to.
+          // session on the routes it matches. /cart is not one of them (its account cart owner
+          // check, spec 0012 AC-7): a refresh there is dropped, and the browser's next request
+          // spends its old refresh token, which Supabase still honours as the parent of the
+          // newest one.
         }
       },
     },

@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/empty";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { loadCart } from "@/lib/cart/load-cart";
+import { loadOwnedCart } from "@/lib/cart/owned";
 import { NO_DISCOUNT_CENTS } from "@/lib/orders/snapshot";
 import { freeDeliveryGapCents, orderCharges } from "@/lib/shipping/rule";
 import { getShippingSettings } from "@/lib/shipping/settings";
@@ -24,10 +24,11 @@ import { CartLineControls } from "./cart-line-controls";
 
 export const checkoutPath = "/checkout";
 
-// Reads the cookie, so it streams in behind the page's Suspense boundary (spec 0005, AC-12).
+// Reads the cookie, so it streams in behind the page's Suspense boundary (spec 0005, AC-12). An
+// account cart shows only to its customer's session (spec 0012, AC-7).
 // Delivery comes from the cached settings and the one shipping rule (spec 0007, AC-8).
 export async function CartContents() {
-  const [cart, settings] = await Promise.all([loadCart(), getShippingSettings()]);
+  const [cart, settings] = await Promise.all([loadOwnedCart(), getShippingSettings()]);
 
   if (!cart || cart.lines.length === 0) {
     return (

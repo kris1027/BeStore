@@ -12,7 +12,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { requestPasswordReset } from "../actions/password-reset";
 import { authMessages } from "../messages";
 import { forgotPasswordSchema } from "../schemas";
-import { applyFieldErrors } from "./form-errors";
+import { applyFieldErrors } from "@/lib/form-errors";
 import { FormNotice } from "@/components/form-notice";
 
 export function ForgotPasswordForm() {

@@ -58,7 +58,7 @@ Stored in `docs/specs/`. Format: `docs/specs/NNNN-title/index.md`. Scope lives i
 - **Caching**: `cacheComponents` is on. Catalog reads are `'use cache'` functions tagged from `src/lib/cache-tags.ts`; whatever changes what they return must expire the tag (`updateTag` in a server action, `revalidateTag(tag, { expire: 0 })` in a route handler). Request data (cookies, the cart) sits behind Suspense.
 - **Status codes**: under Cache Components a page's `notFound()` / `redirect()` answer 200 (the shell streams first). Where the real status matters, decide it in the proxy before rendering (the admin gate does this).
 - **Cron**: handlers under `app/api/cron/` refuse anything but `Authorization: Bearer ${CRON_SECRET}` (constant time compare); schedules live in `vercel.json`.
-- **Env**: every variable is added to the Zod schema in `src/lib/env.ts` and to `.env.example`.
+- **Env**: every variable the app reads is added to the Zod schema in `src/lib/env.ts` and to `.env.example`. A variable only a CLI reads (e.g. `SEND_EMAIL_HOOK_URI`, read by the Supabase CLI through `env()` in `supabase/config.toml`) goes in `.env.example` alone, marked as such.
 - **UI**: WCAG AA baseline on storefront and admin (labels, keyboard use, visible focus, contrast).
 - **Comments**: explain the why (invariants, gotchas), not the what.
 - **Tests**: each feature ships Vitest tests for its logic and server actions plus Playwright for its user flows.
@@ -102,6 +102,7 @@ MCP servers: Supabase (connected), Stripe (connected), Vercel (connected), Playw
 - [src/features/checkout/AGENTS.md](src/features/checkout/AGENTS.md): the checkout form, `startCheckout` and the Stripe session, the confirmation page
 - [src/features/orders/AGENTS.md](src/features/orders/AGENTS.md): the Stripe webhook, order transitions, the reconcile cron, the expired order PII purge cron, admin orders
 - [src/features/settings/AGENTS.md](src/features/settings/AGENTS.md): the admin settings page, the shipping fee and free delivery threshold
+- [src/features/account/AGENTS.md](src/features/account/AGENTS.md): customer accounts, sign up and sign in, the customer session and lock, order history, the address book, settings
 - [src/lib/shipping/AGENTS.md](src/lib/shipping/AGENTS.md): the shared delivery fee rule, address schema and settings reads
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._

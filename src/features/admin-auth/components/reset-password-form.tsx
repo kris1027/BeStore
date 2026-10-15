@@ -8,14 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { missingPasswordRules, passwordRuleList, passwordRuleMessages } from "@/lib/auth/password";
 
 import { resetPassword } from "../actions/password-reset";
-import { authMessages, passwordRuleMessages } from "../messages";
-import { missingPasswordRules, resetPasswordSchema } from "../schemas";
-import { applyFieldErrors } from "./form-errors";
+import { authMessages } from "../messages";
+import { resetPasswordSchema } from "../schemas";
+import { applyFieldErrors } from "@/lib/form-errors";
 import { FormNotice } from "@/components/form-notice";
-
-const ruleList = Object.values(passwordRuleMessages).join(", ").toLowerCase();
 
 export function ResetPasswordForm() {
   const [formError, setFormError] = useState<string | null>(null);
@@ -56,7 +55,7 @@ export function ResetPasswordForm() {
             aria-describedby={errors.password ? "password-help password-error" : "password-help"}
             {...form.register("password")}
           />
-          <FieldDescription id="password-help">It needs {ruleList}.</FieldDescription>
+          <FieldDescription id="password-help">It needs {passwordRuleList}.</FieldDescription>
           <FieldError
             id="password-error"
             errors={

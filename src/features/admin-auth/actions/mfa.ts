@@ -7,14 +7,15 @@ import { brand } from "@/lib/brand/brand";
 import type { ActionResult } from "@/lib/result";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-import { classifyAuthError } from "../auth-errors";
+import { classifyAuthError } from "@/lib/auth/errors";
 import { factorToVerify, loadTotpFactors } from "../factors";
 import { logAuthEvent, requestIp } from "../log";
 import { isLockedOut, withFactorLock } from "../mfa-lockout";
 import { requireAdminSession } from "../require-admin";
 import { safeAdminPath, signInPath } from "../safe-admin-path";
 import { totpCodeSchema } from "../schemas";
-import { endLocalSession, fieldErrors } from "../session";
+import { fieldErrors } from "@/lib/form-errors";
+import { endLocalSession } from "@/lib/supabase/session";
 
 export type EnrollTotpData = {
   // An SVG data URL from Supabase, shown in an <img>.

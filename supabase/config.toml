@@ -166,7 +166,8 @@ site_url = "http://localhost:3000"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["http://localhost:3000/**"]
+# `/account/**` is the customer area (spec 0012, AC-23); production lists it too (AC-26).
+additional_redirect_urls = ["http://localhost:3000/**", "http://localhost:3000/account/**"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
@@ -179,8 +180,9 @@ enable_refresh_token_rotation = true
 # Requires enable_refresh_token_rotation = true.
 refresh_token_reuse_interval = 10
 # Allow/disallow new user signups to your project.
-# Off until customer accounts (feature 12): admins are created only by `pnpm admin:create` (spec 0004).
-enable_signup = false
+# On for customer accounts (spec 0012, AC-23). Admins are still created only by
+# `pnpm admin:create` (spec 0004): signing up never makes an admin_users row.
+enable_signup = true
 # Allow/disallow anonymous sign-ins to your project.
 enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
@@ -230,16 +232,19 @@ web3 = 30
 [auth.email]
 # Allow/disallow new user signups via email to your project.
 # Stays true: in the CLI this switch turns the whole email provider off, password sign in
-# included. `[auth] enable_signup = false` above is what blocks public sign up.
+# included. `[auth] enable_signup` above is the public sign up switch, on for customer accounts
+# (spec 0012, AC-23).
 enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+# spec 0012, AC-1 and AC-2: a customer confirms their email before choosing a password.
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
+# Lowered locally so e2e can resend at once (spec 0012, AC-23); production keeps the default.
 max_frequency = "1s"
 # Number of characters used in the email OTP.
 otp_length = 6
@@ -255,12 +260,6 @@ otp_expiry = 3600
 # pass = "env(SENDGRID_API_KEY)"
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
-
-# The recovery link is fixed to the token hash pattern, so it never depends on `redirectTo`
-# matching the allow list (spec 0004). Production uses the same template in the dashboard.
-[auth.email.template.recovery]
-subject = "Reset your admin password"
-content_path = "./supabase/templates/recovery.html"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]
@@ -293,6 +292,15 @@ max_frequency = "5s"
 # timebox = "24h"
 # Force log out if the user has been inactive longer than the specified duration.
 # inactivity_timeout = "8h"
+
+# Every auth email (confirm sign up, reset password) goes to the app's Send Email Hook, which picks
+# the template and sends it through the app's email transport (spec 0012, AC-8). Both values come
+# from .env.local (or the CI env): the URI must reach the app from inside Docker, e.g.
+# http://host.docker.internal:3000/api/auth/send-email, on the port the app runs on.
+[auth.hook.send_email]
+enabled = true
+uri = "env(SEND_EMAIL_HOOK_URI)"
+secrets = "env(SEND_EMAIL_HOOK_SECRET)"
 
 # This hook runs before a new user is created and allows developers to reject the request based on the incoming user object.
 # [auth.hook.before_user_created]

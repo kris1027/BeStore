@@ -24,16 +24,6 @@ export const fieldMessages = {
   codeRequired: "Enter the 6 digit code",
 } as const;
 
-export const passwordRuleMessages = {
-  length: "At least 8 characters",
-  lower: "A lower case letter",
-  upper: "An upper case letter",
-  digit: "A digit",
-  symbol: "A symbol",
-} as const;
-
-export type PasswordRule = keyof typeof passwordRuleMessages;
-
 // The reasons the sign in page shows from its `reason` query param.
 const signInReasons = ["expired", "signed_out", "invalid_link", "too_many_codes"] as const;
 

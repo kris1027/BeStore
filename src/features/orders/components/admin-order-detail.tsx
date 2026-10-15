@@ -26,13 +26,14 @@ import {
 import { type DateFormat, formatDateTime } from "@/lib/dates";
 import { deliveryLabel } from "@/lib/shipping/rule";
 import { cn } from "@/lib/utils";
+import { orderStatusLabels } from "@/lib/orders/status-labels";
 
 import type { AdminOrderDetail as Detail } from "../admin-queries";
 import { adminOrdersPath } from "../paths";
 import { EmailsSection } from "./emails-section";
 import { NoteForm } from "./note-form";
 import { OrderActionsPanel } from "./order-actions-panel";
-import { NeedsAttentionBadge, orderStatusLabels, OrderStatusBadge } from "./order-status-badge";
+import { NeedsAttentionBadge, OrderStatusBadge } from "./order-status-badge";
 import { OrderEmail, PersonalDataField } from "./personal-data";
 import { RefundStateBadge } from "./refund-state-badge";
 import { RefundsSection } from "./refunds-section";
@@ -223,6 +224,8 @@ export function AdminOrderDetail({
               <DetailRow label="Email">
                 <OrderEmail order={order} placement="detail" dateFormat={dateFormat} />
               </DetailRow>
+              {/* spec 0012, AC-21: whether the customer can look the order up themselves. */}
+              <DetailRow label="Customer">{order.hasAccount ? "Account" : "Guest"}</DetailRow>
               <DetailRow label="Delivery address">
                 <PersonalDataField
                   purgedAt={order.piiPurgedAt}

@@ -3,7 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { signCartId } from "@/lib/cart/signature";
 
 import { resetDatabaseBeforeEach, testDb } from "./client";
-import { createProductWithOptions, createSimpleProduct, inThirtyDays } from "./fixtures";
+import {
+  createCustomer,
+  createProductWithOptions,
+  createSimpleProduct,
+  inThirtyDays,
+} from "./fixtures";
 import { eventsOf, seedPendingOrder } from "./stripe-support";
 
 // startCheckout against a real Postgres; Stripe is stubbed at src/lib/stripe.ts
@@ -19,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   info: vi.fn(),
   warn: vi.fn(),
   error: vi.fn(),
+  customer: null as { id: string; email: string } | null,
 }));
 
 vi.mock("server-only", () => ({}));
@@ -49,7 +55,14 @@ vi.mock("next/headers", () => ({
       const value = mocks.jar.get(name);
       return value === undefined ? undefined : { name, value };
     },
+    set: (name: string, value: string) => mocks.jar.set(name, value),
+    delete: (name: string) => mocks.jar.delete(name),
   }),
+}));
+// spec 0012, AC-15: the signed in customer, or null for a guest.
+vi.mock("@/lib/customer/session", () => ({
+  getCustomer: async () => mocks.customer,
+  getCustomerId: async () => mocks.customer?.id ?? null,
 }));
 
 const { startCheckout } = await import("@/features/checkout/actions/start-checkout");
@@ -61,6 +74,7 @@ let sessionCounter = 0;
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.jar.clear();
+  mocks.customer = null;
   mocks.create.mockImplementation(async () => {
     sessionCounter += 1;
     const id = `cs_test_new${sessionCounter}`;
@@ -250,7 +264,8 @@ describe("delivery (spec 0007)", () => {
       shipPostalCode: "00-950",
       shipCountryCode: "PL",
       phone: "+48 600 100 200",
-      customerName: null,
+      // spec 0012, AC-15: a guest order is greeted by the delivery full name.
+      customerName: "Anna Kowalska",
       subtotalCents: 5000,
       shippingCents: 1500,
       totalCents: 6500,
@@ -401,6 +416,20 @@ describe("refusals create nothing", () => {
       ok: false,
       error: { code: "cart_changed" },
     });
+  });
+
+  // spec 0012, AC-7: a leftover cookie naming an account cart, with no session, pays for nothing.
+  it("treats an account cart as no cart for a visitor who is not its customer", async () => {
+    const { variant } = await createSimpleProduct("a", 5);
+    const owner = await createCustomer("owner@example.com");
+    const cart = await cartWith([{ variantId: variant.id, quantity: 1 }]);
+    await testDb.cart.update({ where: { id: cart.id }, data: { customerId: owner.id } });
+
+    expect(await startCheckout(checkout("a@example.com"))).toEqual({
+      ok: false,
+      error: { code: "cart_changed" },
+    });
+    expect(await testDb.order.count()).toBe(0);
   });
 
   it.each([
@@ -754,5 +783,199 @@ describe("logs", () => {
     ]) {
       expect(logged).not.toContain(secretValue);
     }
+  });
+});
+
+// spec 0012, AC-15.
+describe("a signed in checkout", () => {
+  // A second Pay for one cart ends the first session at Stripe (spec 0006, AC-9).
+  beforeEach(() => {
+    mocks.retrieve.mockResolvedValue({ status: "open", payment_status: "unpaid" });
+  });
+
+  async function signedIn(email = "ada@example.com") {
+    const customer = await createCustomer(email);
+    mocks.customer = { id: customer.id, email: customer.email };
+    return customer;
+  }
+
+  async function savedAddresses(customerId: string) {
+    return testDb.customerAddress.findMany({
+      where: { customerId },
+      orderBy: { createdAt: "asc" },
+    });
+  }
+
+  it("gives the order the customer and the account email, whatever was typed", async () => {
+    const customer = await signedIn();
+    const { variant } = await createSimpleProduct("a", 5);
+    await cartWith([{ variantId: variant.id, quantity: 1 }]);
+
+    const result = await startCheckout(checkout("someone.else@example.com"));
+
+    expect(result.ok).toBe(true);
+    const order = await testDb.order.findFirstOrThrow();
+    expect(order).toMatchObject({ customerId: customer.id, email: "ada@example.com" });
+    expect(mocks.create.mock.calls[0]![0]).toMatchObject({ customer_email: "ada@example.com" });
+  });
+
+  it("saves the ticked address as the first, default one, and never twice", async () => {
+    const customer = await signedIn();
+    const { variant } = await createSimpleProduct("a", 5);
+    await cartWith([{ variantId: variant.id, quantity: 1 }]);
+
+    await startCheckout(checkout("x@example.com", { saveAddress: true, line2: "  " }));
+    expect((await startCheckout(checkout("x@example.com", { saveAddress: true }))).ok).toBe(true);
+
+    const rows = await savedAddresses(customer.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      fullName: "Anna Kowalska",
+      postalCode: "00-950",
+      line2: null,
+      isDefault: true,
+      countryCode: "PL",
+    });
+  });
+
+  it("saves nothing when the box is not ticked, and skips silently at 10", async () => {
+    const customer = await signedIn();
+    const { variant } = await createSimpleProduct("a", 5);
+    await cartWith([{ variantId: variant.id, quantity: 1 }]);
+
+    await startCheckout(checkout("x@example.com", { saveAddress: false }));
+    expect(await savedAddresses(customer.id)).toHaveLength(0);
+
+    await testDb.customerAddress.createMany({
+      data: Array.from({ length: 10 }, (_, i) => ({
+        customerId: customer.id,
+        fullName: "Ada",
+        line1: `Line ${i}`,
+        city: "Warsaw",
+        postalCode: "00-001",
+        countryCode: "PL",
+        isDefault: i === 0,
+      })),
+    });
+    const result = await startCheckout(checkout("x@example.com", { saveAddress: true }));
+
+    expect(result.ok).toBe(true);
+    expect(await savedAddresses(customer.id)).toHaveLength(10);
+  });
+
+  it("fills a blank profile phone from the order and never overwrites one", async () => {
+    const customer = await signedIn();
+    const { variant } = await createSimpleProduct("a", 5);
+    await cartWith([{ variantId: variant.id, quantity: 1 }]);
+
+    await startCheckout(checkout("x@example.com", { phone: "+48 600 100 200" }));
+    expect((await testDb.customer.findUniqueOrThrow({ where: { id: customer.id } })).phone).toBe(
+      "+48 600 100 200",
+    );
+
+    expect((await startCheckout(checkout("x@example.com", { phone: "+48 700 200 300" }))).ok).toBe(
+      true,
+    );
+    expect((await testDb.customer.findUniqueOrThrow({ where: { id: customer.id } })).phone).toBe(
+      "+48 600 100 200",
+    );
+  });
+
+  it("names the order after a set profile name, even when shipping to someone else", async () => {
+    const customer = await signedIn();
+    await testDb.customer.update({ where: { id: customer.id }, data: { name: "Ada Lovelace" } });
+    const { variant } = await createSimpleProduct("a", 5);
+    await cartWith([{ variantId: variant.id, quantity: 1 }]);
+
+    await startCheckout(checkout("x@example.com", { fullName: "Grace Hopper" }));
+
+    const order = await testDb.order.findFirstOrThrow();
+    expect(order).toMatchObject({ customerName: "Ada Lovelace", shipFullName: "Grace Hopper" });
+    expect((await testDb.customer.findUniqueOrThrow({ where: { id: customer.id } })).name).toBe(
+      "Ada Lovelace",
+    );
+  });
+
+  it.each([null, ""])(
+    "with a blank profile name (%j) names the order after the delivery name and fills the profile once, ticked or not",
+    async (blank) => {
+      const customer = await signedIn();
+      await testDb.customer.update({ where: { id: customer.id }, data: { name: blank } });
+      const { variant } = await createSimpleProduct("a", 5);
+      await cartWith([{ variantId: variant.id, quantity: 1 }]);
+
+      await startCheckout(
+        checkout("x@example.com", { fullName: "Grace Hopper", saveAddress: false }),
+      );
+      expect((await testDb.order.findFirstOrThrow()).customerName).toBe("Grace Hopper");
+      expect((await testDb.customer.findUniqueOrThrow({ where: { id: customer.id } })).name).toBe(
+        "Grace Hopper",
+      );
+
+      // The next order uses the now set profile name, and the fill never overwrites it.
+      await startCheckout(checkout("x@example.com", { fullName: "Alan Turing" }));
+      const latest = await testDb.order.findFirstOrThrow({ orderBy: { createdAt: "desc" } });
+      expect(latest).toMatchObject({ customerName: "Grace Hopper", shipFullName: "Alan Turing" });
+      expect((await testDb.customer.findUniqueOrThrow({ where: { id: customer.id } })).name).toBe(
+        "Grace Hopper",
+      );
+    },
+  );
+
+  it("never logs the order's customer name", async () => {
+    const customer = await signedIn();
+    await testDb.customer.update({ where: { id: customer.id }, data: { name: "Ada Lovelace" } });
+    const { variant } = await createSimpleProduct("a", 5);
+    await cartWith([{ variantId: variant.id, quantity: 1 }]);
+
+    await startCheckout(checkout("x@example.com", { saveAddress: true }));
+
+    const logged = JSON.stringify([
+      mocks.info.mock.calls,
+      mocks.warn.mock.calls,
+      mocks.error.mock.calls,
+    ]);
+    expect(logged).not.toContain("Lovelace");
+    expect(logged).not.toContain("Kowalska");
+  });
+
+  it("merges a guest cart into an account cart with lines and asks the customer to look again", async () => {
+    const customer = await signedIn();
+    const { variant: a } = await createSimpleProduct("a", 5);
+    const { variant: b } = await createSimpleProduct("b", 5);
+    const account = await testDb.cart.create({
+      data: {
+        customerId: customer.id,
+        expiresAt: inThirtyDays(),
+        items: { create: [{ variantId: a.id, quantity: 1 }] },
+      },
+    });
+    const guest = await cartWith([{ variantId: b.id, quantity: 2 }]);
+
+    const first = await startCheckout(checkout());
+
+    expect(first).toEqual({ ok: false, error: { code: "cart_changed", merged: true } });
+    expect(await testDb.order.count()).toBe(0);
+    expect(await testDb.cart.findUnique({ where: { id: guest.id } })).toBeNull();
+    expect(mocks.jar.get("bestore_cart")?.split(".")[0]).toBe(account.id);
+
+    const second = await startCheckout(checkout());
+    expect(second.ok).toBe(true);
+    const order = await testDb.order.findFirstOrThrow({ include: { lines: true } });
+    expect(order.cartId).toBe(account.id);
+    expect(order.lines).toHaveLength(2);
+  });
+
+  it("goes straight on when the guest cart simply becomes the account cart", async () => {
+    const customer = await signedIn();
+    const { variant } = await createSimpleProduct("a", 5);
+    const guest = await cartWith([{ variantId: variant.id, quantity: 1 }]);
+
+    const result = await startCheckout(checkout());
+
+    expect(result.ok).toBe(true);
+    expect((await testDb.cart.findUniqueOrThrow({ where: { id: guest.id } })).customerId).toBe(
+      customer.id,
+    );
   });
 });

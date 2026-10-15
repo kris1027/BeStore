@@ -1,6 +1,6 @@
 # 0011. Order emails
 
-**Date**: 2026-10-13 (amended 2026-10-14 after review: AC-7, AC-9, AC-17)
+**Date**: 2026-10-13 (amended 2026-10-14 after review: AC-7, AC-9, AC-17; amended 2026-10-15 by [spec 0012](../0012-customer-accounts/index.md) AC-23: the `mailpit` transport)
 **Status**: Accepted
 
 ## Summary
@@ -41,7 +41,7 @@ Customers get three kinds of email: a confirmation receipt when an order is paid
 - **AC-15**: `sendEmailAgain` calls `requireAdmin()` itself. A visitor without an active admin at `aal2` gets the spec 0004 behaviour and nothing changes. The row must belong to the order named in the input, else `not_found`.
 
 *Environments, logs, accessibility*
-- **AC-16**: `EMAIL_TRANSPORT` picks `log` or `resend`. With `log`, nothing leaves the machine: delivery runs the same claim, render and status steps, marks the row `sent` with `resend_id` null, and logs `email.sent` with `transport: "log"`. The env schema refuses `log` when `VERCEL_ENV` is `production`, and requires `RESEND_API_KEY` when the transport is `resend`. The Vitest setup, the Playwright web server env and the CI workflow all set `EMAIL_TRANSPORT=log`. DB tests replace `scheduleDelivery` (no request scope for `after()`); e2e runs the real one under `next dev`. `pnpm email:dev` previews every template with fixture props.
+- **AC-16**: `EMAIL_TRANSPORT` picks `log` or `resend`. With `log`, nothing leaves the machine: delivery runs the same claim, render and status steps, marks the row `sent` with `resend_id` null, and logs `email.sent` with `transport: "log"`. The env schema refuses `log` when `VERCEL_ENV` is `production`, and requires `RESEND_API_KEY` when the transport is `resend`. The Vitest setup, the Playwright web server env and the CI workflow all set `EMAIL_TRANSPORT=log`. (Amended by spec 0012 AC-23: a third value, `mailpit`, posts every email to the local Mailpit at `MAILPIT_URL`. Playwright, CI and local dev now use it, Vitest stays on `log`, and the env schema accepts only `resend` when `VERCEL_ENV` is `production`.) DB tests replace `scheduleDelivery` (no request scope for `after()`); e2e runs the real one under `next dev`. `pnpm email:dev` previews every template with fixture props.
 - **AC-17**: Logs carry the email row id, kind, order id and number, refund id, attempts and the Resend error name. They never carry a recipient address, subject, body, name, delivery address or tracking number. Events: `email.queued`, `email.sent`, `email.retry` (warn), `email.failed` (warn), `email.gave_up` (error), `email.idempotent_conflict` (warn), `email.config_error` (error), `email.resend_requested`, `cron.email_sweep` (counts), `email.delivery_error` (error: a try that threw, such as a database error or a template bug; it carries the error name and SQLSTATE, and only the row id when the throw came before the row was read), and `order.email_missing` (reused).
 - **AC-18**: The Emails section and the Send again dialog work by keyboard alone, move focus into the dialog and back out, and pass axe with zero violations (desktop and phone, same tags as spec 0003). Each email uses one column, real headings, layout tables marked `role="presentation"`, the line items as a data table with header cells, and text contrast of at least 4.5:1.
 
@@ -155,7 +155,7 @@ Dedupe keys keep spec 0002's format (`order_confirmation:<orderId>`, `order_ship
 - `RESEND_API_KEY` is a server only secret. `EMAIL_FROM` must be on a domain verified in Resend (SPF and DKIM set at the DNS host) before production.
 
 **Configuration required**:
-- `EMAIL_TRANSPORT`: `log` or `resend` (required; `.env.example` sets `log`; `resend` required when `VERCEL_ENV=production`).
+- `EMAIL_TRANSPORT`: `log` or `resend` (required; `.env.example` sets `log`; `resend` required when `VERCEL_ENV=production`). Spec 0012 adds `mailpit`, which `.env.example` now sets.
 - `RESEND_API_KEY`: required when `EMAIL_TRANSPORT=resend`, a sending only key (`re_...`).
 - `EMAIL_FROM`: sender and reply mailbox, `Name <address>` or a bare address, for example `BeStore <orders@yourdomain.com>`. It must be monitored, since replies land there. The schema exposes the parsed address for the footer.
 - Prerequisite before production: a Resend account, the sending domain verified (SPF, DKIM, a DMARC record), and the sending only key in Vercel's env.

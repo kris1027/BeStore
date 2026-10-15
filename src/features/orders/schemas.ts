@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { maxOrderNumber } from "@/lib/orders/order-number";
+
 // Pure: the inputs of every admin order action (spec 0010, API surface), shared by the forms
 // and the actions. Text is trimmed; carrier and tracking save an empty value as null.
 
@@ -9,7 +11,7 @@ export const TRACKING_MAX_LENGTH = 100;
 
 // What the page was rendered with, posted back so the action can refuse a stale form (AC-8).
 const orderRef = {
-  orderNumber: z.number().int().min(1001).max(2_147_483_647),
+  orderNumber: z.number().int().min(1001).max(maxOrderNumber),
   expectedUpdatedAt: z.iso.datetime(),
 };
 
@@ -76,7 +78,7 @@ export const checkRefundSchema = z.object({
 
 // spec 0011, API surface. The order number names the order the row must belong to (AC-15).
 export const sendEmailAgainSchema = z.object({
-  orderNumber: z.number().int().min(1).max(2_147_483_647),
+  orderNumber: z.number().int().min(1).max(maxOrderNumber),
   emailSendId: z.uuid(),
 });
 

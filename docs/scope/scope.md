@@ -25,7 +25,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 9 | Admin catalog management | Slice 3 | done |
 | 10 | Admin order management | Slice 4 | done |
 | 11 | Order emails | Slice 5 | done |
-| 12 | Customer accounts | Slice 6 | planned |
+| 12 | Customer accounts | Slice 6 | done |
 | 13 | Categories, search & filters | Slice 7 | planned |
 | 14 | Discounts & promo codes | Slice 8 | planned |
 | 15 | Admin sales dashboard | Slice 9 | planned |
@@ -229,10 +229,22 @@ spec [0011](../specs/0011-order-emails/index.md) · code in [src/lib/email/](../
 
 ## Slice 6: Accounts
 
-### 12. Customer accounts · needs a decision · GA
+### 12. Customer accounts · done · GA
 Optional accounts: guest checkout stays the default, customers who sign up see their order history and saved address.
 **Done when:** a customer can sign up, sign in, reset a password, and see past orders; guest checkout still works; a guest can later create an account with the same email and see earlier orders.
-- [ ] Design it (spec): `/architect customer accounts`
+spec [0012](../specs/0012-customer-accounts/index.md) · code in [src/features/account/](../../src/features/account/), [src/lib/customer/](../../src/lib/customer/), [src/lib/cart/merge.ts](../../src/lib/cart/merge.ts), [src/lib/email/](../../src/lib/email/), [emails/](../../emails/), [app/(store)/account/](../../app/(store)/account/)
+- [x] Design it (spec): `/architect customer accounts`
+- [x] Build it: `/develop customer accounts`
+  - [x] Thin thread: config, the Send Email Hook, Mailpit transport, sign up, confirm, choose password, account setup and a bare order list (AC-1 to AC-3, AC-10, AC-11, AC-13, AC-22, AC-23)
+  - [x] Sign in, sign out, cart merge and password reset through the hook (AC-4 to AC-9)
+  - [x] Account area: order history and detail, address book (AC-11 to AC-14)
+  - [x] Checkout integration, settings, delete account and the admin badge (AC-15 to AC-21)
+  - [x] Safety net: logs, axe, header link, production runbook (AC-22, AC-24 to AC-26)
+  - [x] Review follow ups: account cart usable only by its owner's session, the merge count, the admin guard on the confirm password replace (AC-2, AC-5, AC-7, AC-24)
+- [x] Verify it: `/check verify customer accounts`
+- [x] Test it: `/test customer accounts`
+- [x] Review it (fresh model): `/check review customer accounts`
+- [x] Document it: `/document customer accounts`
 
 ## Slice 7: Discovery
 
@@ -294,6 +306,9 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Redact customer data at Stripe**: remove the name, email and address Stripe keeps on expired Checkout Sessions, if its redaction tooling fits · needs a decision · from spec 0008
 - **Resend bounce and complaint webhooks**: record bounced and complained on `email_sends` and show "Bounced" on the order page, once live · from spec 0011
 - **Email sweep on its own 10 minute cron**: when the project moves to Vercel Pro (feature 19) · from spec 0011
+- **Customer email change**: Supabase secure email change, keeping `customers.email` and order linking in step · needs a decision · from spec 0012
+- **Order data retention and export**: set the accounting retention period, extend the spec 0008 purge to settled orders past it, and offer account holders a data export · needs a decision · GA · from spec 0012
+- **Admin customers page**: search customers and see their orders, if support needs it · needs a decision · from spec 0012
 
 ## Legend
 

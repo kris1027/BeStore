@@ -5,12 +5,14 @@ import { LockIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import {
+  Controller,
   type FieldError as FormFieldError,
   useForm,
   type UseFormRegisterReturn,
 } from "react-hook-form";
 
 import { FormNotice } from "@/components/form-notice";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useStoreFormat } from "@/components/store-format-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +31,21 @@ import type { StoreCountry } from "@/lib/shipping/address";
 
 import { startCheckout, type StartCheckoutError } from "../actions/start-checkout";
 import { type CheckoutPrefill, checkoutFields, checkoutSchema } from "../schemas";
+
+// A saved address the signed in customer can swap in (spec 0012, AC-15).
+export type SavedAddressChoice = {
+  readonly id: string;
+  readonly label: string;
+  readonly values: Omit<CheckoutPrefill, "email">;
+};
+
+export type CheckoutAccount = {
+  readonly email: string;
+  readonly addresses: readonly SavedAddressChoice[];
+};
+
+const mergedMessage =
+  "Your cart was updated with items saved in your account. Check it and pay again.";
 
 const noSubscription = () => () => {};
 
@@ -57,11 +74,14 @@ export function CheckoutForm({
   country,
   countryName,
   prefill,
+  account = null,
 }: {
   readonly totalCents: number;
   readonly country: StoreCountry;
   readonly countryName: string;
   readonly prefill: CheckoutPrefill;
+  // The signed in customer: the email is theirs, and saved addresses can fill the form.
+  readonly account?: CheckoutAccount | null;
 }) {
   const router = useRouter();
   const format = useStoreFormat();
@@ -78,7 +98,14 @@ export function CheckoutForm({
   const schema = useMemo(() => checkoutSchema(country), [country]);
   // The resolver hands the cleaned output to the submit handler; the server parses it again,
   // which every transform in the schema allows.
-  const form = useForm({ resolver: zodResolver(schema), defaultValues: prefill });
+  const form = useForm({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      ...prefill,
+      ...(account === null ? {} : { email: account.email }),
+      saveAddress: account !== null,
+    },
+  });
   const { errors } = form.formState;
 
   // Back from Stripe can restore this page from the back/forward cache with the button still
@@ -111,6 +138,9 @@ export function CheckoutForm({
             { shouldFocus: index === 0 },
           );
         });
+      } else if (error.code === "cart_changed" && error.merged) {
+        setNotice(mergedMessage);
+        router.refresh();
       } else if (error.code === "cart_changed") {
         router.push("/cart");
       } else if (error.code === "already_paid") {
@@ -134,13 +164,29 @@ export function CheckoutForm({
           type="email"
           inputMode="email"
           autoComplete="email"
-          hint="For your order number and updates about it."
+          hint={
+            account === null
+              ? "For your order number and updates about it."
+              : "Your account email. Order updates go here."
+          }
+          readOnly={account !== null}
           error={errors.email}
           registration={form.register("email")}
         />
         <FieldSet>
           <FieldLegend>Delivery address</FieldLegend>
           <FieldGroup>
+            {account !== null && account.addresses.length > 0 ? (
+              <SavedAddressPicker
+                addresses={account.addresses}
+                onPick={(values) => {
+                  for (const [name, value] of Object.entries(values)) {
+                    form.setValue(name as keyof typeof values, value, { shouldDirty: true });
+                  }
+                  form.clearErrors();
+                }}
+              />
+            ) : null}
             <TextField
               id="checkout-full-name"
               label="Full name"
@@ -198,6 +244,24 @@ export function CheckoutForm({
             />
           </FieldGroup>
         </FieldSet>
+        {account !== null ? (
+          <Field orientation="horizontal">
+            <Controller
+              control={form.control}
+              name="saveAddress"
+              render={({ field }) => (
+                <Checkbox
+                  id="checkout-save-address"
+                  checked={field.value}
+                  onCheckedChange={(checked) => field.onChange(checked === true)}
+                />
+              )}
+            />
+            <FieldLabel htmlFor="checkout-save-address" className="font-normal">
+              Save this address to my account
+            </FieldLabel>
+          </Field>
+        ) : null}
         <Button type="submit" size="lg" className="h-11" disabled={busy || !hydrated}>
           {busy ? <Spinner data-icon="inline-start" /> : null}
           {redirecting ? "Redirecting to payment…" : `Pay ${formatMoney(totalCents, format)}`}
@@ -227,6 +291,7 @@ function TextField({
   readonly type?: "email" | "tel" | "text";
   readonly inputMode?: "email" | "numeric" | "tel";
   readonly autoComplete: string;
+  readonly readOnly?: boolean;
 }) {
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
@@ -239,6 +304,7 @@ function TextField({
         type={input.type ?? "text"}
         inputMode={input.inputMode}
         autoComplete={input.autoComplete}
+        readOnly={input.readOnly}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy}
         {...registration}
@@ -248,6 +314,38 @@ function TextField({
       ) : hint ? (
         <FieldDescription id={hintId}>{hint}</FieldDescription>
       ) : null}
+    </Field>
+  );
+}
+
+// spec 0012, AC-15: swap in a saved address; the fields stay editable, so a new one can be typed.
+function SavedAddressPicker({
+  addresses,
+  onPick,
+}: {
+  readonly addresses: readonly SavedAddressChoice[];
+  readonly onPick: (values: SavedAddressChoice["values"]) => void;
+}) {
+  return (
+    <Field>
+      <FieldLabel htmlFor="checkout-saved-address">Saved addresses</FieldLabel>
+      <select
+        id="checkout-saved-address"
+        defaultValue=""
+        onChange={(event) => {
+          const picked = addresses.find((address) => address.id === event.target.value);
+          if (picked) onPick(picked.values);
+        }}
+        className="h-10 w-full min-w-0 rounded-md border border-input bg-transparent px-3 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm"
+      >
+        <option value="">Choose a saved address</option>
+        {addresses.map((address) => (
+          <option key={address.id} value={address.id}>
+            {address.label}
+          </option>
+        ))}
+      </select>
+      <FieldDescription>Picking one fills in the fields below.</FieldDescription>
     </Field>
   );
 }

@@ -1,0 +1,86 @@
+import { createHash } from "node:crypto";
+
+import { describe, expect, it } from "vitest";
+
+import {
+  authEmailKind,
+  authEmailLink,
+  authIdempotencyKey,
+  hookPayloadSchema,
+  hookSecretKey,
+  usedActionType,
+} from "./auth-hook";
+
+// spec 0012, AC-8.
+
+describe("usedActionType", () => {
+  it("keeps sign up and recovery and refuses every other type", () => {
+    expect(usedActionType("signup")).toBe("signup");
+    expect(usedActionType("recovery")).toBe("recovery");
+    for (const type of ["magiclink", "invite", "email_change", "reauthentication", "email"]) {
+      expect(usedActionType(type)).toBeNull();
+    }
+  });
+});
+
+describe("authEmailKind", () => {
+  it("confirms a sign up whoever the user is", () => {
+    expect(authEmailKind("signup", false)).toBe("confirm_signup");
+    expect(authEmailKind("signup", true)).toBe("confirm_signup");
+  });
+
+  it("sends the admin reset to anyone who runs the store, else the customer reset", () => {
+    expect(authEmailKind("recovery", true)).toBe("admin_reset");
+    expect(authEmailKind("recovery", false)).toBe("customer_reset");
+  });
+});
+
+describe("authEmailLink", () => {
+  const site = "https://shop.example";
+
+  it("points customers at /account/confirm and admins at /auth/confirm", () => {
+    expect(authEmailLink(site, "confirm_signup", "abc")).toBe(
+      "https://shop.example/account/confirm?token_hash=abc&type=signup",
+    );
+    expect(authEmailLink(site, "customer_reset", "abc")).toBe(
+      "https://shop.example/account/confirm?token_hash=abc&type=recovery",
+    );
+    expect(authEmailLink(site, "admin_reset", "abc")).toBe(
+      "https://shop.example/auth/confirm?token_hash=abc&type=recovery",
+    );
+  });
+
+  it("encodes the token hash", () => {
+    expect(authEmailLink(site, "confirm_signup", "a&b=c")).toContain("token_hash=a%26b%3Dc");
+  });
+});
+
+describe("authIdempotencyKey", () => {
+  it("is the type plus the SHA 256 of the token hash, never the hash itself", () => {
+    const key = authIdempotencyKey("signup", "pkce_secret");
+    const digest = createHash("sha256").update("pkce_secret").digest("hex");
+
+    expect(key).toBe(`auth:signup:${digest}`);
+    expect(key).not.toContain("pkce_secret");
+  });
+});
+
+describe("hookSecretKey", () => {
+  it("strips the v1,whsec_ prefix Supabase shows", () => {
+    expect(hookSecretKey("v1,whsec_abc123==")).toBe("abc123==");
+  });
+});
+
+describe("hookPayloadSchema", () => {
+  it("needs a user id and email and a token hash", () => {
+    const valid = {
+      user: { id: "8b4a7e2c-3f6d-4c1a-9e8b-2d5f7a1c3e9b", email: "ada@example.com" },
+      email_data: { token_hash: "abc", email_action_type: "signup", redirect_to: "x" },
+    };
+    expect(hookPayloadSchema.safeParse(valid).success).toBe(true);
+    expect(
+      hookPayloadSchema.safeParse({ ...valid, email_data: { email_action_type: "signup" } })
+        .success,
+    ).toBe(false);
+  });
+});

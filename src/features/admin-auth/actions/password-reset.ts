@@ -10,12 +10,12 @@ import { logger } from "@/lib/logger";
 import type { ActionResult } from "@/lib/result";
 import { createSupabaseServerClient, createSupabaseStatelessClient } from "@/lib/supabase/server";
 
-import { classifyAuthError } from "../auth-errors";
+import { classifyAuthError } from "@/lib/auth/errors";
 import { logAuthEvent, requestIp } from "../log";
 import { requireAdminSession } from "../require-admin";
 import { mfaPath, signInPath } from "../safe-admin-path";
 import { forgotPasswordSchema, resetPasswordSchema } from "../schemas";
-import { fieldErrors } from "../session";
+import { fieldErrors } from "@/lib/form-errors";
 
 export type RequestResetError = {
   readonly fields?: Partial<Record<"email", readonly string[]>>;

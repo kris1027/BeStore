@@ -6,8 +6,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   env: {
-    EMAIL_TRANSPORT: "log" as "log" | "resend",
+    EMAIL_TRANSPORT: "log" as "log" | "resend" | "mailpit",
     RESEND_API_KEY: "re_test_key" as string | undefined,
+    MAILPIT_URL: "http://127.0.0.1:55324",
     EMAIL_FROM: "BeStore <orders@example.com>",
   },
   constructed: vi.fn(),
@@ -124,6 +125,55 @@ describe("the resend transport", () => {
     expect(await currentTransport().send(email)).toEqual({
       ok: false,
       failure: { name, statusCode },
+    });
+  });
+});
+
+// spec 0012, AC-23: every email lands in Mailpit, so e2e can read it.
+describe("the mailpit transport", () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    mocks.env.EMAIL_TRANSPORT = "mailpit";
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ ID: "abc" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  it("posts the email to Mailpit's send API and never reaches Resend", async () => {
+    const transport = currentTransport();
+    const result = await transport.send(email);
+
+    expect(transport.name).toBe("mailpit");
+    expect(result).toEqual({ ok: true, resendId: null });
+    expect(mocks.send).not.toHaveBeenCalled();
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toBe("http://127.0.0.1:55324/api/v1/send");
+    expect(JSON.parse(init.body)).toEqual({
+      From: { Email: "orders@example.com", Name: "BeStore" },
+      To: [{ Email: "ada@example.com" }],
+      Subject: "Order #1042 confirmed",
+      HTML: "<p>Hi Ada,</p>",
+      Text: "Hi Ada,",
+    });
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("answers a failure with Mailpit's status", async () => {
+    fetchMock.mockResolvedValue(new Response("nope", { status: 500 }));
+
+    expect(await currentTransport().send(email)).toEqual({
+      ok: false,
+      failure: { name: "mailpit_error", statusCode: 500 },
+    });
+  });
+
+  it("answers a network error as a failure with no status", async () => {
+    fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+
+    expect(await currentTransport().send(email)).toEqual({
+      ok: false,
+      failure: { name: "TypeError", statusCode: null },
     });
   });
 });

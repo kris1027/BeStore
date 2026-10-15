@@ -4,7 +4,11 @@ import { refresh } from "next/cache";
 import { z } from "zod";
 
 import { lineCap, MAX_LINE_QUANTITY } from "@/lib/availability";
-import { cartExpiry, readCartId, setCartCookie } from "@/lib/cart/cookie";
+import { cartExpiry, setCartCookie } from "@/lib/cart/cookie";
+import { lockAccountCart } from "@/lib/cart/merge";
+import { readOwnedCartId } from "@/lib/cart/owned";
+import { lockCustomer } from "@/lib/customer/lock";
+import { getCustomerId } from "@/lib/customer/session";
 import { db } from "@/lib/db";
 import type { ActionResult } from "@/lib/result";
 
@@ -33,6 +37,94 @@ async function lockLiveCart(tx: Tx, cartId: string): Promise<string | null> {
   return rows[0]?.id ?? null;
 }
 
+// spec 0012, AC-7: a signed in customer with no cookie cart adds to their account cart, under the
+// customer lock so a sign in merging at the same moment cannot make a second one.
+async function accountCart(tx: Tx, customerId: string): Promise<string | null> {
+  await lockCustomer(tx, customerId);
+  return lockAccountCart(tx, customerId);
+}
+
+type AddResult = ActionResult<AddToCartData & { readonly cartId: string }, AddToCartError>;
+
+// Where an add writes: the live cookie cart, or (no valid cookie cart) the signed in customer's
+// account cart or a new cart. `customerId` is read before the transaction, so no lock waits on
+// the network.
+type AddTarget =
+  | { readonly kind: "cookie"; readonly cartId: string }
+  | { readonly kind: "create"; readonly customerId: string | null };
+
+// Null when the cookie cart expired between the read and the lock: the caller then reads the
+// session and takes the create branch, so a signed in customer still gets their own cart (AC-7).
+async function addLine(
+  variantId: string,
+  quantity: number,
+  expiresAt: Date,
+  target: AddTarget,
+): Promise<AddResult | null> {
+  return db.$transaction(async (tx): Promise<AddResult | null> => {
+    const variant = await tx.productVariant.findUnique({
+      where: { id: variantId },
+      select: { stockQuantity: true, archived: true, product: { select: { status: true } } },
+    });
+    if (!variant || variant.archived || variant.product.status !== "active") {
+      return { ok: false, error: "unavailable" };
+    }
+    const cap = lineCap(variant.stockQuantity);
+    if (cap === 0) return { ok: false, error: "sold_out" };
+
+    // With no cookie there is nothing to lock, so two first adds racing from two fresh tabs
+    // each create a cart and the last Set-Cookie wins; the other cart expires unseen. Two
+    // cookieless requests look like two visitors, so no server check can merge them. One tab
+    // cannot race itself: Next dispatches a client's Server Functions one at a time.
+    const liveCartId =
+      target.kind === "cookie"
+        ? await lockLiveCart(tx, target.cartId)
+        : target.customerId === null
+          ? null
+          : await accountCart(tx, target.customerId);
+    if (target.kind === "cookie" && liveCartId === null) return null;
+    const customerId = target.kind === "create" ? target.customerId : null;
+    const cartId = liveCartId
+      ? (
+          await tx.cart.update({
+            where: { id: liveCartId },
+            data: { expiresAt },
+            select: { id: true },
+          })
+        ).id
+      : (
+          await tx.cart.create({
+            data: { expiresAt, ...(customerId === null ? {} : { customerId }) },
+            select: { id: true },
+          })
+        ).id;
+
+    const existing = await tx.cartItem.findUnique({
+      where: { cartId_variantId: { cartId, variantId } },
+      select: { quantity: true },
+    });
+    const wanted = (existing?.quantity ?? 0) + quantity;
+    const lineQuantity = Math.min(wanted, cap);
+    await tx.cartItem.upsert({
+      where: { cartId_variantId: { cartId, variantId } },
+      create: { cartId, variantId, quantity: lineQuantity },
+      update: { quantity: lineQuantity },
+      select: { id: true },
+    });
+    const total = await tx.cartItem.aggregate({ where: { cartId }, _sum: { quantity: true } });
+
+    return {
+      ok: true,
+      data: {
+        cartId,
+        lineQuantity,
+        cartQuantity: total._sum.quantity ?? lineQuantity,
+        ...(lineQuantity < wanted ? { cappedTo: lineQuantity } : {}),
+      },
+    };
+  });
+}
+
 // spec 0005, AC-8 and AC-9: the first add creates the cart and sets the cookie; later adds
 // grow the line up to the variant's stock or 10.
 export async function addToCart(
@@ -42,64 +134,21 @@ export async function addToCart(
   if (!parsed.success) return { ok: false, error: "invalid" };
   const { variantId, quantity } = parsed.data;
 
-  const cookieCartId = await readCartId();
-  const nowMs = Date.now();
-  const expiresAt = cartExpiry(nowMs);
-
-  const result = await db.$transaction(
-    async (
-      tx,
-    ): Promise<ActionResult<AddToCartData & { readonly cartId: string }, AddToCartError>> => {
-      const variant = await tx.productVariant.findUnique({
-        where: { id: variantId },
-        select: { stockQuantity: true, archived: true, product: { select: { status: true } } },
-      });
-      if (!variant || variant.archived || variant.product.status !== "active") {
-        return { ok: false, error: "unavailable" };
-      }
-      const cap = lineCap(variant.stockQuantity);
-      if (cap === 0) return { ok: false, error: "sold_out" };
-
-      // With no cookie there is nothing to lock, so two first adds racing from two fresh tabs
-      // each create a cart and the last Set-Cookie wins; the other cart expires unseen. Two
-      // cookieless requests look like two visitors, so no server check can merge them. One tab
-      // cannot race itself: Next dispatches a client's Server Functions one at a time.
-      const liveCartId = cookieCartId === null ? null : await lockLiveCart(tx, cookieCartId);
-      const cartId = liveCartId
-        ? (
-            await tx.cart.update({
-              where: { id: liveCartId },
-              data: { expiresAt },
-              select: { id: true },
-            })
-          ).id
-        : (await tx.cart.create({ data: { expiresAt }, select: { id: true } })).id;
-
-      const existing = await tx.cartItem.findUnique({
-        where: { cartId_variantId: { cartId, variantId } },
-        select: { quantity: true },
-      });
-      const wanted = (existing?.quantity ?? 0) + quantity;
-      const lineQuantity = Math.min(wanted, cap);
-      await tx.cartItem.upsert({
-        where: { cartId_variantId: { cartId, variantId } },
-        create: { cartId, variantId, quantity: lineQuantity },
-        update: { quantity: lineQuantity },
-        select: { id: true },
-      });
-      const total = await tx.cartItem.aggregate({ where: { cartId }, _sum: { quantity: true } });
-
-      return {
-        ok: true,
-        data: {
-          cartId,
-          lineQuantity,
-          cartQuantity: total._sum.quantity ?? lineQuantity,
-          ...(lineQuantity < wanted ? { cappedTo: lineQuantity } : {}),
-        },
-      };
-    },
-  );
+  // spec 0012, AC-7: the cookie cart only when it is live and this visitor's (a leftover account
+  // cart cookie reads as none). Read without a lock: the transaction locks it again and the add
+  // falls back to the create branch if it expired in between.
+  const cookieCartId = await readOwnedCartId();
+  const expiresAt = cartExpiry(Date.now());
+  const result =
+    (cookieCartId === null
+      ? null
+      : await addLine(variantId, quantity, expiresAt, { kind: "cookie", cartId: cookieCartId })) ??
+    (await addLine(variantId, quantity, expiresAt, {
+      kind: "create",
+      customerId: await getCustomerId(),
+    }));
+  // The create branch never answers null.
+  if (result === null) throw new Error("addToCart: the create branch found no cart");
   if (!result.ok) return result;
 
   const { cartId, ...data } = result.data;
@@ -120,11 +169,12 @@ const setQuantitySchema = z.object({
 const removeSchema = z.object({ itemId: z.uuid() });
 
 // Runs `write` on the cookie's live cart, locked, then renews the cart and its cookie. A line id
-// from any other cart reads as not found (spec 0005, AC-15).
+// from any other cart reads as not found (spec 0005, AC-15), and so does every line of an account
+// cart this visitor's session does not own (spec 0012, AC-7).
 async function withCookieCart<T>(
   write: (tx: Tx, cartId: string) => Promise<ActionResult<T, CartLineError>>,
 ): Promise<ActionResult<T, CartLineError>> {
-  const cookieCartId = await readCartId();
+  const cookieCartId = await readOwnedCartId();
   if (cookieCartId === null) return { ok: false, error: "not_found" };
   const expiresAt = cartExpiry(Date.now());
 

@@ -326,6 +326,41 @@ describe("env", () => {
       expect(String(error)).not.toContain("sk_test_not_resend");
     });
 
+    // spec 0012, AC-23.
+    it("refuses the mailpit transport in production", async () => {
+      stubEnv({ EMAIL_TRANSPORT: "mailpit" });
+      vi.stubEnv("MAILPIT_URL", "http://127.0.0.1:55324");
+      vi.stubEnv("VERCEL_ENV", "production");
+
+      await expect(loadEnv()).rejects.toThrow("EMAIL_TRANSPORT");
+    });
+
+    it.each([undefined, ""])("requires MAILPIT_URL for mailpit (%j)", async (url) => {
+      stubEnv({ EMAIL_TRANSPORT: "mailpit" });
+      vi.stubEnv("MAILPIT_URL", url);
+
+      await expect(loadEnv()).rejects.toThrow("MAILPIT_URL");
+    });
+
+    it("accepts mailpit with a URL", async () => {
+      stubEnv({ EMAIL_TRANSPORT: "mailpit" });
+      vi.stubEnv("MAILPIT_URL", "http://127.0.0.1:55324");
+
+      await expect(loadEnv()).resolves.toMatchObject({
+        EMAIL_TRANSPORT: "mailpit",
+        MAILPIT_URL: "http://127.0.0.1:55324",
+      });
+    });
+
+    it.each(["whsec_abc", "v1,abc", "v1,whsec_not base64!"])(
+      "rejects a hook secret that is not a Standard Webhooks secret (%j)",
+      async (secret) => {
+        stubEnv({ SEND_EMAIL_HOOK_SECRET: secret });
+
+        await expect(loadEnv()).rejects.toThrow("SEND_EMAIL_HOOK_SECRET");
+      },
+    );
+
     it("rejects an unknown transport", async () => {
       stubEnv({ EMAIL_TRANSPORT: "smtp" });
 
