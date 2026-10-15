@@ -234,12 +234,13 @@ Optional accounts: guest checkout stays the default, customers who sign up see t
 **Done when:** a customer can sign up, sign in, reset a password, and see past orders; guest checkout still works; a guest can later create an account with the same email and see earlier orders.
 spec [0012](../specs/0012-customer-accounts/index.md) · code in [src/features/account/](../../src/features/account/), [src/lib/customer/](../../src/lib/customer/), [src/lib/cart/merge.ts](../../src/lib/cart/merge.ts), [src/lib/email/](../../src/lib/email/), [emails/](../../emails/), [app/(store)/account/](../../app/(store)/account/)
 - [x] Design it (spec): `/architect customer accounts`
-- [x] Build it: `/develop customer accounts`
+- [ ] Build it: `/develop customer accounts`
   - [x] Thin thread: config, the Send Email Hook, Mailpit transport, sign up, confirm, choose password, account setup and a bare order list (AC-1 to AC-3, AC-10, AC-11, AC-13, AC-22, AC-23)
   - [x] Sign in, sign out, cart merge and password reset through the hook (AC-4 to AC-9)
   - [x] Account area: order history and detail, address book (AC-11 to AC-14)
   - [x] Checkout integration, settings, delete account and the admin badge (AC-15 to AC-21)
   - [x] Safety net: logs, axe, header link, production runbook (AC-22, AC-24 to AC-26)
+  - [ ] Review follow ups: account cart usable only by its owner's session, the merge count, the admin guard on the confirm password replace (AC-2, AC-5, AC-7, AC-24)
 - [x] Verify it: `/check verify customer accounts`
 - [x] Test it: `/test customer accounts`
 - [x] Review it (fresh model): `/check review customer accounts`
