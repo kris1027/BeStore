@@ -191,6 +191,10 @@ describe("deleteAccount (AC-20)", () => {
     });
     expect(await testDb.customer.findUnique({ where: { id: mocks.customer.id } })).not.toBeNull();
     expect(mocks.clearAuthCookies).not.toHaveBeenCalled();
+    expect(mocks.error).toHaveBeenCalledWith(
+      expect.objectContaining({ customerId: mocks.customer.id, errorName: "AuthApiError" }),
+      "account.delete_failed",
+    );
   });
 
   it("refuses an admin before asking for anything, and logs it", async () => {

@@ -27,3 +27,10 @@ export async function checkPassword(
   }
   return { ok: true };
 }
+
+// The form error for a failed check: a refused sign in means the password typed was not theirs.
+export function passwordCheckError(
+  failure: AuthFailure,
+): "wrong_password" | Exclude<AuthFailure, "rejected"> {
+  return failure === "rejected" ? "wrong_password" : failure;
+}

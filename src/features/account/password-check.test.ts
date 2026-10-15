@@ -17,7 +17,7 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 vi.mock("@/lib/logger", () => ({ logger: { warn: mocks.warn } }));
 
-const { checkPassword } = await import("./password-check");
+const { checkPassword, passwordCheckError } = await import("./password-check");
 
 const CUSTOMER_ID = "33333333-3333-3333-3333-333333333333";
 
@@ -95,5 +95,13 @@ describe("checkPassword", () => {
       "account.password_check.sign_out_failed",
     );
     expect(JSON.stringify(mocks.warn.mock.calls)).not.toContain("ada@example.com");
+  });
+});
+
+describe("passwordCheckError", () => {
+  it("reads a refused sign in as a wrong password and passes the rest through", () => {
+    expect(passwordCheckError("rejected")).toBe("wrong_password");
+    expect(passwordCheckError("rate_limited")).toBe("rate_limited");
+    expect(passwordCheckError("unavailable")).toBe("unavailable");
   });
 });

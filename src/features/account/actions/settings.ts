@@ -16,7 +16,7 @@ import type { ActionResult } from "@/lib/result";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { clearAuthCookies, createSupabaseServerClient } from "@/lib/supabase/server";
 
-import { checkPassword } from "../password-check";
+import { checkPassword, passwordCheckError } from "../password-check";
 import { type PasswordUpdateError, passwordUpdateError } from "../password-errors";
 import { changePasswordSchema, deleteAccountSchema, profileSchema } from "../schemas";
 
@@ -59,12 +59,7 @@ export async function changePassword(
   if (await runsTheStore(customer.id)) return { ok: false, error: { form: "runs_the_store" } };
 
   const check = await checkPassword(customer.id, customer.email, parsed.data.currentPassword);
-  if (!check.ok) {
-    return {
-      ok: false,
-      error: { form: check.failure === "rejected" ? "wrong_password" : check.failure },
-    };
-  }
+  if (!check.ok) return { ok: false, error: { form: passwordCheckError(check.failure) } };
 
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
@@ -75,6 +70,10 @@ export async function changePassword(
   }
   logAccountEvent("account.password_changed", { customerId: customer.id });
   return { ok: true, data: null };
+}
+
+function authErrorName(error: unknown): string | null {
+  return error instanceof Error && typeof error.cause === "string" ? error.cause : null;
 }
 
 export type DeleteAccountError = {
@@ -99,26 +98,18 @@ export async function deleteAccount(
   }
 
   const check = await checkPassword(customer.id, customer.email, parsed.data.password);
-  if (!check.ok) {
-    return {
-      ok: false,
-      error: { form: check.failure === "rejected" ? "wrong_password" : check.failure },
-    };
-  }
+  if (!check.ok) return { ok: false, error: { form: passwordCheckError(check.failure) } };
 
+  // Set once the login is gone: a failure after that point (the commit) cannot be rolled back.
   let authDeleted = false;
-  let authError: string | null = null;
   try {
     await db.$transaction(
       async (tx) => {
         await lockCustomer(tx, customer.id);
         await tx.customer.deleteMany({ where: { id: customer.id } });
         const { error } = await createSupabaseAdminClient().auth.admin.deleteUser(customer.id);
-        if (error) {
-          authError = error.name;
-          // Thrown to roll the row delete back; caught below.
-          throw new Error("auth_delete_failed");
-        }
+        // Thrown to roll the row delete back; caught below.
+        if (error) throw new Error("auth_delete_failed", { cause: error.name });
         authDeleted = true;
       },
       // Covers one round trip to the Auth server.
@@ -129,7 +120,7 @@ export async function deleteAccount(
       // Supabase's error name, or the SQLSTATE of a database failure; never a message, which can
       // quote the row.
       logger.error(
-        { customerId: customer.id, errorName: authError, pgCode: pgErrorCode(error) },
+        { customerId: customer.id, errorName: authErrorName(error), pgCode: pgErrorCode(error) },
         "account.delete_failed",
       );
       return { ok: false, error: { form: "delete_failed" } };
