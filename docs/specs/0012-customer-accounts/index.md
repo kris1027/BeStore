@@ -1,6 +1,6 @@
 # 0012. Customer accounts
 
-**Date**: 2026-10-14 (amended the same day after a cross check: AC-1 to AC-5, AC-7 to AC-11, AC-13 to AC-15, AC-17, AC-19, AC-20, AC-23, AC-24, AC-26)
+**Date**: 2026-10-14 (amended the same day after a cross check: AC-1 to AC-5, AC-7 to AC-11, AC-13 to AC-15, AC-17, AC-19, AC-20, AC-23, AC-24, AC-26; amended 2026-10-14 again: AC-15 now names where the order's `customer_name` comes from)
 **Status**: In Progress
 
 ## Summary
@@ -72,7 +72,9 @@ Customers can make an optional account. They give their email, click the link we
   * The email shows read only as the account email. `startCheckout` still validates the typed email field but uses `customers.email`.
   * The address form starts with the pending order's address for this cart when there is one (spec 0007 prefill), else with the default address. A list of saved addresses lets the customer swap, and they can still type a new one.
   * "Save this address to my account" is ticked by default. When ticked, the save runs in the order's transaction under the customer lock. Fields are trimmed and an empty `line2` or `phone` counts as null. An address equal to a saved one, field by field, adds nothing. Otherwise a new row is added, and it is the default if it is the first. At 10 saved, the save is skipped without a message.
-  * A blank `customers.name` is filled from the order's `customer_name` and a blank `phone` from its `phone`. Values already set are never overwritten.
+  * The order's `customer_name` is `customers.name` when that is set, else the delivery full name (`ship_full_name`). A guest order (signed out) always gets the delivery full name. Before this, nothing set `customer_name`, so order emails said "Hello," and admin search on it never matched.
+  * "Set" and "blank" mean exactly: blank is null or `""` (the profile schema already stores names trimmed or null), the same test the phone fill uses. No new validation: `fullName` and the profile name are both trimmed and capped at 100. `customer_name` is written only when the order is created (checkout never reuses a pending order; spec 0008's purge already nulls it on expired orders).
+  * A blank `customers.name` is then filled from the order's `customer_name`, and a blank `phone` from its `phone`, whether or not the save box is ticked. Values already set are never overwritten. The fill is silent: no new log event, and `customer_name` never appears in a log (AC-24).
   * The order gets `customer_id`.
   * Before the order is created, a guest cookie cart goes through the AC-5 merge. If the merge added lines from the account cart, `startCheckout` returns `cart_changed`. The form then reloads with "Your cart was updated with items saved in your account. Check it and pay again."
 - **AC-16**: A signed out visitor on `/checkout` sees "Have an account? Sign in", linking to `/account/sign-in?next=/checkout`. After sign in they are back on `/checkout` with the merged cart and their default address filled in.
@@ -138,6 +140,7 @@ Customers get accounts with no new auth vendor, and the shared reset template pr
 - **Password checks for change and delete** call `signInWithPassword` on the stateless client (`createSupabaseStatelessClient`, no cookies) with the session's email. The throwaway session it returns is then signed out with its own access token (a failure there is logged, not shown). Guessing is limited by Supabase's per IP sign in limits and the Firewall rule. Runner up: Supabase `reauthenticate`, which sends a code by email instead of asking for the password the customer just typed.
 - **Delete: database rows and auth user in one transaction**, the API call made before commit, so a failed API call rolls back and leaves nothing half done. Runner up: auth first and then the rows, which can strand PII for good when the second step fails.
 - **Not found for orders renders inside the page** (`notFound()`), which answers 200 under Cache Components. The page is private and `noindex`, so the status does not matter, and only the signed out redirect is decided in the proxy. Runner up: an ownership check in the proxy, which would put a DB query on every account request.
+- **Order `customer_name`: the profile name, else the delivery full name.** It is the buyer's name as best we know it before payment, with no new checkout field. A signed in customer who set a name is greeted by it even when shipping to someone else; everyone else is greeted by the recipient's name. The blank profile fill then copies it, so it stays a one time fill that never overwrites. Existing orders are not backfilled (nothing is deployed, only local and test data). Runners up: always the delivery full name (simpler, but ignores a name the customer chose); the Stripe billing name from the webhook (`customer_details.name`, the true payer, but only after payment, it couples the profile fill to the webhook, and the cardholder may be someone else); or dropping `customer_name` and leaving the profile name to settings only.
 - **No order events for linking.** Linking only changes who can view an order, and `account.orders_linked` records it. Runner up: a `note` event per linked order, which would flood the admin timeline for a frequent guest.
 
 ## Rationale
@@ -201,7 +204,8 @@ Reasoning and options: see [rationale.md](rationale.md).
 | `/account/orders/[number]` | lines, totals, address, tracking, refunded | order snapshot columns, `order_lines`, `refunded_cents`, `carrier`, `tracking_number` |
 | dates | timezone and locale | `STORE_TIMEZONE`, `STORE_LOCALE` (existing env) |
 | `startCheckout` signed in | email, customer id | `customers.email` of `getCustomerId()` |
-| `startCheckout` | save address flag; profile fill | `saveAddress` input; order `customer_name` and `phone` |
+| `startCheckout` | order `customer_name` | signed in: `customers.name` of `getCustomerId()`, read with `tx.customer.findUnique` right after `lockCustomer` in the order's transaction, when not null or `""`; otherwise (blank profile, a missing customers row, or a guest) the parsed `fullName` that also becomes `ship_full_name`. Set as its own field on the order create, not inside `deliveryColumns` |
+| `startCheckout` | save address flag; profile fill | `saveAddress` input; the order's `customer_name` (fills a blank `customers.name` through `updateMany` where name is null or `""`) and `phone` (fills a blank `customers.phone`) |
 | checkout page | prefill | pending order for this cart (spec 0007), else default `customer_addresses` row |
 | address book | country | the store's country from `src/lib/shipping` (spec 0007) |
 | `signUpFromOrder` | email, eligibility | the order found by `stripe_checkout_session_id`: `email`, `status`, `customer_id`; the visitor's session |
@@ -239,6 +243,7 @@ Reasoning and options: see [rationale.md](rationale.md).
 **Critical test scenarios**:
 - Happy path: sign up with an email, read the confirm email in Mailpit, Continue, choose a password, land on `/account` and see an earlier guest order placed with that email, verifies **AC-1**, **AC-2**, **AC-3**, **AC-8**, **AC-10**, **AC-11**
 - Happy path: signed in checkout with a saved default address, ticked save, order shows in history and as "Account" in admin, verifies **AC-15**, **AC-21**
+- Happy path: the order's `customer_name` is the profile name when set, else the delivery full name (guests too), and a blank profile name is filled from it once, verifies **AC-15**
 - Failure case: someone signs up with your unconfirmed email using a password they know (through the Supabase API); you confirm and choose your own; their password no longer works, verifies **AC-1**, **AC-3**
 - Failure case: sign up with an existing email and with a new one give identical replies; a hook failure shows nothing on screen and logs `auth_email.failed`, verifies **AC-1**, **AC-8**
 - Failure case: forgot password for an admin's email sends the admin email, and spec 0004's admin reset e2e passes through the hook, verifies **AC-8**, **AC-9**
@@ -263,7 +268,7 @@ Tracer Bullet: the first task drives one real customer from sign up to their acc
 3. [x] Password reset through the hook: customer and admin reset templates, the admin first template choice (`admin_users`, `auth.mfa_factors`), the URL parsed `redirect_to`, the unused type answer, `requestPasswordReset`, and the recovery Continue into `/account/set-password`. Then remove `supabase/templates/recovery.html` and keep the spec 0004 admin reset e2e green. Satisfies **AC-8**, **AC-9**
 4. [x] Order history in full: pagination, status words, the `paid_at` filter, the order detail page, not found for every hidden case, DB tests for ownership. Satisfies **AC-11**, **AC-12**, **AC-13**
 5. [x] Address book: `src/lib/customer/addresses.ts` (save, dedupe with null and empty treated alike, cap, default rules under the lock, "Check this address"), the page and its actions, DB tests for the default and cap races. Satisfies **AC-14**
-6. [ ] Checkout: signed in prefill (pending order first) and address list, read only email, `saveAddress` and profile fill in `startCheckout`, the merge with `cart_changed`, the sign in link, and the confirmation page button with `signUpFromOrder` and its eligibility rules. Satisfies **AC-15**, **AC-16**, **AC-17**
+6. [x] Checkout: signed in prefill (pending order first) and address list, read only email, the order's `customer_name` (profile name, else the delivery full name, for guest orders too, computed in the transaction outside `saveToAccount`), `saveAddress` and the name and phone profile fill in `startCheckout` (the name fill beside the phone fill, before the save box early return), `customer_name` added to the log redaction test, the merge with `cart_changed`, the sign in link, and the confirmation page button with `signUpFromOrder` and its eligibility rules. Satisfies **AC-15**, **AC-16**, **AC-17**
 7. [x] Settings: profile, change password with the admin refusal, delete account with the admin refusal, the open order warning and the single transaction delete. Satisfies **AC-18**, **AC-19**, **AC-20**
 8. [x] Admin badge on the order list and detail. Satisfies **AC-21**
 9. [x] Safety net: the `account.*` and `auth_email.*` log events with a redaction test, axe on every account page (desktop and phone), the header Account link, the runbook additions for production (Supabase settings, redirect URLs, hook URL and secret, Firewall rule), and the account `AGENTS.md` facts handed to `/sync`. Satisfies **AC-22**, **AC-24**, **AC-25**, **AC-26**
@@ -287,10 +292,12 @@ Tracer Bullet: the first task drives one real customer from sign up to their acc
 - After deletion, paid orders keep their PII for accounting with no retention limit yet, and signing up again with the same email re-links them.
 - A guest cart merged away on sign in may leave its pending checkout order with `cart_id` null. That Stripe session can still be paid until it expires, and a customer who pays both it and a new checkout gets two orders.
 - No email change and no data export in this feature.
+- On a gift order, a guest (or a signed in customer with no profile name) is greeted by the recipient's name, and that name can become their profile name. They can change it in settings.
 
 **Neutral**:
 - `/checkout` now passes through the proxy for session refresh.
 - `addToCart` reads the session only when it creates a cart.
+- Order emails now greet by first name (spec 0011's `greetingName` already reads `customer_name`), and admin order search now matches it (spec 0010).
 - Spec 0004's AC-10 note "Public sign up is off" and its recovery template no longer hold; spec 0004 needs an amendment line pointing here.
 
 ## Follow-up
