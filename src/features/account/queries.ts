@@ -145,3 +145,22 @@ export async function getAccountOrder(
   if (!order) return null;
   return asVisible(withDeliveryAddress(order, env.STORE_LOCALE));
 }
+
+export type AccountSettings = {
+  readonly name: string | null;
+  readonly phone: string | null;
+  // Paid but not shipped yet: the delete dialog warns about them (AC-20).
+  readonly openOrders: number;
+};
+
+// spec 0012, AC-18 and AC-20.
+export async function getAccountSettings(customerId: string): Promise<AccountSettings> {
+  const [profile, openOrders] = await Promise.all([
+    db.customer.findUniqueOrThrow({
+      where: { id: customerId },
+      select: { name: true, phone: true },
+    }),
+    db.order.count({ where: { customerId, status: "paid" } }),
+  ]);
+  return { ...profile, openOrders };
+}

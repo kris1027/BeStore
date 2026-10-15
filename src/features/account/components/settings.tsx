@@ -1,8 +1,8 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { requireCustomer } from "@/lib/customer/session";
-import { db } from "@/lib/db";
 
 import { accountMessages } from "../messages";
+import { getAccountSettings } from "../queries";
 import { ChangePasswordForm } from "./change-password-form";
 import { DeleteAccountDialog } from "./delete-account-dialog";
 import { ProfileForm } from "./profile-form";
@@ -12,13 +12,7 @@ const sectionClass = "flex flex-col gap-4 rounded-md border p-6";
 // spec 0012, AC-18 to AC-20.
 export async function Settings() {
   const customer = await requireCustomer();
-  const [profile, openOrders] = await Promise.all([
-    db.customer.findUniqueOrThrow({
-      where: { id: customer.id },
-      select: { name: true, phone: true },
-    }),
-    db.order.count({ where: { customerId: customer.id, status: "paid" } }),
-  ]);
+  const { name, phone, openOrders } = await getAccountSettings(customer.id);
 
   return (
     <div className="grid max-w-3xl gap-6">
@@ -31,7 +25,7 @@ export async function Settings() {
           <dd>{customer.email}</dd>
           <dd className="text-sm text-muted-foreground">{accountMessages.emailChange}</dd>
         </dl>
-        <ProfileForm name={profile.name} phone={profile.phone} />
+        <ProfileForm name={name} phone={phone} />
       </section>
       <section aria-labelledby="password-heading" className={sectionClass}>
         <h3 id="password-heading" className="font-heading text-xl">
