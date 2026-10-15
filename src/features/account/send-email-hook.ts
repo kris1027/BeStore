@@ -16,10 +16,10 @@ import {
   hookPayloadSchema,
   hookSecretKey,
   usedActionType,
-} from "./auth-hook";
-import { classifySendFailure } from "./classify";
-import { renderAuthEmail } from "./render-auth";
-import { currentTransport } from "./transport";
+} from "@/lib/email/auth-hook";
+import { classifySendFailure } from "@/lib/email/classify";
+import { renderAuthEmail } from "@/lib/email/render-auth";
+import { currentTransport } from "@/lib/email/transport";
 
 // Supabase waits 5 seconds for the hook, so the one send gets 4.
 export const AUTH_EMAIL_TIMEOUT_MS = 4_000;

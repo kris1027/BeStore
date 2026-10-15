@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 
-import { handleSendEmailHook } from "@/lib/email/send-auth-email";
+import { handleSendEmailHook } from "@/features/account/send-email-hook";
 
 // Supabase's Send Email Hook (spec 0012, AC-8): every auth email goes out from here.
 export async function POST(request: Request) {

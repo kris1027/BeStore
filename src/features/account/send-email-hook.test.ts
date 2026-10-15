@@ -24,12 +24,14 @@ vi.mock("@/lib/env", () => ({
   },
 }));
 vi.mock("@/lib/customer/store-admin", () => ({ runsTheStore: mocks.runsTheStore }));
-vi.mock("./transport", () => ({ currentTransport: () => ({ name: "log", send: mocks.send }) }));
+vi.mock("@/lib/email/transport", () => ({
+  currentTransport: () => ({ name: "log", send: mocks.send }),
+}));
 vi.mock("@/lib/logger", () => ({
   logger: { info: mocks.info, warn: mocks.warn, error: mocks.error },
 }));
 
-const { AUTH_EMAIL_TIMEOUT_MS, handleSendEmailHook } = await import("./send-auth-email");
+const { AUTH_EMAIL_TIMEOUT_MS, handleSendEmailHook } = await import("./send-email-hook");
 
 const userId = "8b4a7e2c-3f6d-4c1a-9e8b-2d5f7a1c3e9b";
 

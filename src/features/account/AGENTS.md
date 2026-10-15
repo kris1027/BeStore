@@ -12,6 +12,7 @@ Optional customer accounts under `/account`: sign up, confirm, choose a password
 - `proxy.ts`, `proxy-decision.ts`: the first gate, called from the root `proxy.ts` for `/account` and `/checkout`. Refreshes the session, redirects signed out visitors to sign in, sets `Cache-Control: no-store` on account pages.
 - `guards.ts`: `redirectIfSignedIn` for the sign in and sign up pages.
 - `queries.ts`, `order-view.ts`: order history and detail; `order-sign-up.ts`: when the confirmation page may offer sign up.
+- `send-email-hook.ts`: `handleSendEmailHook`, behind `POST /api/auth/send-email` (AC-8). Checks the Standard Webhooks signature, picks the template (admin reset first) and sends it within 4 seconds; the pure parts live in `src/lib/email/auth-hook.ts`.
 - `sign-up-email.ts`, `throwaway-password.ts`, `settle.ts`: the sign up call made in `after()` with a password nobody knows, and its failure as a reason code.
 - `src/lib/customer/session.ts`: `getCustomer`, `getCustomerId`, `requireCustomer`. `setup.ts`: `accountSetup` (customer row, guest order links, cart merge). `lock.ts`: `lockCustomer`. `addresses.ts`, `address-rules.ts`: the address book. `store-admin.ts`: `runsTheStore`. `log.ts`: `account.*` events.
 - `src/lib/auth/password.ts`: the one password schema for admin pages, account pages and scripts, mirroring `password_requirements` in `supabase/config.toml`. Keep the two in step.
