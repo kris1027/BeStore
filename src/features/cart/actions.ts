@@ -4,8 +4,9 @@ import { refresh } from "next/cache";
 import { z } from "zod";
 
 import { lineCap, MAX_LINE_QUANTITY } from "@/lib/availability";
-import { cartExpiry, readCartId, setCartCookie } from "@/lib/cart/cookie";
+import { cartExpiry, setCartCookie } from "@/lib/cart/cookie";
 import { lockAccountCart } from "@/lib/cart/merge";
+import { readOwnedCartId } from "@/lib/cart/owned";
 import { lockCustomer } from "@/lib/customer/lock";
 import { getCustomerId } from "@/lib/customer/session";
 import { db } from "@/lib/db";
@@ -36,13 +37,6 @@ async function lockLiveCart(tx: Tx, cartId: string): Promise<string | null> {
   return rows[0]?.id ?? null;
 }
 
-// Whether the cookie names a cart that still exists and has not expired. Read without a lock: the
-// transaction locks it again and falls back if it expired in between.
-async function hasLiveCart(cartId: string | null): Promise<boolean> {
-  if (cartId === null) return false;
-  return (await db.cart.count({ where: { id: cartId, expiresAt: { gt: new Date() } } })) > 0;
-}
-
 // spec 0012, AC-7: a signed in customer with no cookie cart adds to their account cart, under the
 // customer lock so a sign in merging at the same moment cannot make a second one.
 async function accountCart(tx: Tx, customerId: string): Promise<string | null> {
@@ -59,12 +53,14 @@ export async function addToCart(
   if (!parsed.success) return { ok: false, error: "invalid" };
   const { variantId, quantity } = parsed.data;
 
-  const cookieCartId = await readCartId();
+  // spec 0012, AC-7: the cookie cart only when it is live and this visitor's (a leftover account
+  // cart cookie reads as none). Read without a lock: the transaction locks it again and falls back
+  // if it expired in between. An add that must create a cart reads the session before the
+  // transaction, so no lock waits on the network.
+  const cookieCartId = await readOwnedCartId();
   const nowMs = Date.now();
   const expiresAt = cartExpiry(nowMs);
-  // spec 0012, AC-7: only an add that must create a cart reads the session (one call to the Auth
-  // server), and it does so before the transaction, so no lock waits on the network.
-  const customerId = (await hasLiveCart(cookieCartId)) ? null : await getCustomerId();
+  const customerId = cookieCartId !== null ? null : await getCustomerId();
 
   const result = await db.$transaction(
     async (
@@ -147,11 +143,12 @@ const setQuantitySchema = z.object({
 const removeSchema = z.object({ itemId: z.uuid() });
 
 // Runs `write` on the cookie's live cart, locked, then renews the cart and its cookie. A line id
-// from any other cart reads as not found (spec 0005, AC-15).
+// from any other cart reads as not found (spec 0005, AC-15), and so does every line of an account
+// cart this visitor's session does not own (spec 0012, AC-7).
 async function withCookieCart<T>(
   write: (tx: Tx, cartId: string) => Promise<ActionResult<T, CartLineError>>,
 ): Promise<ActionResult<T, CartLineError>> {
-  const cookieCartId = await readCartId();
+  const cookieCartId = await readOwnedCartId();
   if (cookieCartId === null) return { ok: false, error: "not_found" };
   const expiresAt = cartExpiry(Date.now());
 

@@ -3,7 +3,7 @@
 import type Stripe from "stripe";
 
 import { canCheckout } from "@/lib/cart/cart-lines";
-import { readCartId } from "@/lib/cart/cookie";
+import { readOwnedCartId } from "@/lib/cart/owned";
 import { addressFields } from "@/lib/customer/address-rules";
 import { saveAddress } from "@/lib/customer/addresses";
 import { lockCustomer } from "@/lib/customer/lock";
@@ -71,13 +71,15 @@ async function run(input: unknown): Promise<Result<{ readonly url: string }>> {
   const shipTo: ShipTo = { ...address, countryCode: env.STORE_COUNTRY };
 
   // spec 0012, AC-15: a signed in checkout uses the account email, whatever was typed, and a
-  // guest cookie cart first joins the account cart.
+  // guest cookie cart first joins the account cart. A guest pays only for a guest cart (AC-7).
   const customer = await getCustomer();
-  let cartId = await readCartId();
+  let cartId: string | null;
   if (customer !== null) {
     const merge = await mergeCartForCustomer(customer.id);
     if (merge.accountHadLines) return fail({ code: "cart_changed", merged: true });
     cartId = merge.cartId;
+  } else {
+    cartId = await readOwnedCartId();
   }
   if (cartId === null) return fail({ code: "cart_changed" });
   const email = customer?.email ?? typedEmail;

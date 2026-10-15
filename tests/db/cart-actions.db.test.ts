@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   warn: vi.fn(),
   customerId: null as string | null,
   sessionReads: 0,
+  sessionFails: false,
 }));
 
 vi.mock("server-only", () => ({}));
@@ -25,6 +26,7 @@ vi.mock("next/cache", () => ({ refresh: mocks.refresh }));
 vi.mock("@/lib/customer/session", () => ({
   getCustomerId: async () => {
     mocks.sessionReads += 1;
+    if (mocks.sessionFails) throw new Error("Auth server unreachable");
     return mocks.customerId;
   },
 }));
@@ -49,6 +51,7 @@ beforeEach(() => {
   mocks.jar.clear();
   mocks.customerId = null;
   mocks.sessionReads = 0;
+  mocks.sessionFails = false;
 });
 
 function cookieCartId(): string | undefined {
@@ -358,5 +361,91 @@ describe("removeCartItem", () => {
       error: "not_found",
     });
     expect(await testDb.cartItem.count({ where: { id: other.item.id } })).toBe(1);
+  });
+});
+
+// spec 0012, AC-7: a cookie naming an account cart works only for that customer's session (a
+// session that ended without our sign out leaves the cookie behind).
+describe("an account cart named by the cookie", () => {
+  async function accountCartWithLine() {
+    const owner = await createCustomer();
+    const { variant } = await createSimpleProduct("owned", 5);
+    const cart = await testDb.cart.create({
+      data: {
+        customerId: owner.id,
+        expiresAt: new Date(Date.now() + 86_400_000),
+        items: { create: { variantId: variant.id, quantity: 1 } },
+      },
+      include: { items: true },
+    });
+    mocks.jar.set("bestore_cart", { value: signCartId(cart.id, secret) });
+    return { owner, variant, cart, item: cart.items[0]! };
+  }
+
+  it("works as before for its own customer", async () => {
+    const { owner, variant, cart, item } = await accountCartWithLine();
+    mocks.customerId = owner.id;
+
+    await addToCart({ variantId: variant.id, quantity: 1 });
+    expect(cookieCartId()).toBe(cart.id);
+    expect((await setCartItemQuantity({ itemId: item.id, quantity: 3 })).ok).toBe(true);
+    expect(await removeCartItem({ itemId: item.id })).toEqual({ ok: true, data: {} });
+  });
+
+  it("gives a signed out visitor a new guest cart on add and leaves the account cart alone", async () => {
+    const { variant, cart } = await accountCartWithLine();
+
+    await addToCart({ variantId: variant.id, quantity: 2 });
+
+    const guest = await testDb.cart.findFirstOrThrow({ where: { customerId: null } });
+    expect(cookieCartId()).toBe(guest.id);
+    expect(await testDb.cartItem.findMany({ where: { cartId: cart.id } })).toEqual([
+      expect.objectContaining({ quantity: 1 }),
+    ]);
+  });
+
+  it("adds to the signed in customer's own cart when the cookie names someone else's", async () => {
+    const { variant, cart } = await accountCartWithLine();
+    const me = await createCustomer();
+    const mine = await testDb.cart.create({
+      data: { customerId: me.id, expiresAt: new Date(Date.now() + 86_400_000) },
+    });
+    mocks.customerId = me.id;
+
+    await addToCart({ variantId: variant.id, quantity: 1 });
+
+    expect(cookieCartId()).toBe(mine.id);
+    expect(await testDb.cartItem.count({ where: { cartId: mine.id } })).toBe(1);
+    expect(await testDb.cartItem.count({ where: { cartId: cart.id } })).toBe(1);
+  });
+
+  it("answers not found to quantity and remove for anyone but its customer, cookie untouched", async () => {
+    const { item, cart } = await accountCartWithLine();
+    const cookie = mocks.jar.get("bestore_cart")?.value;
+    mocks.customerId = (await createCustomer()).id;
+
+    expect(await setCartItemQuantity({ itemId: item.id, quantity: 3 })).toEqual({
+      ok: false,
+      error: "not_found",
+    });
+    mocks.customerId = null;
+    expect(await removeCartItem({ itemId: item.id })).toEqual({ ok: false, error: "not_found" });
+    expect(await testDb.cartItem.findUniqueOrThrow({ where: { id: item.id } })).toMatchObject({
+      cartId: cart.id,
+      quantity: 1,
+    });
+    expect(mocks.jar.get("bestore_cart")?.value).toBe(cookie);
+  });
+
+  it("treats a session it cannot read as no cart, never an error", async () => {
+    const { owner, item } = await accountCartWithLine();
+    mocks.customerId = owner.id;
+    mocks.sessionFails = true;
+
+    expect(await removeCartItem({ itemId: item.id })).toEqual({ ok: false, error: "not_found" });
+    expect(mocks.warn).toHaveBeenCalledWith(
+      { event: "cart.owner_unknown", error: "Error" },
+      "cart.owner_unknown",
+    );
   });
 });

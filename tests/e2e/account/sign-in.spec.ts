@@ -106,3 +106,31 @@ test("the guest cart joins the account cart on sign in and comes back after sign
   await signInAsCustomer(page, customer.email, testPassword);
   await expect(page.getByRole("link", { name: "Cart, 4 items" })).toBeVisible();
 });
+
+// AC-7: a session that ended without our sign out (expiry, another device, an admin sign out)
+// leaves the cart cookie behind; the account cart stays its customer's.
+test("a leftover account cart cookie with no session shows an empty cart and starts a guest one", async ({
+  page,
+}) => {
+  const customer = await createTestUser({ admin: false });
+  const socks = await seedProduct({ stock: 20, priceCents: 1500 });
+  const scarf = await seedProduct({ stock: 20, priceCents: 4000, label: "Scarf" });
+
+  await signInAsCustomer(page, customer.email, testPassword);
+  await expect(page).toHaveURL("/account");
+  await addToCart(page, socks, 2);
+
+  // The session ends, the cart cookie stays.
+  await page.context().clearCookies({ name: /^sb-/ });
+  await page.goto("/cart");
+  await expect(page.getByRole("heading", { name: "Your cart is empty" })).toBeVisible();
+
+  await addToCart(page, scarf);
+  await page.goto("/cart");
+  await expect(page.getByRole("link", { name: scarf.name })).toBeVisible();
+  await expect(page.getByRole("link", { name: socks.name })).toHaveCount(0);
+
+  // Signing in again brings the account cart back, with the guest line merged in.
+  await signInAsCustomer(page, customer.email, testPassword);
+  await expect(page.getByRole("link", { name: "Cart, 3 items" })).toBeVisible();
+});

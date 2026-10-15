@@ -9,8 +9,11 @@ export type MergeOutcome = {
   // The cart the cookie names from now on, or null for none.
   readonly cartId: string | null;
   readonly expiresAt: Date;
-  // Guest lines that went into the account cart.
-  readonly linesMoved: number;
+  // spec 0012, AC-24 (`account.cart_merged`): guest lines that went into the account cart, moved
+  // or summed into a line already there; a guest line dropped beside an account line of an
+  // archived or sold out variant does not count. Every line of an adopted guest cart counts. Null
+  // when no guest cart joined, so no event is logged.
+  readonly linesMerged: number | null;
   // The account cart already held lines, so the merged cart differs from the guest one the
   // visitor saw (spec 0012, AC-15: checkout then asks them to look again).
   readonly accountHadLines: boolean;
@@ -40,21 +43,26 @@ export async function mergeCarts(
   const guest = cookieCart !== null && cookieCart.customer_id === null ? cookieCart : null;
 
   const account = await lockAccountCart(tx, customerId);
-  const done = async (cartId: string | null, linesMoved = 0, accountHadLines = false) => {
+  const done = async (
+    cartId: string | null,
+    linesMerged: number | null = null,
+    accountHadLines = false,
+  ) => {
     if (cartId !== null) await tx.cart.update({ where: { id: cartId }, data: { expiresAt } });
-    return { cartId, expiresAt, linesMoved, accountHadLines };
+    return { cartId, expiresAt, linesMerged, accountHadLines };
   };
 
   if (guest === null) return done(account);
   if (account === null) {
     await tx.cart.update({ where: { id: guest.id }, data: { customerId } });
-    return done(guest.id);
+    return done(guest.id, await tx.cartItem.count({ where: { cartId: guest.id } }));
   }
 
   const [guestLines, accountLines] = await Promise.all([
     cartLines(tx, guest.id),
     cartLines(tx, account),
   ]);
+  let linesMerged = 0;
   for (const line of guestLines) {
     const cap = line.available ? lineCap(line.stockQuantity) : 0;
     const existing = accountLines.find((other) => other.variantId === line.variantId);
@@ -65,6 +73,7 @@ export async function mergeCarts(
           where: { id: existing.id },
           data: { quantity: Math.min(existing.quantity + line.quantity, cap) },
         });
+        linesMerged += 1;
       }
       continue;
     }
@@ -73,11 +82,12 @@ export async function mergeCarts(
       where: { id: line.id },
       data: { cartId: account, ...(cap > 0 ? { quantity: Math.min(line.quantity, cap) } : {}) },
     });
+    linesMerged += 1;
   }
   // The rest of the guest cart's lines go with it. A pending order on it keeps its row with
   // cart_id null, as when the expired cart cron deletes a cart.
   await tx.cart.delete({ where: { id: guest.id } });
-  return done(account, guestLines.length, accountLines.length > 0);
+  return done(account, linesMerged, accountLines.length > 0);
 }
 
 // The customer's cart, locked; the caller holds the customer lock. One that has expired but not

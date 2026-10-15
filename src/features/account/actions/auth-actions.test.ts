@@ -204,6 +204,18 @@ describe("confirmEmail (AC-2)", () => {
     expect(mocks.signOut).not.toHaveBeenCalled();
   });
 
+  // A store admin's password guards /admin, so a confirm link never replaces it (Key invariants).
+  it("keeps the password of a user who runs the store on a sign up confirm", async () => {
+    mocks.verifyOtp.mockResolvedValue({ data: { user: confirmedUser }, error: null });
+    mocks.runsTheStore.mockResolvedValue(true);
+
+    const result = await outcome(() => confirmEmail(form({ token_hash: "abc", type: "signup" })));
+
+    expect(result).toBe("redirect:/account/set-password");
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+    expect(mocks.signOut).not.toHaveBeenCalled();
+  });
+
   it("sends a recovery to the new password page with the reset wording", async () => {
     mocks.verifyOtp.mockResolvedValue({ data: { user: confirmedUser }, error: null });
 

@@ -60,7 +60,10 @@ vi.mock("next/headers", () => ({
   }),
 }));
 // spec 0012, AC-15: the signed in customer, or null for a guest.
-vi.mock("@/lib/customer/session", () => ({ getCustomer: async () => mocks.customer }));
+vi.mock("@/lib/customer/session", () => ({
+  getCustomer: async () => mocks.customer,
+  getCustomerId: async () => mocks.customer?.id ?? null,
+}));
 
 const { startCheckout } = await import("@/features/checkout/actions/start-checkout");
 
@@ -413,6 +416,20 @@ describe("refusals create nothing", () => {
       ok: false,
       error: { code: "cart_changed" },
     });
+  });
+
+  // spec 0012, AC-7: a leftover cookie naming an account cart, with no session, pays for nothing.
+  it("treats an account cart as no cart for a visitor who is not its customer", async () => {
+    const { variant } = await createSimpleProduct("a", 5);
+    const owner = await createCustomer("owner@example.com");
+    const cart = await cartWith([{ variantId: variant.id, quantity: 1 }]);
+    await testDb.cart.update({ where: { id: cart.id }, data: { customerId: owner.id } });
+
+    expect(await startCheckout(checkout("a@example.com"))).toEqual({
+      ok: false,
+      error: { code: "cart_changed" },
+    });
+    expect(await testDb.order.count()).toBe(0);
   });
 
   it.each([

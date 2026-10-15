@@ -8,7 +8,7 @@ import { ProductImage } from "@/components/product-image";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { loadCart } from "@/lib/cart/load-cart";
+import { loadOwnedCart } from "@/lib/cart/owned";
 import { addressNeedsCheck } from "@/lib/customer/address-rules";
 import { listSavedAddresses, type SavedAddress } from "@/lib/customer/addresses";
 import { getCustomer } from "@/lib/customer/session";
@@ -48,7 +48,7 @@ export async function CheckoutSummary({
 }: {
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [cart, params] = await Promise.all([loadCart(), searchParams]);
+  const [cart, params] = await Promise.all([loadOwnedCart(), searchParams]);
   if (!cart || !cart.canCheckout) redirect(cartPath);
   const cancelled = params.cancelled === "1";
   const [settings, orderPrefill, customer] = await Promise.all([

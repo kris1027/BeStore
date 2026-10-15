@@ -30,12 +30,14 @@ export async function confirmEmail(formData: FormData): Promise<void> {
   const { data, error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
   if (error || !data.user) redirect(`${accountPaths.confirm}?failed=1&type=${type}`);
 
-  // A password that guards /admin is never reset from an inbox alone (Key invariants), even with
-  // an admin's link pasted here: it goes to the authenticator step like /auth/confirm.
-  if (type === "recovery" && (await runsTheStore(data.user.id))) redirect(adminResetPath);
+  // A password that guards /admin is never changed from an inbox alone (Key invariants), even with
+  // an admin's link pasted here: a reset goes to the authenticator step like /auth/confirm, and a
+  // sign up keeps the admin's password as it is.
+  const storeAdmin = await runsTheStore(data.user.id);
+  if (type === "recovery" && storeAdmin) redirect(adminResetPath);
 
   if (type === "signup") {
-    await dropPlantedPassword(supabase, data.user.id);
+    if (!storeAdmin) await dropPlantedPassword(supabase, data.user.id);
     logAccountEvent("account.confirmed", { customerId: customerIdentity(data.user)?.id ?? null });
   }
   redirect(

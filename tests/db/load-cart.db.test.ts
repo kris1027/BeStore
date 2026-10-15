@@ -3,14 +3,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { signCartId } from "@/lib/cart/signature";
 
 import { resetDatabaseBeforeEach, testDb } from "./client";
-import { createProductWithOptions, createSimpleProduct, inThirtyDays } from "./fixtures";
+import {
+  createCustomer,
+  createProductWithOptions,
+  createSimpleProduct,
+  inThirtyDays,
+} from "./fixtures";
 
 // Loading the cart against a real Postgres: live prices and flags (AC-10, AC-11), a bad or
 // expired cookie read as no cart (AC-9), and rendering never writes (AC-11).
 
 const secret = "c".repeat(32);
 
-const mocks = vi.hoisted(() => ({ cookie: undefined as string | undefined, warn: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  cookie: undefined as string | undefined,
+  warn: vi.fn(),
+  customerId: null as string | null,
+}));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", async () => ({ db: (await import("./client")).testDb }));
@@ -18,6 +27,7 @@ vi.mock("@/lib/env", () => ({
   env: { CART_COOKIE_SECRET: "c".repeat(32), NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:55321" },
 }));
 vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), warn: mocks.warn } }));
+vi.mock("@/lib/customer/session", () => ({ getCustomerId: async () => mocks.customerId }));
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (name: string) =>
@@ -31,12 +41,14 @@ vi.mock("next/headers", () => ({
 }));
 
 const { loadCart, loadCartById } = await import("@/lib/cart/load-cart");
+const { loadOwnedCart } = await import("@/lib/cart/owned");
 
 resetDatabaseBeforeEach();
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.cookie = undefined;
+  mocks.customerId = null;
 });
 
 async function cartWith(
@@ -172,5 +184,50 @@ describe("loadCart", () => {
       { event: "cart.cookie.invalid" },
       "cart.cookie.invalid",
     );
+  });
+});
+
+// spec 0012, AC-7: the cart page and checkout show an account cart only to its customer; the
+// header count (loadCart) keeps the raw read.
+describe("loadOwnedCart", () => {
+  async function accountCart() {
+    const owner = await createCustomer();
+    const cart = await testDb.cart.create({
+      data: { customerId: owner.id, expiresAt: inThirtyDays() },
+    });
+    mocks.cookie = signCartId(cart.id, secret);
+    return { owner, cart };
+  }
+
+  it("loads a guest cart for anyone", async () => {
+    const cart = await cartWith([]);
+    mocks.cookie = signCartId(cart.id, secret);
+
+    expect((await loadOwnedCart())?.id).toBe(cart.id);
+  });
+
+  it("loads an account cart for its own customer", async () => {
+    const { owner, cart } = await accountCart();
+    mocks.customerId = owner.id;
+
+    expect((await loadOwnedCart())?.id).toBe(cart.id);
+  });
+
+  it("is null for a signed out visitor or another customer, and writes nothing", async () => {
+    const { cart } = await accountCart();
+    const before = await snapshot();
+
+    expect(await loadOwnedCart()).toBeNull();
+    mocks.customerId = (await createCustomer()).id;
+    expect(await loadOwnedCart()).toBeNull();
+    expect((await loadCart())?.id).toBe(cart.id);
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it("is null for an expired cart", async () => {
+    const cart = await cartWith([], new Date(Date.now() - 1000));
+    mocks.cookie = signCartId(cart.id, secret);
+
+    expect(await loadOwnedCart()).toBeNull();
   });
 });

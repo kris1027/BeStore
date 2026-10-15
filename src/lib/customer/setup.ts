@@ -87,7 +87,7 @@ export async function mergeCartForCustomer(customerId: string): Promise<MergeOut
 async function finishMerge(customerId: string, cookieCartId: string | null, merge: MergeOutcome) {
   if (merge.cartId !== null) await setCartCookie(merge.cartId, merge.expiresAt);
   else if (cookieCartId !== null) await clearCartCookie();
-  if (merge.linesMoved > 0) {
-    logAccountEvent("account.cart_merged", { customerId, lines: merge.linesMoved });
+  if (merge.linesMerged !== null) {
+    logAccountEvent("account.cart_merged", { customerId, lines: merge.linesMerged });
   }
 }
