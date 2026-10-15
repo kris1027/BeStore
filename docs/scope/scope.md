@@ -242,7 +242,7 @@ spec [0012](../specs/0012-customer-accounts/index.md) · code in [src/features/a
   - [x] Safety net: logs, axe, header link, production runbook (AC-22, AC-24 to AC-26)
 - [ ] Verify it: `/check verify customer accounts`
 - [ ] Test it: `/test customer accounts`
-- [ ] Review it (fresh model): `/check review customer accounts`
+- [x] Review it (fresh model): `/check review customer accounts`
 - [ ] Document it: `/document customer accounts`
 
 ## Slice 7: Discovery
