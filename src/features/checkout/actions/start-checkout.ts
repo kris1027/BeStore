@@ -4,9 +4,6 @@ import type Stripe from "stripe";
 
 import { canCheckout } from "@/lib/cart/cart-lines";
 import { readOwnedCartId } from "@/lib/cart/owned";
-import { addressFields } from "@/lib/customer/address-rules";
-import { saveAddress } from "@/lib/customer/addresses";
-import { lockCustomer } from "@/lib/customer/lock";
 import { logAccountEvent } from "@/lib/customer/log";
 import { getCustomer } from "@/lib/customer/session";
 import { type CustomerIdentity, mergeCartForCustomer } from "@/lib/customer/setup";
@@ -27,6 +24,7 @@ import { stripe } from "@/lib/stripe";
 import { uuidv7 } from "@/lib/uuid";
 import { variantLabel } from "@/lib/variant-label";
 
+import { type CheckoutAccount, lockAccount, orderCustomerName, saveToAccount } from "../account";
 import { logCheckoutRefused, logCheckoutStarted, logStripeFailed, stripeErrorCode } from "../log";
 import { type CheckoutFieldErrors, checkoutFieldErrors, checkoutSchema } from "../schemas";
 import { checkoutSessionParams } from "../stripe-session";
@@ -73,15 +71,9 @@ async function run(input: unknown): Promise<Result<{ readonly url: string }>> {
   // spec 0012, AC-15: a signed in checkout uses the account email, whatever was typed, and a
   // guest cookie cart first joins the account cart. A guest pays only for a guest cart (AC-7).
   const customer = await getCustomer();
-  let cartId: string | null;
-  if (customer !== null) {
-    const merge = await mergeCartForCustomer(customer.id);
-    if (merge.accountHadLines) return fail({ code: "cart_changed", merged: true });
-    cartId = merge.cartId;
-  } else {
-    cartId = await readOwnedCartId();
-  }
-  if (cartId === null) return fail({ code: "cart_changed" });
+  const cart = await checkoutCartId(customer);
+  if (!cart.ok) return cart;
+  const cartId = cart.data;
   const email = customer?.email ?? typedEmail;
   const account = customer === null ? null : { customer, saveAddress: saveRequested };
 
@@ -225,10 +217,14 @@ async function keepEarlierOrder(orderId: string, sessionId: string): Promise<Res
   });
 }
 
-type CheckoutAccount = {
-  readonly customer: CustomerIdentity;
-  readonly saveAddress: boolean;
-};
+// spec 0012, AC-7 and AC-15: a guest pays only for a guest cart; a signed in customer's guest
+// cookie cart first joins the account cart, and lines already there send the form back to reload.
+async function checkoutCartId(customer: CustomerIdentity | null): Promise<Result<string>> {
+  const merge = customer === null ? null : await mergeCartForCustomer(customer.id);
+  if (merge?.accountHadLines) return fail({ code: "cart_changed", merged: true });
+  const cartId = merge === null ? await readOwnedCartId() : merge.cartId;
+  return cartId === null ? fail({ code: "cart_changed" }) : { ok: true, data: cartId };
+}
 
 type CreatedOrder = {
   readonly id: string;
@@ -249,15 +245,7 @@ async function createPendingOrder(
     const created = await db.$transaction(
       async (tx): Promise<Result<CreatedOrder & { readonly addressSaved: boolean }>> => {
         // The customer lock comes before the cart lock, the order every account write takes.
-        let profileName: string | null = null;
-        if (account !== null) {
-          await lockCustomer(tx, account.customer.id);
-          const profile = await tx.customer.findUnique({
-            where: { id: account.customer.id },
-            select: { name: true },
-          });
-          profileName = profile?.name ?? null;
-        }
+        const profileName = account === null ? null : await lockAccount(tx, account);
         const [cart] = await tx.$queryRaw<{ id: string }[]>`
         SELECT id FROM carts WHERE id = ${cartId}::uuid AND expires_at > now() FOR UPDATE`;
         if (!cart) return fail({ code: "cart_changed" });
@@ -343,40 +331,6 @@ async function createPendingOrder(
     if (uniqueViolation(error) === pendingOrderIndex) return fail({ code: "checkout_in_progress" });
     throw error;
   }
-}
-
-// spec 0012, AC-15: the buyer's name as best we know it before payment. A profile name the
-// customer chose wins; otherwise (blank profile, or a guest) the delivery full name. Blank is null
-// or "", the same test the profile fills use. Written only here, when the order is created.
-function orderCustomerName(profileName: string | null, fullName: string): string {
-  return profileName === null || profileName === "" ? fullName : profileName;
-}
-
-// spec 0012, AC-15, inside the order's transaction and under the customer lock: a blank name and
-// phone on the profile are filled from this order whether or not the box is ticked, and the
-// ticked address joins the address book (an equal one adds nothing, and at 10 nothing is added,
-// silently). Values already set are never overwritten, and the fills log nothing (AC-24).
-// Returns whether a new address was saved.
-async function saveToAccount(
-  tx: Tx,
-  account: CheckoutAccount,
-  shipTo: ShipTo,
-  customerName: string,
-): Promise<boolean> {
-  const customerId = account.customer.id;
-  await tx.customer.updateMany({
-    where: { id: customerId, OR: [{ name: null }, { name: "" }] },
-    data: { name: customerName },
-  });
-  if (shipTo.phone !== null) {
-    await tx.customer.updateMany({
-      where: { id: customerId, OR: [{ phone: null }, { phone: "" }] },
-      data: { phone: shipTo.phone },
-    });
-  }
-  if (!account.saveAddress) return false;
-  const outcome = await saveAddress(tx, customerId, addressFields(shipTo, shipTo.countryCode));
-  return outcome.kind === "saved";
 }
 
 async function loadLockedCart(tx: Tx, cartId: string) {

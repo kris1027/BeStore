@@ -10,6 +10,7 @@ Everything from `/checkout` to the order confirmation. The customer types their 
 |---|---|
 | `app/(store)/checkout/page.tsx`, `complete/page.tsx` | Thin routes. Both wrap the feature component in Suspense and are `noindex`. |
 | `actions/start-checkout.ts` | `startCheckout`: validate, clear any earlier pending order, create the order under the cart lock, create the Stripe session, save its id. |
+| `account.ts` | What a signed in checkout adds inside the order's transaction (spec 0012, AC-15): the customer lock, the order's `customer_name`, the profile fills and the saved address. |
 | `schemas.ts` | Pure. `checkoutSchema(country)` = email plus `shippingAddressSchema`, `checkoutFields`, `checkoutFieldErrors`, `sessionIdSchema`. |
 | `stripe-session.ts` | Pure. `checkoutSessionParams`, the order turned into Checkout Session params (inline `price_data`, one fixed `shipping_rate_data`). |
 | `queries.ts` | `checkoutPrefill(cartId)` for a return visit and `getCompletion(sessionId)` for the confirmation page. |
