@@ -40,10 +40,16 @@ describe("accountEventRecord", () => {
   });
 
   it("never passes on a field it does not know, such as an email smuggled in", () => {
-    const smuggled = { customerId: "c1", email: "ada@example.com", password: "Secret-1" } as never;
+    const smuggled = {
+      customerId: "c1",
+      email: "ada@example.com",
+      password: "Secret-1",
+      customerName: "Ada Lovelace",
+      customer_name: "Ada Lovelace",
+    } as never;
 
     expect(JSON.stringify(accountEventRecord("account.sign_up", smuggled))).not.toMatch(
-      /ada@example\.com|Secret-1/,
+      /ada@example\.com|Secret-1|Lovelace/,
     );
   });
 });

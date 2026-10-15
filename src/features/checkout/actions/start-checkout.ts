@@ -247,7 +247,15 @@ async function createPendingOrder(
     const created = await db.$transaction(
       async (tx): Promise<Result<CreatedOrder & { readonly addressSaved: boolean }>> => {
         // The customer lock comes before the cart lock, the order every account write takes.
-        if (account !== null) await lockCustomer(tx, account.customer.id);
+        let profileName: string | null = null;
+        if (account !== null) {
+          await lockCustomer(tx, account.customer.id);
+          const profile = await tx.customer.findUnique({
+            where: { id: account.customer.id },
+            select: { name: true },
+          });
+          profileName = profile?.name ?? null;
+        }
         const [cart] = await tx.$queryRaw<{ id: string }[]>`
         SELECT id FROM carts WHERE id = ${cartId}::uuid AND expires_at > now() FOR UPDATE`;
         if (!cart) return fail({ code: "cart_changed" });
@@ -283,12 +291,14 @@ async function createPendingOrder(
         if (snapshot.totalCents < minimumCents)
           return fail({ code: "below_minimum", minimumCents });
 
+        const customerName = orderCustomerName(profileName, shipTo.fullName);
         const order = await tx.order.create({
           data: {
             id: uuidv7(),
             cartId,
             customerId: account?.customer.id ?? null,
             email,
+            customerName,
             ...deliveryColumns(shipTo),
             currency: env.STORE_CURRENCY,
             subtotalCents: snapshot.subtotalCents,
@@ -315,7 +325,8 @@ async function createPendingOrder(
           },
           select: { id: true, number: true, totalCents: true },
         });
-        const addressSaved = account === null ? false : await saveToAccount(tx, account, shipTo);
+        const addressSaved =
+          account === null ? false : await saveToAccount(tx, account, shipTo, customerName);
         return { ok: true, data: { ...order, snapshot, addressSaved } };
       },
     );
@@ -332,12 +343,29 @@ async function createPendingOrder(
   }
 }
 
-// spec 0012, AC-15, inside the order's transaction and under the customer lock: the ticked address
-// joins the address book (an equal one adds nothing, and at 10 nothing is added, silently), and
-// a blank phone on the profile is filled from this order. Values already set are never
-// overwritten. Returns whether a new address was saved.
-async function saveToAccount(tx: Tx, account: CheckoutAccount, shipTo: ShipTo): Promise<boolean> {
+// spec 0012, AC-15: the buyer's name as best we know it before payment. A profile name the
+// customer chose wins; otherwise (blank profile, or a guest) the delivery full name. Blank is null
+// or "", the same test the profile fills use. Written only here, when the order is created.
+function orderCustomerName(profileName: string | null, fullName: string): string {
+  return profileName === null || profileName === "" ? fullName : profileName;
+}
+
+// spec 0012, AC-15, inside the order's transaction and under the customer lock: a blank name and
+// phone on the profile are filled from this order whether or not the box is ticked, and the
+// ticked address joins the address book (an equal one adds nothing, and at 10 nothing is added,
+// silently). Values already set are never overwritten, and the fills log nothing (AC-24).
+// Returns whether a new address was saved.
+async function saveToAccount(
+  tx: Tx,
+  account: CheckoutAccount,
+  shipTo: ShipTo,
+  customerName: string,
+): Promise<boolean> {
   const customerId = account.customer.id;
+  await tx.customer.updateMany({
+    where: { id: customerId, OR: [{ name: null }, { name: "" }] },
+    data: { name: customerName },
+  });
   if (shipTo.phone !== null) {
     await tx.customer.updateMany({
       where: { id: customerId, OR: [{ phone: null }, { phone: "" }] },

@@ -261,7 +261,8 @@ describe("delivery (spec 0007)", () => {
       shipPostalCode: "00-950",
       shipCountryCode: "PL",
       phone: "+48 600 100 200",
-      customerName: null,
+      // spec 0012, AC-15: a guest order is greeted by the delivery full name.
+      customerName: "Anna Kowalska",
       subtotalCents: 5000,
       shippingCents: 1500,
       totalCents: 6500,
@@ -861,6 +862,64 @@ describe("a signed in checkout", () => {
     expect((await testDb.customer.findUniqueOrThrow({ where: { id: customer.id } })).phone).toBe(
       "+48 600 100 200",
     );
+  });
+
+  it("names the order after a set profile name, even when shipping to someone else", async () => {
+    const customer = await signedIn();
+    await testDb.customer.update({ where: { id: customer.id }, data: { name: "Ada Lovelace" } });
+    const { variant } = await createSimpleProduct("a", 5);
+    await cartWith([{ variantId: variant.id, quantity: 1 }]);
+
+    await startCheckout(checkout("x@example.com", { fullName: "Grace Hopper" }));
+
+    const order = await testDb.order.findFirstOrThrow();
+    expect(order).toMatchObject({ customerName: "Ada Lovelace", shipFullName: "Grace Hopper" });
+    expect((await testDb.customer.findUniqueOrThrow({ where: { id: customer.id } })).name).toBe(
+      "Ada Lovelace",
+    );
+  });
+
+  it.each([null, ""])(
+    "with a blank profile name (%j) names the order after the delivery name and fills the profile once, ticked or not",
+    async (blank) => {
+      const customer = await signedIn();
+      await testDb.customer.update({ where: { id: customer.id }, data: { name: blank } });
+      const { variant } = await createSimpleProduct("a", 5);
+      await cartWith([{ variantId: variant.id, quantity: 1 }]);
+
+      await startCheckout(
+        checkout("x@example.com", { fullName: "Grace Hopper", saveAddress: false }),
+      );
+      expect((await testDb.order.findFirstOrThrow()).customerName).toBe("Grace Hopper");
+      expect((await testDb.customer.findUniqueOrThrow({ where: { id: customer.id } })).name).toBe(
+        "Grace Hopper",
+      );
+
+      // The next order uses the now set profile name, and the fill never overwrites it.
+      await startCheckout(checkout("x@example.com", { fullName: "Alan Turing" }));
+      const latest = await testDb.order.findFirstOrThrow({ orderBy: { createdAt: "desc" } });
+      expect(latest).toMatchObject({ customerName: "Grace Hopper", shipFullName: "Alan Turing" });
+      expect((await testDb.customer.findUniqueOrThrow({ where: { id: customer.id } })).name).toBe(
+        "Grace Hopper",
+      );
+    },
+  );
+
+  it("never logs the order's customer name", async () => {
+    const customer = await signedIn();
+    await testDb.customer.update({ where: { id: customer.id }, data: { name: "Ada Lovelace" } });
+    const { variant } = await createSimpleProduct("a", 5);
+    await cartWith([{ variantId: variant.id, quantity: 1 }]);
+
+    await startCheckout(checkout("x@example.com", { saveAddress: true }));
+
+    const logged = JSON.stringify([
+      mocks.info.mock.calls,
+      mocks.warn.mock.calls,
+      mocks.error.mock.calls,
+    ]);
+    expect(logged).not.toContain("Lovelace");
+    expect(logged).not.toContain("Kowalska");
   });
 
   it("merges a guest cart into an account cart with lines and asks the customer to look again", async () => {
