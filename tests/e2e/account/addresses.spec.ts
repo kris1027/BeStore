@@ -50,7 +50,9 @@ test("a customer adds, edits, defaults and deletes addresses", async ({ page }) 
   const edit = page.getByRole("dialog", { name: "Edit address" });
   await edit.getByLabel("City").fill("Gdańsk");
   await edit.getByRole("button", { name: "Save address" }).click();
-  await expect(page.getByText("Gdańsk")).toBeVisible();
+  // The dialog's description repeats the address label, so look in the list once it closes.
+  await expect(edit).toBeHidden();
+  await expect(cards(page).filter({ hasText: "Gdańsk" })).toHaveCount(1);
 
   await page.getByRole("button", { name: "Delete: Anna Kowalska, ul. Krótka 2, Kraków" }).click();
   await page.getByRole("button", { name: "Delete address" }).click();
