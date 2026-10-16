@@ -1,7 +1,7 @@
 # 0013. Categories, search and filters
 
 **Date**: 2026-10-16 (amended the same day after a cross check: AC-3, AC-5, AC-6, AC-8, AC-9, AC-11, AC-13 to AC-16, AC-18, AC-20, AC-22 to AC-24, the index shape)
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 
