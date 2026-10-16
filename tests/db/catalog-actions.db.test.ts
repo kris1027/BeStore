@@ -102,6 +102,8 @@ describe("createProduct", () => {
     ]);
     expect(mocks.updateTag).toHaveBeenCalledWith("catalog");
     expect(mocks.updateTag).toHaveBeenCalledWith("product:linen-shirt");
+    // spec 0013, AC-22: it may join categories.
+    expect(mocks.updateTag).toHaveBeenCalledWith("categories");
     expect(mocks.info).toHaveBeenCalledWith(
       {
         event: "catalog.product.created",

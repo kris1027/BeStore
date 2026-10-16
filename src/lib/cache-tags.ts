@@ -10,3 +10,7 @@ export function productTag(slug: string): string {
 // The one store_settings row (spec 0007): the delivery fee and free delivery threshold the cart
 // and checkout show. Pay never reads it through the cache.
 export const storeSettingsTag = "store-settings";
+
+// Category membership, order and visibility (spec 0013, AC-22): the header nav, category pages
+// and the listing index. Every category write expires it after its commit.
+export const categoriesTag = "categories";

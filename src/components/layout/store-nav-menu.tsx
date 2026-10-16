@@ -19,7 +19,10 @@ export function StoreDesktopNav({ items }: StoreNavProps) {
   if (items.length === 0) return null;
 
   return (
-    <nav aria-label="Main" className="hidden md:block">
+    <nav
+      aria-label="Main"
+      className="hidden min-w-0 [scrollbar-width:none] overflow-x-auto md:block"
+    >
       <ul className="flex items-center gap-1">
         {items.map((item) => (
           <li key={item.href}>
@@ -27,7 +30,7 @@ export function StoreDesktopNav({ items }: StoreNavProps) {
               href={item.href}
               aria-current={item.href === current ? "page" : undefined}
               className={cn(
-                "inline-flex h-11 items-center rounded-md px-3 text-sm text-muted-foreground transition-colors hover:text-foreground",
+                "inline-flex h-11 items-center rounded-md px-3 text-sm whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground",
                 "aria-[current=page]:font-medium aria-[current=page]:text-foreground",
               )}
             >

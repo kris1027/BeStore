@@ -12,3 +12,7 @@ export function adminProductPath(id: string): string {
 export function productPath(slug: string): string {
   return `/products/${slug}`;
 }
+
+// spec 0013: the storefront listings.
+export const homePath = "/";
+export const searchPath = "/search";

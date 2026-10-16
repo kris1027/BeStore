@@ -1,6 +1,9 @@
 "use server";
 
+import { updateTag } from "next/cache";
+
 import { requireAdmin } from "@/features/admin-auth/require-admin";
+import { catalogTag, categoriesTag } from "@/lib/cache-tags";
 import { db } from "@/lib/db";
 import type { ActionResult } from "@/lib/result";
 
@@ -26,6 +29,9 @@ export async function deleteCategory(
   });
   if (products === null) return { ok: false, error: { code: "not_found" } };
 
+  // The cascade drops links too; the listing index carries both tags (spec 0013, AC-22).
+  updateTag(categoriesTag);
+  updateTag(catalogTag);
   logCategoryEvent("catalog.category.deleted", { adminId: admin.id, categoryId, products });
   return { ok: true, data: null };
 }

@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resetDatabaseBeforeEach, testDb } from "./client";
 import { createProductWithOptions, createSimpleProduct, createVariant } from "./fixtures";
 
-// The catalog reads against a real Postgres: the home grid (AC-6), the product page view
-// (AC-7), their cache tags (AC-14) and the admin list (AC-1).
+// The catalog reads against a real Postgres: the product page view (AC-7), its cache tag
+// (AC-14) and the admin list (AC-1). The listing index has catalog-listing.db.test.ts.
 
 const mocks = vi.hoisted(() => ({ cacheTag: vi.fn(), cacheLife: vi.fn() }));
 
@@ -13,8 +13,7 @@ vi.mock("@/lib/db", async () => ({ db: (await import("./client")).testDb }));
 vi.mock("@/lib/env", () => ({ env: { NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:55321" } }));
 vi.mock("next/cache", () => ({ cacheTag: mocks.cacheTag, cacheLife: mocks.cacheLife }));
 
-const { getActiveProducts, getPrerenderedSlugs, getProductBySlug, HOME_PRODUCT_LIMIT } =
-  await import("@/features/catalog/queries");
+const { getPrerenderedSlugs, getProductBySlug } = await import("@/features/catalog/queries");
 const { getAdminProducts, parseAdminProductsParams } =
   await import("@/features/catalog/admin-queries");
 
@@ -30,89 +29,6 @@ async function product(
 ) {
   return testDb.product.create({ data: { name: slug, slug, status: "active", ...data } });
 }
-
-describe("getActiveProducts", () => {
-  it("lists active products by position, then newest first, and tags the list", async () => {
-    await product("old-first", { position: 0, createdAt: at(1) });
-    await product("new-first", { position: 0, createdAt: at(2) });
-    await product("later", { position: 1, createdAt: at(3) });
-    await product("a-draft", { status: "draft", createdAt: at(4) });
-    await product("archived", { status: "archived", createdAt: at(5) });
-
-    const cards = await getActiveProducts();
-
-    expect(cards.map((card) => card.slug)).toEqual(["new-first", "old-first", "later"]);
-    expect(mocks.cacheTag).toHaveBeenCalledWith("catalog");
-  });
-
-  it(`stops at ${48} products`, async () => {
-    await testDb.product.createMany({
-      data: Array.from({ length: 50 }, (_, i) => ({
-        name: `P${i}`,
-        slug: `p-${i}`,
-        status: "active" as const,
-      })),
-    });
-
-    expect(HOME_PRODUCT_LIMIT).toBe(48);
-    expect(await getActiveProducts()).toHaveLength(48);
-  });
-
-  it("gives the price range of live variants, ignoring archived ones", async () => {
-    const shirt = await product("shirt", {});
-    await createVariant(shirt.id, { sku: "A", priceCents: 1500, optionKey: "a" });
-    await createVariant(shirt.id, { sku: "B", priceCents: 2500, optionKey: "b" });
-    const archived = await createVariant(shirt.id, { sku: "C", priceCents: 100, optionKey: "c" });
-    await testDb.productVariant.update({ where: { id: archived.id }, data: { archived: true } });
-
-    const [card] = await getActiveProducts();
-
-    expect(card).toMatchObject({ minPriceCents: 1500, maxPriceCents: 2500, soldOut: false });
-  });
-
-  it("is sold out only when every live variant has no stock", async () => {
-    const { product: gone } = await createSimpleProduct("gone", 0);
-    const { product: left } = await createSimpleProduct("left", 1);
-
-    const cards = await getActiveProducts();
-
-    expect(cards.find((card) => card.id === gone.id)?.soldOut).toBe(true);
-    expect(cards.find((card) => card.id === left.id)?.soldOut).toBe(false);
-  });
-
-  it("shows the first image by position, or the decorative placeholder", async () => {
-    const withImage = await product("with-image", { createdAt: at(2) });
-    await product("without-image", { createdAt: at(1) });
-    await testDb.productImage.createMany({
-      data: [
-        {
-          productId: withImage.id,
-          storagePath: "products/second.png",
-          altText: "Back",
-          position: 1,
-        },
-        {
-          productId: withImage.id,
-          storagePath: "products/first.png",
-          altText: "Front",
-          position: 0,
-          width: 800,
-          height: 1000,
-        },
-      ],
-    });
-
-    const [first, second] = await getActiveProducts();
-
-    expect(first?.image).toEqual({
-      src: "http://127.0.0.1:55321/storage/v1/object/public/product-images/products/first.png",
-      alt: "Front",
-      width: 800,
-      height: 1000,
-    });
-    expect(second?.image).toEqual({ src: "/placeholder.svg", alt: "", width: null, height: null });
-  });
-});
 
 describe("getProductBySlug", () => {
   it("never sends a stock count above 5, only an availability", async () => {
@@ -251,29 +167,6 @@ describe("getAdminProducts", () => {
 
 // covers: spec 0009 AC-16
 describe("sale prices", () => {
-  it("marks a card on sale only when an in stock, live variant has a compare at price", async () => {
-    const sale = await product("sale", { position: 0 });
-    await createVariant(sale.id, { sku: "SALE-A", stockQuantity: 2, optionKey: "a" });
-    await testDb.productVariant.updateMany({
-      where: { sku: "SALE-A" },
-      data: { compareAtPriceCents: 4000 },
-    });
-    const soldOutSale = await product("sold-out-sale", { position: 1 });
-    await createVariant(soldOutSale.id, { sku: "SOS-A", stockQuantity: 0, optionKey: "a" });
-    await createVariant(soldOutSale.id, { sku: "SOS-B", stockQuantity: 3, optionKey: "b" });
-    await testDb.productVariant.updateMany({
-      where: { sku: "SOS-A" },
-      data: { compareAtPriceCents: 4000 },
-    });
-
-    const cards = await getActiveProducts();
-
-    expect(cards.map((card) => [card.slug, card.onSale])).toEqual([
-      ["sale", true],
-      ["sold-out-sale", false],
-    ]);
-  });
-
   it("gives each variant its compare at price on the product page", async () => {
     const { product: tee, variant } = await createSimpleProduct("1");
     await testDb.productVariant.update({

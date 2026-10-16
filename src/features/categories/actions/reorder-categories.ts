@@ -1,6 +1,9 @@
 "use server";
 
+import { updateTag } from "next/cache";
+
 import { requireAdmin } from "@/features/admin-auth/require-admin";
+import { categoriesTag } from "@/lib/cache-tags";
 import { db } from "@/lib/db";
 import type { ActionResult } from "@/lib/result";
 import { sameIdSet } from "@/lib/sortable";
@@ -39,6 +42,7 @@ export async function reorderCategories(
   });
   if (!saved) return { ok: false, error: { code: "stale" } };
 
+  updateTag(categoriesTag);
   logCategoryEvent("catalog.categories.reordered", { adminId: admin.id, count: orderedIds.length });
   return { ok: true, data: null };
 }

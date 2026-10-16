@@ -45,7 +45,7 @@ export function StoreShell({
             </Suspense>
             <Wordmark />
           </div>
-          <div className="flex flex-1 justify-center">
+          <div className="flex min-w-0 flex-1 justify-center">
             <Suspense fallback={null}>
               <StoreDesktopNav items={navItems} />
             </Suspense>

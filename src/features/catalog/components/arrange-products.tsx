@@ -12,7 +12,6 @@ import {
 
 import type { ArrangeItem } from "../admin-queries";
 import { reorderProducts } from "../actions/reorder-products";
-import { HOME_PRODUCT_LIMIT } from "../queries";
 import { adminProductsPath } from "../paths";
 
 // spec 0009, AC-20: every active product in home grid order; each drop saves at once.
@@ -30,9 +29,8 @@ export function ArrangeProducts({ products }: { readonly products: readonly Arra
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold">Arrange products</h1>
           <p className="max-w-prose text-sm text-muted-foreground">
-            The home page shows active products in this order, the first {HOME_PRODUCT_LIMIT} of
-            them. Drag a product, or focus its handle and use Space and the arrow keys. Each move
-            saves at once.
+            The home page shows active products in this order. Drag a product, or focus its handle
+            and use Space and the arrow keys. Each move saves at once.
           </p>
         </div>
       </div>
