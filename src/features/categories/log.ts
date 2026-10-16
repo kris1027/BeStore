@@ -11,6 +11,8 @@ type CategoryEvents = {
   };
   "catalog.category.deleted": { readonly categoryId: string; readonly products: number };
   "catalog.categories.reordered": { readonly count: number };
+  // spec 0013, AC-23.
+  "catalog.category.products_reordered": { readonly categoryId: string; readonly count: number };
 };
 
 export const logCategoryEvent = createAdminEventLogger<CategoryEvents>();
