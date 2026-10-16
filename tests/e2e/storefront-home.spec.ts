@@ -29,8 +29,14 @@ test.describe("storefront home", () => {
     await expect(header.getByRole("link", { name: brand.name })).toHaveAttribute("href", "/");
     const footer = page.getByRole("contentinfo");
     await expect(footer).toContainText(new RegExp(`© \\d{4} ${brand.name}`));
-    // No nav links yet, so no menu button on phones either.
-    await expect(page.getByRole("button", { name: "Open menu" })).toHaveCount(0);
+    // spec 0013, AC-6: a search box on every page.
+    await expect(
+      header
+        .getByRole("search", { name: "Store search" })
+        .or(header.getByRole("link", { name: "Search" }))
+        .or(header.getByRole("button", { name: "Search" }))
+        .first(),
+    ).toBeVisible();
   });
 
   test("shows the heading on any screen size", async ({ page }) => {
