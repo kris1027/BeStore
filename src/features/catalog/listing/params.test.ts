@@ -71,6 +71,15 @@ describe("parseListingParams (spec 0013, AC-17, AC-18)", () => {
     expect(parse({ min: "1.999" }).minCents).toBeNull();
   });
 
+  it("reads a price in the store currency's own minor units", () => {
+    expect(parse({ min: "9.5" }).minCents).toBe(950);
+    // JPY has no minor units, so a fraction is not a price and the bound is dropped.
+    expect(parseListingParams({ min: "9.5", max: "950" }, "home", "JPY")).toMatchObject({
+      minCents: null,
+      maxCents: 950,
+    });
+  });
+
   it("ignores an unknown sort, and relevance outside search", () => {
     expect(parse({ sort: "zzz" }).sort).toBe("featured");
     expect(parse({ sort: "relevance" }).sort).toBe("featured");
@@ -151,6 +160,25 @@ describe("listingHref", () => {
       "EUR",
     );
     expect(reparsed).toEqual(state);
+  });
+
+  it("keeps a query with spaces, symbols and accents as one q param", () => {
+    const state = parse({ q: "a&b = 50% łódź" }, "search");
+    const href = listingHref("/search", state, "search", "EUR");
+
+    const reparsed = parseListingParams(
+      Object.fromEntries(new URL(href, "https://shop.example").searchParams),
+      "search",
+      "EUR",
+    );
+    expect(reparsed.q).toBe("a&b = 50% łódź");
+  });
+
+  it("writes a currency without minor units as whole numbers", () => {
+    const state = parseListingParams({ min: "500", max: "1200" }, "home", "JPY");
+
+    expect(state).toMatchObject({ minCents: 500, maxCents: 1200 });
+    expect(listingHref("/", state, "home", "JPY")).toBe("/?min=500&max=1200");
   });
 
   it("never writes relevance off search, or q off search", () => {

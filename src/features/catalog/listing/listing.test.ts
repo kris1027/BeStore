@@ -126,6 +126,13 @@ describe("paging (AC-5, AC-18)", () => {
     expect(names(listing)).toEqual(["P48", "P49"]);
   });
 
+  it("needs a second page from the 25th match on", () => {
+    const at = (count: number) => list(index.slice(0, count));
+
+    expect(at(24)).toMatchObject({ total: 24, pageCount: 1 });
+    expect(at(25)).toMatchObject({ total: 25, pageCount: 2 });
+  });
+
   it("has one page when nothing matches", () => {
     const listing = list(index, { min: "999" });
 
@@ -173,6 +180,11 @@ describe("search (AC-7 to AC-9)", () => {
     expect(search("!!")).toEqual({ status: "prompt" });
     expect(search(" a ")).toEqual({ status: "prompt" });
     expect(search("ab").status).toBe("ok");
+  });
+
+  it("prompts for a query of symbols or emoji only, whatever its length (AC-9)", () => {
+    expect(search("😀😀")).toEqual({ status: "prompt" });
+    expect(search("-- ** --")).toEqual({ status: "prompt" });
   });
 
   it("can still sort a search by another key", () => {
@@ -275,6 +287,27 @@ describe("option groups (AC-13)", () => {
     expect(groups[0]?.values.map((value) => value.key)).toEqual(["s", "m"]);
   });
 
+  it("labels a tied spelling by the first one in Featured order", () => {
+    const first = product({ name: "A", position: 0, options: { COLOR: ["Red", "Blue"] } });
+    const second = product({ name: "B", position: 1, options: { Color: ["red", "blue"] } });
+
+    expect(list([first, second]).groups[0]).toMatchObject({ label: "COLOR" });
+    expect(
+      list([
+        { ...first, position: 1 },
+        { ...second, position: 0 },
+      ]).groups[0],
+    ).toMatchObject({ label: "Color" });
+  });
+
+  it("orders groups used by as many products by label", () => {
+    const { groups } = list([
+      product({ name: "A", options: { Size: ["S", "M"], Fit: ["Slim", "Wide"] } }),
+    ]);
+
+    expect(groups.map((group) => group.label)).toEqual(["Fit", "Size"]);
+  });
+
   it("keeps a Cyrillic option a key of its own", () => {
     const { groups } = list([product({ name: "A", options: { Цвет: ["Красный", "Синий"] } })]);
 
@@ -338,6 +371,72 @@ describe("counts (AC-14)", () => {
   });
 });
 
+describe("the scope behind filters and counts (AC-3, AC-11, AC-13)", () => {
+  const options = { Color: ["Red", "Blue"] };
+  const inCategory = product({
+    name: "Linen Tee",
+    categories: { c: 0 },
+    options,
+    variants: [
+      { price: 2000, values: { Color: "Red" } },
+      { price: 4000, values: { Color: "Blue" } },
+    ],
+  });
+  const elsewhere = product({
+    name: "Wool Coat",
+    position: 1,
+    options: { Size: ["S", "M"] },
+    variants: [
+      { price: 90000, values: { Size: "S" } },
+      { price: 95000, values: { Size: "M" } },
+    ],
+  });
+  const index = [inCategory, elsewhere];
+
+  it("offers a category only the groups and prices of its own products", () => {
+    const listing = list(index, {}, { kind: "category", categoryId: "c" });
+
+    expect(listing.groups.map((group) => group.key)).toEqual(["color"]);
+    expect(listing.priceBounds).toEqual({ minCents: 2000, maxCents: 4000 });
+  });
+
+  it("offers a search only the groups and prices of what it found", () => {
+    const result = buildListing(
+      index,
+      { kind: "search" },
+      parseListingParams({ q: "coat" }, "search", "EUR"),
+      "en",
+    );
+
+    expect(result.status === "ok" && result.groups.map((group) => group.key)).toEqual(["size"]);
+    expect(result.status === "ok" && result.priceBounds).toEqual({
+      minCents: 90000,
+      maxCents: 95000,
+    });
+  });
+
+  it("keeps every group when the filters leave nothing", () => {
+    const listing = list(index, { min: "999999" });
+
+    expect(listing.total).toBe(0);
+    expect(listing.groups.map((group) => group.key)).toEqual(["color", "size"]);
+    expect(listing.priceBounds).toEqual({ minCents: 2000, maxCents: 95000 });
+  });
+
+  it("gives an empty category no groups, no prices and one page", () => {
+    const listing = list(index, {}, { kind: "category", categoryId: "empty" });
+
+    expect(listing).toMatchObject({
+      total: 0,
+      scopeTotal: 0,
+      page: 1,
+      pageCount: 1,
+      groups: [],
+      priceBounds: null,
+    });
+  });
+});
+
 describe("price bounds (AC-15)", () => {
   it("are the lowest and highest variant price of the scope before filters", () => {
     const index = [
@@ -375,6 +474,20 @@ describe("sorts (AC-16)", () => {
     ["name", ["Apple", "banana", "cherry"]],
   ])("sorts by %s", (sort, expected) => {
     expect(names(list(index, { sort }))).toEqual(expected);
+  });
+
+  it("sorts names by the store locale's collation", () => {
+    const polish = [
+      product({ name: "Mama", position: 0 }),
+      product({ name: "Łódź", position: 1 }),
+      product({ name: "Lato", position: 2 }),
+    ];
+    const state = parseListingParams({ sort: "name" }, "home", "PLN");
+
+    const result = buildListing(polish, { kind: "home" }, state, "pl-PL");
+
+    // Code points would put Ł after M; Polish puts it right after L.
+    expect(result.status === "ok" && names(result)).toEqual(["Lato", "Łódź", "Mama"]);
   });
 
   it("keeps the category's own order for ties", () => {
