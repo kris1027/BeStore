@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { zonedDateTimeToUtc } from "@/lib/dates";
+import type { DiscountType } from "@/lib/discounts/rule";
 import { DISCOUNT_CODE_PATTERN } from "@/lib/discounts/schema";
 import { parseMoney } from "@/lib/money";
 
@@ -74,16 +75,10 @@ export function discountCodeFieldsSchema(currency: string, timeZone: string) {
       const type = values.type === "" ? null : values.type;
       if (type === null) issue("type", discountMessages.type);
 
-      let value = 0;
-      if (type === "percent") {
-        const percent = wholeNumber(values.value);
-        if (percent === null || percent < 1 || percent > 100)
-          issue("value", discountMessages.percent);
-        else value = percent;
-      } else if (type === "fixed_amount") {
-        const amount = parseMoney(values.value, currency);
-        if (!amount.ok || amount.cents < 1) issue("value", discountMessages.fixed);
-        else value = amount.cents;
+      const value = type === null ? null : codeValue(type, values.value, currency);
+      if (value === null) {
+        if (type === "percent") issue("value", discountMessages.percent);
+        if (type === "fixed_amount") issue("value", discountMessages.fixed);
       }
 
       const startsAt = optionalDate(values.startsAt, timeZone);
@@ -99,12 +94,8 @@ export function discountCodeFieldsSchema(currency: string, timeZone: string) {
       const perCustomerLimit = optionalLimit(values.perCustomerLimit);
       if (perCustomerLimit === undefined) issue("perCustomerLimit", discountMessages.limit);
 
-      let minSubtotalCents: number | null = null;
-      if (values.minSubtotal.trim() !== "") {
-        const amount = parseMoney(values.minSubtotal, currency);
-        if (!amount.ok || amount.cents < 1) issue("minSubtotal", discountMessages.minSubtotal);
-        else minSubtotalCents = amount.cents;
-      }
+      const minSubtotalCents = optionalAmount(values.minSubtotal, currency);
+      if (minSubtotalCents === undefined) issue("minSubtotal", discountMessages.minSubtotal);
 
       const note = values.note.trim();
       if (note.length > NOTE_MAX_LENGTH) issue("note", discountMessages.note);
@@ -113,12 +104,12 @@ export function discountCodeFieldsSchema(currency: string, timeZone: string) {
         code,
         // Only reached as null once an issue was raised, so the parse fails.
         type: type ?? "percent",
-        value,
+        value: value ?? 0,
         startsAt: startsAt ?? null,
         endsAt: endsAt ?? null,
         maxRedemptions: maxRedemptions ?? null,
         perCustomerLimit: perCustomerLimit ?? null,
-        minSubtotalCents,
+        minSubtotalCents: minSubtotalCents ?? null,
         active: values.active,
         note: note === "" ? null : note,
       };
@@ -154,6 +145,24 @@ function wholeNumber(text: string): number | null {
   if (!/^\d+$/.test(trimmed)) return null;
   const number = Number(trimmed);
   return number > MAX_INT ? null : number;
+}
+
+// The value in its column's unit: a whole percent from 1 to 100, or minor units above 0. null
+// when it is not one.
+function codeValue(type: DiscountType, text: string, currency: string): number | null {
+  if (type === "percent") {
+    const percent = wholeNumber(text);
+    return percent === null || percent < 1 || percent > 100 ? null : percent;
+  }
+  const amount = parseMoney(text, currency);
+  return amount.ok && amount.cents >= 1 ? amount.cents : null;
+}
+
+// null for empty, undefined for not an amount above 0.
+function optionalAmount(text: string, currency: string): number | null | undefined {
+  if (text.trim() === "") return null;
+  const amount = parseMoney(text, currency);
+  return amount.ok && amount.cents >= 1 ? amount.cents : undefined;
 }
 
 // null for empty, undefined for not a whole number above 0.
