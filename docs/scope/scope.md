@@ -267,13 +267,13 @@ spec [0013](../specs/0013-categories-search-filters/index.md) · code in [src/fe
 ### 14. Discounts & promo codes · GA · in-progress
 Admin created promo codes (percent or fixed amount, with dates and usage limits), applied at checkout.
 **Done when:** a valid code lowers the total correctly before payment; expired, used up, or invalid codes are rejected with a clear message; the discount is saved on the order and in refunds.
-Spec: [0014](../specs/0014-discounts-promo-codes/index.md)
+Spec: [0014](../specs/0014-discounts-promo-codes/index.md) · code in [src/features/discounts/](../../src/features/discounts/), [src/lib/discounts/](../../src/lib/discounts/)
 - [x] Design it (spec): `/architect discounts & promo codes`
-- [ ] Build it: `/develop discounts & promo codes`
-  - [ ] Thin thread: migration, the pure discount rule and split, code lock, counts and redemption lifecycle, admin create, Apply and Pay with the Stripe coupon, the admin order row, e2e through Stripe test mode (AC-1, AC-2, AC-4 to AC-8, AC-11, AC-14, AC-17, AC-19)
-  - [ ] Refusals and prefill: every refusal message on Apply and Pay, focus and live region, coupon failure, logs, returning to checkout with the code (AC-1, AC-3, AC-4, AC-7, AC-9, AC-18)
-  - [ ] Admin list, edit, delete and the orders filter: uses, discount given, status, search, edit lock, stale check, delete refusal, nav (AC-10, AC-12 to AC-14, AC-17, AC-18)
-  - [ ] Customer views and safety net: code on the complete page, account order page and email, refund check, e2e with axe and keyboard (AC-15, AC-16, AC-20)
+- [x] Build it: `/develop discounts & promo codes`
+  - [x] Thin thread: migration, the pure discount rule and split, code lock, counts and redemption lifecycle, admin create, Apply and Pay with the Stripe coupon, the admin order row, e2e through Stripe test mode (AC-1, AC-2, AC-4 to AC-8, AC-11, AC-14, AC-17, AC-19)
+  - [x] Refusals and prefill: every refusal message on Apply and Pay, focus and live region, coupon failure, logs, returning to checkout with the code (AC-1, AC-3, AC-4, AC-7, AC-9, AC-18)
+  - [x] Admin list, edit, delete and the orders filter: uses, discount given, status, search, edit lock, stale check, delete refusal, nav (AC-10, AC-12 to AC-14, AC-17, AC-18)
+  - [x] Customer views and safety net: code on the complete page, account order page and email, refund check, e2e with axe and keyboard (AC-15, AC-16, AC-20)
 - [ ] Verify it: `/check verify discounts & promo codes`
 - [ ] Test it: `/test discounts & promo codes`
 - [ ] Review it (fresh model): `/check review discounts & promo codes`

@@ -189,3 +189,98 @@ export async function stockOf(variantId: string): Promise<number> {
     return row.rows[0]!.stock_quantity;
   });
 }
+
+// spec 0014: a promo code with a unique text, made by a throwaway admin row (the code needs the
+// admin who created it). Codes are shared by every spec running at the same time, so each test
+// makes its own.
+export async function seedCode(
+  options: {
+    readonly type?: "percent" | "fixed_amount";
+    readonly value?: number;
+    readonly endsAt?: Date;
+    readonly minSubtotalCents?: number;
+    readonly maxRedemptions?: number;
+  } = {},
+): Promise<{ readonly id: string; readonly code: string }> {
+  const code = `E2E-${randomUUID().slice(0, 8).toUpperCase()}`;
+  return withDb(async (db) => {
+    const admin = await db.query<{ id: string }>(
+      `INSERT INTO admin_users (id, email, name, updated_at)
+       VALUES (gen_random_uuid(), $1, 'Code seeder', now()) RETURNING id`,
+      [`codes-${randomUUID()}@example.com`],
+    );
+    const row = await db.query<{ id: string }>(
+      `INSERT INTO discount_codes (id, code, type, value, ends_at, min_subtotal_cents,
+         max_redemptions, created_by_admin_id, updated_at)
+       VALUES (gen_random_uuid(), $1, $2::discount_type, $3, $4, $5, $6, $7, now()) RETURNING id`,
+      [
+        code,
+        options.type ?? "percent",
+        options.value ?? 10,
+        options.endsAt ?? null,
+        options.minSubtotalCents ?? null,
+        options.maxRedemptions ?? null,
+        admin.rows[0]!.id,
+      ],
+    );
+    return { id: row.rows[0]!.id, code };
+  });
+}
+
+export async function setCodeActive(id: string, active: boolean) {
+  await withDb((db) =>
+    db.query("UPDATE discount_codes SET active = $2, updated_at = now() WHERE id = $1", [
+      id,
+      active,
+    ]),
+  );
+}
+
+// A paid order that used the code, one line, no delivery fee: what Pay and the webhook leave
+// behind, with its redemption.
+export async function seedPaidOrderWithCode(
+  product: SeededProduct,
+  code: { readonly id: string; readonly code: string },
+  options: { readonly priceCents: number; readonly discountCents: number },
+): Promise<SeededOrder> {
+  const sessionId = `cs_test_e2e${randomUUID().replace(/-/g, "")}`;
+  const total = options.priceCents - options.discountCents;
+  return withDb(async (db) => {
+    const value = await db.query<{ type: string; value: number }>(
+      "SELECT type::text AS type, value FROM discount_codes WHERE id = $1",
+      [code.id],
+    );
+    const order = await db.query<{ id: string; number: number }>(
+      `INSERT INTO orders (id, status, email, currency, subtotal_cents, discount_cents,
+         shipping_cents, total_cents, discount_code_id, discount_code, discount_type,
+         discount_value, stripe_checkout_session_id, paid_at, updated_at)
+       VALUES (gen_random_uuid(), 'paid', 'e2e.customer@example.com', 'EUR', $1, $2, 0, $3, $4,
+         $5, $6::discount_type, $7, $8, now(), now())
+       RETURNING id, number`,
+      [
+        options.priceCents,
+        options.discountCents,
+        total,
+        code.id,
+        code.code,
+        value.rows[0]!.type,
+        value.rows[0]!.value,
+        sessionId,
+      ],
+    );
+    const { id, number } = order.rows[0]!;
+    await db.query(
+      `INSERT INTO order_lines (id, order_id, variant_id, product_id, product_name, sku,
+         unit_price_cents, quantity, discount_cents, line_total_cents)
+       SELECT gen_random_uuid(), $1, v.id, v.product_id, $2, v.sku, $3, 1, $4, $5
+       FROM product_variants v WHERE v.id = $6`,
+      [id, product.name, options.priceCents, options.discountCents, total, product.variantId],
+    );
+    await db.query(
+      `INSERT INTO discount_redemptions (id, discount_code_id, order_id, email)
+       VALUES (gen_random_uuid(), $1, $2, 'e2e.customer@example.com')`,
+      [code.id, id],
+    );
+    return { id, number, sessionId, totalCents: total };
+  });
+}
