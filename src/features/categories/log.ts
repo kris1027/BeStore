@@ -11,7 +11,7 @@ type CategoryEvents = {
   };
   "catalog.category.deleted": { readonly categoryId: string; readonly products: number };
   "catalog.categories.reordered": { readonly count: number };
-  // spec 0013, AC-23.
+  // spec 0013, AC-23: like the rest, ids and a count; the new order itself is in the database.
   "catalog.category.products_reordered": { readonly categoryId: string; readonly count: number };
 };
 
