@@ -3,7 +3,7 @@
 import { updateTag } from "next/cache";
 
 import { requireAdmin } from "@/features/admin-auth/require-admin";
-import { catalogTag, productTag } from "@/lib/cache-tags";
+import { catalogTag, categoriesTag, productTag } from "@/lib/cache-tags";
 import { db } from "@/lib/db";
 import { uniqueViolation } from "@/lib/db-errors";
 import { env } from "@/lib/env";
@@ -207,6 +207,8 @@ export async function createProduct(
   // Only after the commit: the next storefront request reads the new product.
   updateTag(catalogTag);
   updateTag(productTag(product.slug));
+  // It may join categories through linkAtEnd (spec 0013, AC-22).
+  updateTag(categoriesTag);
   logCatalogEvent("catalog.product.created", {
     adminId: admin.id,
     productId: created.id,

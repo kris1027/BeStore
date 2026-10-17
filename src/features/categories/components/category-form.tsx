@@ -186,7 +186,7 @@ export function CategoryForm({
           <div className="flex flex-col gap-1">
             <FieldLabel htmlFor="category-visible">Visible</FieldLabel>
             <FieldDescription id="category-visible-description">
-              Shoppers will see visible categories once the storefront lists them.
+              Shoppers see a visible category in the store header and on its own page.
             </FieldDescription>
           </div>
         </Field>

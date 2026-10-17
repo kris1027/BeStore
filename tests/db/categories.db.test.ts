@@ -4,12 +4,13 @@ import { resetDatabaseBeforeEach, testDb } from "./client";
 import { createSimpleProduct } from "./fixtures";
 
 // The category actions and admin reads against a real Postgres (spec 0009, AC-17 to AC-21,
-// AC-24).
+// AC-24), their cache expiry and the arrange action (spec 0013, AC-22, AC-23).
 
-const mocks = vi.hoisted(() => ({ requireAdmin: vi.fn(), info: vi.fn() }));
+const mocks = vi.hoisted(() => ({ requireAdmin: vi.fn(), info: vi.fn(), updateTag: vi.fn() }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", async () => ({ db: (await import("./client")).testDb }));
+vi.mock("next/cache", () => ({ updateTag: mocks.updateTag }));
 vi.mock("@/features/admin-auth/require-admin", () => ({ requireAdmin: mocks.requireAdmin }));
 vi.mock("@/lib/logger", async (importOriginal) =>
   (await import("./logger-mock")).mockLoggerModule(importOriginal, {
@@ -24,6 +25,8 @@ const { updateCategory } = await import("@/features/categories/actions/update-ca
 const { deleteCategory } = await import("@/features/categories/actions/delete-category");
 const { reorderCategories } = await import("@/features/categories/actions/reorder-categories");
 const { setCategoryProducts } = await import("@/features/categories/actions/set-category-products");
+const { reorderCategoryProducts } =
+  await import("@/features/categories/actions/reorder-category-products");
 const { getAdminCategories, getCategoryForEdit } =
   await import("@/features/categories/admin-queries");
 
@@ -209,5 +212,161 @@ describe("setCategoryProducts and deleteCategory", () => {
   it("loads null for an unknown or malformed id", async () => {
     expect(await getCategoryForEdit("01890000-0000-7000-8000-000000000000")).toBeNull();
     expect(await getCategoryForEdit("nope")).toBeNull();
+  });
+});
+
+const tags = () => mocks.updateTag.mock.calls.map(([tag]) => tag);
+
+describe("category cache expiry (spec 0013, AC-22)", () => {
+  it("expires the categories tag after every write, and catalog after a delete", async () => {
+    const id = await create("linen");
+    expect(tags()).toEqual(["categories"]);
+
+    mocks.updateTag.mockClear();
+    const { updatedAt } = await testDb.category.findUniqueOrThrow({ where: { id } });
+    await updateCategory({
+      ...fields("linen"),
+      visible: false,
+      categoryId: id,
+      loadedUpdatedAt: updatedAt.toISOString(),
+    });
+    expect(tags()).toEqual(["categories"]);
+
+    mocks.updateTag.mockClear();
+    await reorderCategories({ orderedIds: [id] });
+    expect(tags()).toEqual(["categories"]);
+
+    mocks.updateTag.mockClear();
+    const { product } = await createSimpleProduct("1");
+    await setCategoryProducts({ categoryId: id, add: [product.id] });
+    expect(tags()).toEqual(["categories"]);
+
+    mocks.updateTag.mockClear();
+    await deleteCategory({ categoryId: id });
+    expect(tags()).toEqual(["categories", "catalog"]);
+  });
+
+  it("expires nothing when a write is refused", async () => {
+    await createCategory({ ...fields("bad slug"), slug: "Bad Slug" });
+    await reorderCategories({ orderedIds: ["01890000-0000-7000-8000-000000000000"] });
+    await deleteCategory({ categoryId: "01890000-0000-7000-8000-000000000000" });
+
+    expect(mocks.updateTag).not.toHaveBeenCalled();
+  });
+});
+
+describe("reorderCategoryProducts (spec 0013, AC-23)", () => {
+  async function linked(count: number) {
+    const id = await create("linen");
+    const products = [];
+    for (let i = 0; i < count; i += 1)
+      products.push((await createSimpleProduct(String(i))).product);
+    await setCategoryProducts({ categoryId: id, add: products.map((product) => product.id) });
+    return { id, ids: products.map((product) => product.id) };
+  }
+
+  it("rewrites the category's positions to 0..n-1 in the given order and logs counts only", async () => {
+    const { id, ids } = await linked(3);
+    const [a, b, c] = ids;
+    mocks.updateTag.mockClear();
+
+    expect(await reorderCategoryProducts({ categoryId: id, productIds: [c, a, b] })).toEqual({
+      ok: true,
+      data: null,
+    });
+
+    const rows = await testDb.productCategory.findMany({
+      where: { categoryId: id },
+      orderBy: { position: "asc" },
+      select: { productId: true, position: true },
+    });
+    expect(rows).toEqual([
+      { productId: c, position: 0 },
+      { productId: a, position: 1 },
+      { productId: b, position: 2 },
+    ]);
+    expect((await getCategoryForEdit(id))?.products.map((product) => product.id)).toEqual([
+      c,
+      a,
+      b,
+    ]);
+    expect(tags()).toEqual(["categories"]);
+    expect(mocks.info).toHaveBeenCalledWith(
+      {
+        event: "catalog.category.products_reordered",
+        adminId: "admin-1",
+        categoryId: id,
+        count: 3,
+      },
+      "catalog.category.products_reordered",
+    );
+  });
+
+  it("leaves the products' own updated_at alone", async () => {
+    const { id, ids } = await linked(2);
+    const before = await testDb.product.findMany({ select: { id: true, updatedAt: true } });
+
+    await reorderCategoryProducts({ categoryId: id, productIds: ids.toReversed() });
+
+    expect(await testDb.product.findMany({ select: { id: true, updatedAt: true } })).toEqual(
+      before,
+    );
+  });
+
+  it("refuses with stale unless the list is exactly the category's current set, saving nothing", async () => {
+    const { id, ids } = await linked(2);
+    const [a, b] = ids;
+    const { product: other } = await createSimpleProduct("other");
+    mocks.updateTag.mockClear();
+
+    for (const productIds of [[a], [a, b, other.id], [a, a], [b, other.id]]) {
+      expect(await reorderCategoryProducts({ categoryId: id, productIds })).toEqual({
+        ok: false,
+        error: { code: "stale" },
+      });
+    }
+    expect(
+      await reorderCategoryProducts({
+        categoryId: "01890000-0000-7000-8000-000000000000",
+        productIds: [a, b],
+      }),
+    ).toEqual({ ok: false, error: { code: "stale" } });
+    expect((await getCategoryForEdit(id))?.products.map((product) => product.id)).toEqual([a, b]);
+    expect(mocks.updateTag).not.toHaveBeenCalled();
+  });
+
+  it("refuses with stale when a product joins meanwhile", async () => {
+    const { id, ids } = await linked(2);
+    const { product: late } = await createSimpleProduct("late");
+    await setCategoryProducts({ categoryId: id, add: [late.id] });
+
+    expect(await reorderCategoryProducts({ categoryId: id, productIds: ids.toReversed() })).toEqual(
+      {
+        ok: false,
+        error: { code: "stale" },
+      },
+    );
+  });
+
+  it("answers invalid for malformed input", async () => {
+    expect(await reorderCategoryProducts({ categoryId: "nope", productIds: [] })).toEqual({
+      ok: false,
+      error: { code: "invalid" },
+    });
+    expect(
+      await reorderCategoryProducts({ categoryId: "01890000-0000-7000-8000-000000000000" }),
+    ).toEqual({
+      ok: false,
+      error: { code: "invalid" },
+    });
+  });
+
+  it("is refused for anyone requireAdmin turns away", async () => {
+    const { id, ids } = await linked(1);
+    mocks.requireAdmin.mockRejectedValueOnce(new Error("NEXT_REDIRECT"));
+
+    await expect(reorderCategoryProducts({ categoryId: id, productIds: ids })).rejects.toThrow(
+      "NEXT_REDIRECT",
+    );
   });
 });

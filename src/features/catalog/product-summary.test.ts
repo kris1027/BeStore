@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isOnSale, summarizeVariants } from "./product-summary";
+import { summarizeCard, summarizeVariants } from "./product-summary";
 
 describe("summarizeVariants", () => {
   it("sums stock and finds the price range", () => {
@@ -40,23 +40,34 @@ describe("summarizeVariants", () => {
 });
 
 // covers: spec 0009 AC-16
-describe("isOnSale", () => {
-  it("is true when an in stock variant has a compare at price", () => {
+describe("summarizeCard", () => {
+  it("finds the price range and is on sale when an in stock variant has a compare at price", () => {
     expect(
-      isOnSale([
-        { stockQuantity: 0, compareAtPriceCents: null },
-        { stockQuantity: 2, compareAtPriceCents: 3000 },
+      summarizeCard([
+        { priceCents: 2500, compareAtPriceCents: null, inStock: false },
+        { priceCents: 1900, compareAtPriceCents: 3000, inStock: true },
       ]),
-    ).toBe(true);
+    ).toEqual({ minPriceCents: 1900, maxPriceCents: 2500, soldOut: false, onSale: true });
   });
 
   it("ignores a compare at price on a sold out variant", () => {
     expect(
-      isOnSale([
-        { stockQuantity: 0, compareAtPriceCents: 3000 },
-        { stockQuantity: 4, compareAtPriceCents: null },
-      ]),
+      summarizeCard([
+        { priceCents: 1000, compareAtPriceCents: 3000, inStock: false },
+        { priceCents: 1000, compareAtPriceCents: null, inStock: true },
+      ]).onSale,
     ).toBe(false);
-    expect(isOnSale([])).toBe(false);
+  });
+
+  it("is sold out only when no variant is in stock, and at 0 with none", () => {
+    expect(
+      summarizeCard([{ priceCents: 1000, compareAtPriceCents: 3000, inStock: false }]),
+    ).toMatchObject({ soldOut: true, onSale: false });
+    expect(summarizeCard([])).toEqual({
+      minPriceCents: 0,
+      maxPriceCents: 0,
+      soldOut: true,
+      onSale: false,
+    });
   });
 });

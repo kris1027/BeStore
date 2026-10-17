@@ -26,8 +26,9 @@ export async function expectNoA11yViolations(page: Page) {
 }
 
 // Tabs forward until the target has focus, so a keyboard test proves the target is reachable in
-// tab order rather than focusing it directly.
-export async function tabTo(page: Page, target: Locator, maxPresses = 40) {
+// tab order rather than focusing it directly. The header holds a link per visible category
+// (spec 0013), and e2e runs leave many behind in a local database, hence the generous cap.
+export async function tabTo(page: Page, target: Locator, maxPresses = 200) {
   for (let presses = 0; presses < maxPresses; presses += 1) {
     if (await target.evaluate((element) => element === document.activeElement)) return;
     await page.keyboard.press("Tab");

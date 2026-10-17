@@ -1,6 +1,9 @@
 "use server";
 
+import { updateTag } from "next/cache";
+
 import { requireAdmin } from "@/features/admin-auth/require-admin";
+import { categoriesTag } from "@/lib/cache-tags";
 import { db } from "@/lib/db";
 import { linkAtEnd } from "@/lib/product-categories";
 import type { ActionResult } from "@/lib/result";
@@ -63,6 +66,7 @@ export async function setCategoryProducts(
   );
   if ("code" in outcome) return { ok: false, error: outcome };
 
+  updateTag(categoriesTag);
   logCategoryEvent("catalog.category.updated", { adminId: admin.id, categoryId, ...outcome });
   return { ok: true, data: null };
 }

@@ -37,6 +37,12 @@ export const reorderCategoriesSchema = z.object({
   orderedIds: z.array(z.uuid()).max(10_000),
 });
 
+// spec 0013, AC-23: the category's whole product list, in its new order.
+export const reorderCategoryProductsSchema = z.object({
+  categoryId: z.uuid(),
+  productIds: z.array(z.uuid()).max(10_000),
+});
+
 export const setCategoryProductsSchema = z.object({
   categoryId: z.uuid(),
   add: z.array(z.uuid()).max(100).default([]),

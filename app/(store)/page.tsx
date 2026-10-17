@@ -1,13 +1,23 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { storeContainer } from "@/components/layout/container";
 import { AccountDeletedNotice } from "@/features/account/components/account-deleted-notice";
-import { ProductGrid } from "@/features/catalog/components/product-grid";
+import { ListingSkeleton } from "@/features/catalog/listing/components/listing-skeleton";
+import { ListingView } from "@/features/catalog/listing/components/listing-view";
+import { homePath } from "@/features/catalog/paths";
 import { brand } from "@/lib/brand/brand";
+import { env } from "@/lib/env";
 import { cn } from "@/lib/utils";
 
-// Served from the cache: the grid's read is tagged `catalog` (spec 0005, AC-6).
-export default function StoreHomePage() {
+// spec 0013, AC-24: the home title stays; paged and filtered views point at the plain path.
+export const metadata: Metadata = {
+  alternates: { canonical: new URL(homePath, env.NEXT_PUBLIC_SITE_URL).toString() },
+};
+
+// spec 0013, AC-4: every listable product, with filters, sorts and paging. The heading is the
+// static shell; the results read the search params, so they render behind Suspense.
+export default function StoreHomePage({ searchParams }: PageProps<"/">) {
   return (
     <div className={cn(storeContainer, "flex flex-col gap-12 py-12 md:gap-16 md:py-16")}>
       <Suspense fallback={null}>
@@ -19,7 +29,14 @@ export default function StoreHomePage() {
           Everything we sell, in one place.
         </p>
       </header>
-      <ProductGrid />
+      <Suspense fallback={<ListingSkeleton />}>
+        <ListingView
+          scope={{ kind: "home" }}
+          path={homePath}
+          searchParams={searchParams}
+          heading={{ text: "Shop all", visible: true }}
+        />
+      </Suspense>
     </div>
   );
 }

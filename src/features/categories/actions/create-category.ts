@@ -1,6 +1,9 @@
 "use server";
 
+import { updateTag } from "next/cache";
+
 import { requireAdmin } from "@/features/admin-auth/require-admin";
+import { categoriesTag } from "@/lib/cache-tags";
 import { db } from "@/lib/db";
 import { uniqueViolation } from "@/lib/db-errors";
 import type { ActionResult } from "@/lib/result";
@@ -14,8 +17,7 @@ export type CategoryFormError =
   | { readonly code: "stale" }
   | { readonly code: "not_found" };
 
-// spec 0009, AC-17: a new category goes last. No cache tag yet: nothing on the storefront reads
-// categories until feature 13 (AC-23).
+// spec 0009, AC-17: a new category goes last. Expires the storefront nav (spec 0013, AC-22).
 export async function createCategory(
   input: unknown,
 ): Promise<ActionResult<{ readonly categoryId: string }, CategoryFormError>> {
@@ -43,6 +45,7 @@ export async function createCategory(
     return { ok: false, error: { code: "slug_taken" } };
   }
 
+  updateTag(categoriesTag);
   logCategoryEvent("catalog.category.created", { adminId: admin.id, categoryId });
   return { ok: true, data: { categoryId } };
 }

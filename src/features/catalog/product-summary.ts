@@ -23,15 +23,33 @@ export function summarizeVariants(variants: readonly VariantFacts[]): ProductSum
   };
 }
 
-// spec 0009, AC-16: a card shows "Sale" when a variant a customer could buy now has a compare at
-// price. Callers pass only non archived variants.
-export function isOnSale(
-  variants: readonly {
-    readonly stockQuantity: number;
-    readonly compareAtPriceCents: number | null;
-  }[],
-): boolean {
-  return variants.some(
-    (variant) => variant.stockQuantity > 0 && variant.compareAtPriceCents !== null,
-  );
+type CardVariant = {
+  readonly priceCents: number;
+  readonly compareAtPriceCents: number | null;
+  readonly inStock: boolean;
+};
+
+// spec 0009, AC-16: "Sale" means a variant a customer could buy now has a compare at price. The
+// "On sale only" filter (spec 0013, AC-12) reads the same rule.
+export function isSaleVariant(variant: CardVariant): boolean {
+  return variant.inStock && variant.compareAtPriceCents !== null;
+}
+
+export type CardSummary = {
+  readonly minPriceCents: number;
+  readonly maxPriceCents: number;
+  readonly soldOut: boolean;
+  readonly onSale: boolean;
+};
+
+// What a product card shows, from availability alone: the listing index never holds a stock
+// count. Callers pass only non archived variants; none at all reads as sold out at 0.
+export function summarizeCard(variants: readonly CardVariant[]): CardSummary {
+  const prices = variants.map((variant) => variant.priceCents);
+  return {
+    minPriceCents: prices.length > 0 ? Math.min(...prices) : 0,
+    maxPriceCents: prices.length > 0 ? Math.max(...prices) : 0,
+    soldOut: !variants.some((variant) => variant.inStock),
+    onSale: variants.some(isSaleVariant),
+  };
 }

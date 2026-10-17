@@ -1,6 +1,9 @@
 "use server";
 
+import { updateTag } from "next/cache";
+
 import { requireAdmin } from "@/features/admin-auth/require-admin";
+import { categoriesTag } from "@/lib/cache-tags";
 import { db } from "@/lib/db";
 import { linkAtEnd, lockCategories } from "@/lib/product-categories";
 import type { ActionResult } from "@/lib/result";
@@ -15,8 +18,8 @@ export type UpdateProductCategoriesError =
   | { readonly code: "not_found" };
 
 // spec 0009, AC-18 and AC-21: sets the product's categories, refused when its stored set
-// differs from the one the page loaded. A new category takes the product at its end. Nothing
-// is expired: no storefront read uses categories until feature 13 (AC-23).
+// differs from the one the page loaded. A new category takes the product at its end. Expires
+// the category pages and the listing index (spec 0013, AC-22).
 //
 // The product lock is FOR NO KEY UPDATE: the category page locks a category and then links a
 // product, whose foreign key needs a key share on the product row, so a full lock here would
@@ -61,6 +64,7 @@ export async function updateProductCategories(
   );
   if (outcome !== "saved") return { ok: false, error: outcome };
 
+  updateTag(categoriesTag);
   logCatalogEvent("catalog.product.updated", {
     adminId: admin.id,
     productId,

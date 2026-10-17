@@ -26,7 +26,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 10 | Admin order management | Slice 4 | done |
 | 11 | Order emails | Slice 5 | done |
 | 12 | Customer accounts | Slice 6 | done |
-| 13 | Categories, search & filters | Slice 7 | planned |
+| 13 | Categories, search & filters | Slice 7 | done |
 | 14 | Discounts & promo codes | Slice 8 | planned |
 | 15 | Admin sales dashboard | Slice 9 | planned |
 | 16 | Legal pages & cookie consent | Launch | planned |
@@ -248,10 +248,19 @@ spec [0012](../specs/0012-customer-accounts/index.md) · code in [src/features/a
 
 ## Slice 7: Discovery
 
-### 13. Categories, search & filters · needs a decision
+### 13. Categories, search & filters · done
 Help customers find products: category pages, text search, filters by price and variant options, sorting.
 **Done when:** a customer can browse by category, search by name, filter and sort results, and the URL reflects the filters so results can be shared; empty and no results states render.
-- [ ] Design it (spec): `/architect categories, search & filters`
+spec [0013](../specs/0013-categories-search-filters/index.md) · code in [src/features/catalog/listing/](../../src/features/catalog/listing/), [src/features/categories/](../../src/features/categories/)
+- [x] Design it (spec): `/architect categories, search & filters`
+- [x] Build it: `/develop categories, search & filters`
+  - [x] Thin thread: `categories` cache tag and its expiry, the cached listing index, header nav, category pages with paging, not found and empty states (AC-1 to AC-3, AC-5, AC-22)
+  - [x] Home and search: home becomes the full listing, text folding, the header search box, `/search` with Best match and the short query prompt (AC-4, AC-6 to AC-10)
+  - [x] Filters and sort: option groups and counts, per variant matching, price, stock and sale, URL repair and serialization, sort, the panel, Sheet, chips and no results states (AC-11 to AC-21)
+  - [x] Admin arrange inside a category (AC-23)
+  - [x] Safety net: category metadata and canonicals, e2e with axe and keyboard on home, category and search (AC-1 to AC-25)
+- [x] Verify it: `/check verify categories, search & filters`
+- [x] Test it: `/test categories, search & filters`
 
 ## Slice 8: Discounts
 
@@ -302,6 +311,7 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Wishlist**: save products for later · needs a decision
 - **Dark mode**: a dark token set with its own contrast pass and a theme switch; the semantic tokens rule keeps it a token change · needs a decision · from spec 0003
 - **Sweep abandoned product image uploads**: delete files in `product-images` that no image row and no order line references, older than a day, if storage cost grows · from spec 0009
+- **Storefront listing in SQL**: move search, filters and counts from the cached in memory index to SQL per request (`pg_trgm`, `unaccent`) once the catalog passes about 2,000 active products or the index nears the cache entry limit · needs a decision · from spec 0013
 - **Trigram search indexes for admin orders**: `pg_trgm` indexes on the searched order columns, once the list is measured as slow · from spec 0010
 - **Redact customer data at Stripe**: remove the name, email and address Stripe keeps on expired Checkout Sessions, if its redaction tooling fits · needs a decision · from spec 0008
 - **Resend bounce and complaint webhooks**: record bounced and complained on `email_sends` and show "Bounced" on the order page, once live · from spec 0011

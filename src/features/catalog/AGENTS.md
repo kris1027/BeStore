@@ -2,7 +2,7 @@
 
 ## Overview
 
-Products, option types, variants, ordered image galleries (up to 8, each optionally tied to one option value) and stock history: the admin list, create form, per section edit page and arrange page (`/admin/products`, `/admin/products/<id>`, `/admin/products/arrange`), the storefront home grid (`/`) and product page (`/products/[slug]`). Governing specs: [0005 Core buy loop](../../../docs/specs/0005-core-buy-loop/index.md), [0009 Admin catalog management](../../../docs/specs/0009-admin-catalog-management/index.md). Categories themselves live in `src/features/categories/`.
+Products, option types, variants, ordered image galleries (up to 8, each optionally tied to one option value) and stock history: the admin list, create form, per section edit page and arrange page (`/admin/products`, `/admin/products/<id>`, `/admin/products/arrange`), the storefront listings (home `/`, `/search`, the body of `/categories/[slug]`) and product page (`/products/[slug]`). Governing specs: [0005 Core buy loop](../../../docs/specs/0005-core-buy-loop/index.md), [0009 Admin catalog management](../../../docs/specs/0009-admin-catalog-management/index.md), [0013 Categories, search and filters](../../../docs/specs/0013-categories-search-filters/index.md). Categories themselves live in `src/features/categories/`.
 
 ## Files
 
@@ -12,14 +12,16 @@ Products, option types, variants, ordered image galleries (up to 8, each optiona
 - `status.ts`, `variant-edit.ts`, `stock.ts`, `image-edit.ts`: pure edit rules (status transitions and publish position; variant conflicts, renames and new value combinations; stock changes and moved rows; the images conflict check).
 - `markdown.tsx`: the one description renderer (`ProductDescription`), shared by the cached product page and the admin Preview, so it has no `server-only` import.
 - `paths.ts`: admin and storefront URLs.
+- `listing/`: the storefront listings (spec 0013). `index-query.ts` is the one cached listing index; `index-rows.ts`, `listing.ts`, `params.ts`, `pagination.ts`, `format.ts` are pure (index rows, search / filters / counts / sort / paging, the URL state parser and serializer, page links, the product count label); `components/` holds `ListingView` and its controls, which the home, search and category routes render.
 - `queries.ts`: cached storefront reads; `admin-queries.ts`: live admin reads (never cached): the filtered, keyset paged list, `getProductForEdit`, `getStockHistory`, `getArrangeList`, `getCategoryOptions`, `searchProductsForPicker` (also used by the category page route).
 - `actions/`: `create-product`, `create-image-upload`, and one per edit section or step: `update-details`, `change-status`, `update-variants`, `add-option-value`, `adjust-stock`, `update-images`, `update-product-categories`, `reorder-products`, `delete-product`.
-- `components/editor/`: the edit page sections; `components/` holds the create form, list, arrange page and storefront parts (grid, card, gallery, purchase).
+- `components/editor/`: the edit page sections; `components/` holds the create form, list, arrange page and storefront parts (card, gallery, purchase).
 - `log.ts`: the `catalog.product.*`, `catalog.stock.adjusted` and `catalog.products.reordered` events.
 
 ## Conventions
 
-- Storefront reads are `'use cache'`, tagged `catalog` and `product:<slug>` (`src/lib/cache-tags.ts`); every action that changes what the storefront shows expires both with `updateTag` after the commit (a slug change expires the old and the new tag; `reorderProducts` only `catalog`). The categories actions expire nothing: no cached read uses categories yet. Only `active` products enter the cache.
+- Storefront reads are `'use cache'`, tagged `catalog` and `product:<slug>` (`src/lib/cache-tags.ts`); every action that changes what the storefront shows expires both with `updateTag` after the commit (a slug change expires the old and the new tag; `reorderProducts` only `catalog`). Category membership, order and visibility are tagged `categories`; the listing index carries both `catalog` and `categories`, so `createProduct` and `updateProductCategories` also expire `categories`. Only `active` products enter the cache.
+- Listings read the whole sellable catalog once (`getListingIndex`) and search, filter, count and sort it in plain code per request; no query per search. The URL holds the whole state, and `params.ts` turns any input into a valid state, never an error. Search and filter keys fold text through `src/lib/search-text.ts` (not `slugify`). Index variants carry `inStock`, never the count.
 - The product page gets an availability per variant, never the stock count, so counts above the low stock threshold never reach the browser (`src/lib/availability.ts`).
 - Prices are typed in major units and converted with `parseMoney` (`src/lib/money.ts`) without floating point math.
 - Create and every save are one transaction. Unique violations (23505) map back to the field concerned via `src/lib/db-errors.ts`; invalid input never partly saves.

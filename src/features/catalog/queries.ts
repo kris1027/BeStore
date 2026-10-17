@@ -3,15 +3,13 @@ import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 
 import { type Availability, availability } from "@/lib/availability";
-import { catalogTag, productTag } from "@/lib/cache-tags";
+import { productTag } from "@/lib/cache-tags";
 import { db } from "@/lib/db";
 import { PLACEHOLDER_IMAGE, productImageUrl } from "@/lib/product-image";
 import { SLUG_PATTERN } from "@/lib/slug";
 
-import { isOnSale, summarizeVariants } from "./product-summary";
-
-// The home grid stops here until feature 13 adds paging (spec 0005, AC-6).
-export const HOME_PRODUCT_LIMIT = 48;
+// How many product pages the build prerenders; the rest render on their first visit.
+const PRERENDERED_PRODUCTS = 48;
 
 export type ProductImage = {
   readonly src: string;
@@ -27,13 +25,14 @@ const placeholderImage: ProductImage = {
   height: null,
 };
 
-const imageSelect = {
+// The card image: the first by position.
+export const firstImageSelect = {
   orderBy: { position: "asc" },
   take: 1,
   select: { storagePath: true, altText: true, width: true, height: true },
 } as const;
 
-function toImage(
+export function toImage(
   row:
     | { storagePath: string; altText: string; width: number | null; height: number | null }
     | undefined,
@@ -47,6 +46,7 @@ function toImage(
   };
 }
 
+// A listing card (spec 0013 builds them from the listing index).
 export type ProductCard = {
   readonly id: string;
   readonly name: string;
@@ -58,42 +58,6 @@ export type ProductCard = {
   // spec 0009, AC-16: a variant in stock has a compare at price.
   readonly onSale: boolean;
 };
-
-// Cached until an admin action expires the catalog tag; drafts never enter it (spec 0005).
-export async function getActiveProducts(): Promise<readonly ProductCard[]> {
-  "use cache";
-  cacheLife("max");
-  cacheTag(catalogTag);
-
-  const products = await db.product.findMany({
-    where: { status: "active" },
-    orderBy: [{ position: "asc" }, { createdAt: "desc" }, { id: "desc" }],
-    take: HOME_PRODUCT_LIMIT,
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      images: imageSelect,
-      variants: {
-        where: { archived: false },
-        select: { priceCents: true, stockQuantity: true, compareAtPriceCents: true },
-      },
-    },
-  });
-  return products.map((product) => {
-    const summary = summarizeVariants(product.variants);
-    return {
-      id: product.id,
-      name: product.name,
-      slug: product.slug,
-      image: toImage(product.images[0]),
-      minPriceCents: summary.minPriceCents,
-      maxPriceCents: summary.maxPriceCents,
-      soldOut: summary.soldOut,
-      onSale: isOnSale(product.variants),
-    };
-  });
-}
 
 // What the product page and its picker get: an availability per variant, never the stock
 // count itself, so counts above the low stock threshold never reach the browser (AC-7).
@@ -213,7 +177,7 @@ export async function getPrerenderedSlugs(): Promise<readonly string[]> {
   const products = await db.product.findMany({
     where: { status: "active" },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: HOME_PRODUCT_LIMIT,
+    take: PRERENDERED_PRODUCTS,
     select: { slug: true },
   });
   return products.map((product) => product.slug);

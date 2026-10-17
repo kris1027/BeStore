@@ -1,6 +1,9 @@
 "use server";
 
+import { updateTag } from "next/cache";
+
 import { requireAdmin } from "@/features/admin-auth/require-admin";
+import { categoriesTag } from "@/lib/cache-tags";
 import { db } from "@/lib/db";
 import { uniqueViolation } from "@/lib/db-errors";
 import type { ActionResult } from "@/lib/result";
@@ -38,6 +41,8 @@ export async function updateCategory(
   }
   if (outcome !== "saved") return { ok: false, error: { code: outcome } };
 
+  // A rename, slug change or hide shows on the next storefront request (spec 0013, AC-22).
+  updateTag(categoriesTag);
   logCategoryEvent("catalog.category.updated", { adminId: admin.id, categoryId });
   return { ok: true, data: null };
 }

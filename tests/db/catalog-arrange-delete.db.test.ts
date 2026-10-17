@@ -290,8 +290,8 @@ describe("updateProductCategories", () => {
       ]),
     );
     expect(await testDb.productCategory.count({ where: { productId: product.id } })).toBe(2);
-    // AC-23: no storefront read uses categories yet.
-    expect(mocks.updateTag).not.toHaveBeenCalled();
+    // spec 0013, AC-22: the category pages and the listing index follow.
+    expect(mocks.updateTag.mock.calls.map(([tag]) => tag)).toEqual(["categories"]);
   });
 
   it("refuses a save over another change to the product's categories", async () => {
