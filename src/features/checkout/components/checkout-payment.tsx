@@ -57,7 +57,14 @@ export function CheckoutPayment({
   const [applied, setApplied] = useState<AppliedDiscount | null>(
     initialDiscount?.kind === "applied" ? initialDiscount.applied : null,
   );
-  const [text, setText] = useState(initialDiscount?.kind === "refused" ? initialDiscount.text : "");
+  // An applied code starts in the text too, so a later Pay refusal (AC-4) leaves it in the field.
+  const [text, setText] = useState(
+    initialDiscount?.kind === "applied"
+      ? initialDiscount.applied.code
+      : initialDiscount?.kind === "refused"
+        ? initialDiscount.text
+        : "",
+  );
   const [error, setError] = useState<string | null>(
     initialDiscount?.kind === "refused" ? initialDiscount.message : null,
   );

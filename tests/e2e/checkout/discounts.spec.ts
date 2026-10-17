@@ -11,6 +11,7 @@ import {
   payButton,
   seedCode,
   seedPaidOrderWithCode,
+  seedPendingOrder,
   setCodeActive,
 } from "./support";
 
@@ -124,6 +125,34 @@ test("Pay refuses a code switched off after Apply, keeping the form", async ({ p
     db.query("SELECT 1 FROM orders WHERE cart_id = $1", [await cartIdOf(page)]),
   );
   expect(orders.rowCount).toBe(0);
+});
+
+test("Pay refusing a code that came back applied keeps its text in the field", async ({ page }) => {
+  const seeded = await seedCode();
+  const product = await openCheckoutWith(page, 2000);
+  // The expired order an earlier Pay left behind (AC-9), so no Stripe session is involved.
+  const earlier = await seedPendingOrder(await cartIdOf(page), product, {
+    quantity: 1,
+    priceCents: 2000,
+    shippingCents: 0,
+  });
+  await withDb((db) =>
+    db.query(
+      `UPDATE orders SET status = 'expired', expired_at = now(), discount_code_id = $2,
+         discount_code = $3, discount_type = 'percent', discount_value = 10
+       WHERE id = $1`,
+      [earlier.id, seeded.id, seeded.code],
+    ),
+  );
+  await page.goto("/checkout");
+  await expect(page.getByText(`Discount (${seeded.code})`)).toBeVisible();
+  await setCodeActive(seeded.id, false);
+
+  await fillCheckout(page);
+  await payButton(page).click();
+
+  await expect(page.locator("#checkout-discount-code-error")).toHaveText("This code isn't valid.");
+  await expect(codeField(page)).toHaveValue(seeded.code);
 });
 
 test("Pay with a code reaches Stripe, and coming back shows the code still applied", async ({
