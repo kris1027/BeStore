@@ -5,7 +5,7 @@ import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { orderHoldsUse } from "@/lib/discounts/codes";
-import { type CodeStatus, codeStatus, type DiscountType } from "@/lib/discounts/rule";
+import type { CodeStatus, DiscountType } from "@/lib/discounts/rule";
 import { escapeLike } from "@/lib/like";
 
 import type { DiscountListParams } from "./list-params";
@@ -41,22 +41,22 @@ type RawSummary = {
   code: string;
   type: DiscountType;
   value: number;
-  active: boolean;
   starts_at: Date | null;
   ends_at: Date | null;
   max_redemptions: number | null;
   uses: bigint;
   given: bigint;
-  db_now: Date;
+  status: CodeStatus;
 };
 
 // Uses and discount given from grouped subqueries, the status worked out in SQL with the
-// database clock (the same rule as codeStatus), so the filter applies before the 200 cap.
+// database clock (the same rule as codeStatus), so the filter applies before the 200 cap. The
+// rows carry that status as is, so the list and its filter can never disagree.
 function summaries(where: Prisma.Sql, limit: number) {
   return db.$queryRaw<RawSummary[]>`
     SELECT * FROM (
-      SELECT c.id, c.code, c.type::text AS type, c.value, c.active, c.starts_at, c.ends_at,
-             c.max_redemptions, c.created_at, now() AS db_now,
+      SELECT c.id, c.code, c.type::text AS type, c.value, c.starts_at, c.ends_at,
+             c.max_redemptions, c.created_at,
              coalesce(u.uses, 0) AS uses, coalesce(g.given, 0) AS given,
              CASE
                WHEN NOT c.active THEN 'inactive'
@@ -85,23 +85,13 @@ function summaries(where: Prisma.Sql, limit: number) {
 }
 
 function toSummary(row: RawSummary): DiscountCodeSummary {
-  const uses = Number(row.uses);
   return {
     id: row.id,
     code: row.code,
     type: row.type,
     value: row.value,
-    status: codeStatus(
-      {
-        active: row.active,
-        startsAt: row.starts_at,
-        endsAt: row.ends_at,
-        maxRedemptions: row.max_redemptions,
-      },
-      uses,
-      row.db_now,
-    ),
-    uses,
+    status: row.status,
+    uses: Number(row.uses),
     maxRedemptions: row.max_redemptions,
     startsAt: row.starts_at,
     endsAt: row.ends_at,
