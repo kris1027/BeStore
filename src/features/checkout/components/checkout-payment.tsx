@@ -7,7 +7,7 @@ import { DeliveryRow } from "@/components/delivery-row";
 import { Price } from "@/components/price";
 import { useStoreFormat } from "@/components/store-format-provider";
 import { Separator } from "@/components/ui/separator";
-import { refusalMessage } from "@/lib/discounts/rule";
+import { discountRowLabel, refusalMessage } from "@/lib/discounts/rule";
 import { formatMoney } from "@/lib/money";
 import type { StoreCountry } from "@/lib/shipping/address";
 
@@ -130,7 +130,7 @@ export function CheckoutPayment({
       </div>
       {applied !== null ? (
         <div className="flex items-center justify-between">
-          <span>Discount ({applied.code})</span>
+          <span>{discountRowLabel(applied.code)}</span>
           <span className="font-medium">
             −<Price cents={applied.discountCents} />
           </span>
