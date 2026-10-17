@@ -60,12 +60,14 @@ function toRow(raw: RawCode): CodeRow {
   };
 }
 
+// Every read of a code row: the RawCode columns plus the database clock.
+const codeColumns = Prisma.sql`id, code, type::text AS type, value, active, starts_at, ends_at,
+  max_redemptions, per_customer_limit, min_subtotal_cents, now() AS db_now`;
+
 // By its text, already uppercased (parseCodeText). No lock: Apply and the prefill only preview.
 export async function findCode(client: Client, text: string): Promise<CodeRow | null> {
   const [raw] = await client.$queryRaw<RawCode[]>`
-    SELECT id, code, type::text AS type, value, active, starts_at, ends_at, max_redemptions,
-           per_customer_limit, min_subtotal_cents, now() AS db_now
-    FROM discount_codes WHERE code = ${text}`;
+    SELECT ${codeColumns} FROM discount_codes WHERE code = ${text}`;
   return raw === undefined ? null : toRow(raw);
 }
 
@@ -75,13 +77,9 @@ export async function lockCode(tx: Tx, where: { readonly id: string } | { readon
   const [raw] =
     "id" in where
       ? await tx.$queryRaw<RawCode[]>`
-          SELECT id, code, type::text AS type, value, active, starts_at, ends_at, max_redemptions,
-                 per_customer_limit, min_subtotal_cents, now() AS db_now
-          FROM discount_codes WHERE id = ${where.id}::uuid FOR UPDATE`
+          SELECT ${codeColumns} FROM discount_codes WHERE id = ${where.id}::uuid FOR UPDATE`
       : await tx.$queryRaw<RawCode[]>`
-          SELECT id, code, type::text AS type, value, active, starts_at, ends_at, max_redemptions,
-                 per_customer_limit, min_subtotal_cents, now() AS db_now
-          FROM discount_codes WHERE code = ${where.code} FOR UPDATE`;
+          SELECT ${codeColumns} FROM discount_codes WHERE code = ${where.code} FOR UPDATE`;
   return raw === undefined ? null : toRow(raw);
 }
 
