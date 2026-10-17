@@ -1,4 +1,4 @@
-# Verify: categories, search & filters · spec 0013 · updated 2026-10-16
+# Verify: categories, search & filters · spec 0013 · updated 2026-10-17
 _Steps derived from spec 0013 acceptance criteria. `/check verify` runs these; `/test` locks the durable ones._
 
 ## UI / manual
@@ -30,23 +30,23 @@ _Steps derived from spec 0013 acceptance criteria. `/check verify` runs these; `
 - [x] axe passes on `/`, a category and `/search` with filters open (Sheet on mobile); every group is a fieldset with a legend; the panel, Sheet, sort and pagination work by keyboard with visible focus → AC-25
 
 ## Value sourcing
-- [ ] Rename a category and edit its description → category page shows the new `categories.name` / `description`
-- [ ] Rearrange a category in admin, compare with home → category Featured follows `product_categories.position`, home follows `products.position`
-- [ ] Best match: change a product name so its words start with the query → it moves into the first tier
-- [ ] Home title stays the brand name; `/search` title "Search"
-- [ ] Active count and chip labels: two values, a Min and In stock → "Filters (4)"; labels use the most common spelling; prices formatted in `STORE_CURRENCY` / `STORE_LOCALE` (try `pl-PL` with PLN)
-- [ ] Hide a category → it leaves the nav; reorder categories → nav order follows `categories.position`
-- [ ] Card image is the first image by position; sold out only when every live variant has no stock; Sale only on an in stock variant with a compare at price
+- [x] Rename a category and edit its description → category page shows the new `categories.name` / `description` · e2e `the page reads the category's fields, titles and canonical from their sources`
+- [x] Rearrange a category in admin, compare with home → category Featured follows `product_categories.position`, home follows `products.position` · unit `orders home by position…`, `orders a category by its own positions first…`; e2e `an admin arranges the category…`
+- [x] Best match: change a product name so its words start with the query → it moves into the first tier · unit `puts names that start with the query words first…` (the index re-reads names on every `catalog` expiry)
+- [x] Home title stays the brand name; `/search` title "Search" · e2e `the page reads the category's fields…`
+- [x] Active count and chip labels: two values, a Min and In stock → "Filters (4)"; labels use the most common spelling; prices formatted in `STORE_CURRENCY` / `STORE_LOCALE` (try `pl-PL` with PLN) · e2e `the page reads the category's fields…` (four active); unit `merges spellings, labels with the most common…`; `src/lib/money.test.ts` (`pl-PL` with PLN)
+- [x] Hide a category → it leaves the nav; reorder categories → nav order follows `categories.position` · e2e `hiding the category drops it…`; db `lists visible categories in admin order for the nav` and `expires the categories tag after every write…`
+- [x] Card image is the first image by position; sold out only when every live variant has no stock; Sale only on an in stock variant with a compare at price · db `shows the first image by position…`, `is sold out only when every live variant has no stock…`
 - [x] Option group key and order: groups by product count then label; values by first appearance in Featured order and value position
 - [x] Value counts change when another group's selection changes, not when the group's own selection does
-- [ ] Price placeholders: archive the cheapest variant → the Min placeholder moves to the next lowest
-- [ ] Price filter: `min=9.5` in EUR is 950 cents; in JPY a fraction is dropped
-- [ ] Newest follows `products.created_at`; price sorts use the lowest live variant price (the card's "from" price)
-- [ ] Name sort follows `Intl.Collator(STORE_LOCALE)` ("Apple" before "banana"; try `pl-PL` with "Łódź" and "Lato")
-- [ ] Result count and page count: 25 matches → "25 products", 2 pages
-- [ ] Category without `meta_title` uses its name; with one uses it
-- [ ] Canonical on `/categories/<slug>?page=2&color=red` is `<site>/categories/<slug>`
-- [ ] Arrange save writes positions `0..n-1` in the submitted order
+- [x] Price placeholders: archive the cheapest variant → the Min placeholder moves to the next lowest · db `gives the card price range over live variants, ignoring archived ones`; unit `are the lowest and highest variant price of the scope before filters`
+- [x] Price filter: `min=9.5` in EUR is 950 cents; in JPY a fraction is dropped · unit `reads a price in the store currency's own minor units`
+- [x] Newest follows `products.created_at`; price sorts use the lowest live variant price (the card's "from" price) · unit `sorts by %s`
+- [x] Name sort follows `Intl.Collator(STORE_LOCALE)` ("Apple" before "banana"; try `pl-PL` with "Łódź" and "Lato") · unit `sorts by name`, `sorts names by the store locale's collation`
+- [x] Result count and page count: 25 matches → "25 products", 2 pages · unit `needs a second page from the 25th match on`; the count text is `productCount`
+- [x] Category without `meta_title` uses its name; with one uses it · e2e `the page reads the category's fields…`
+- [x] Canonical on `/categories/<slug>?page=2&color=red` is `<site>/categories/<slug>` · e2e `the page reads the category's fields…`
+- [x] Arrange save writes positions `0..n-1` in the submitted order · db `rewrites the category's positions to 0..n-1 in the given order…`
 
 ## Commands
 - [x] `pnpm test` → the pure rules pass (`src/lib/search-text.test.ts`, `src/features/catalog/listing/*.test.ts`) → AC-5, AC-7 to AC-9, AC-12 to AC-18

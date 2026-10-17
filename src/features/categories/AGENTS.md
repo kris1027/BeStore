@@ -10,7 +10,7 @@ Admin only category management: `/admin/categories` (ordered list with product c
 - `admin-queries.ts`: `getAdminCategories()` and `getCategoryForEdit(id)`, live reads (never cached).
 - `queries.ts`: cached storefront reads of visible categories only: `getNavCategories`, `getCategoryBySlug` (null for unknown, malformed or hidden), `getPrerenderedCategorySlugs`.
 - `actions/`: `create-category`, `update-category`, `delete-category`, `reorder-categories`, `set-category-products`, `reorder-category-products`.
-- `components/`: the list page (built on `src/components/arrange-list.tsx`), the editor, form, product list (with arranging) and delete button; `category-header.tsx` for the storefront page.
+- `components/`: the list page (built on `src/components/arrange-list.tsx`), the editor, form, product list (`category-products.tsx`, with arranging split into `arranged-products.tsx`, `use-draft-order.ts` and `discard-order-dialog.tsx`) and delete button; `category-header.tsx` for the storefront page.
 - `paths.ts`: admin URLs and `categoryPath`. `log.ts`: `catalog.category.created`, `.updated`, `.deleted`, `.products_reordered`, `catalog.categories.reordered` (ids and counts only, never names or descriptions).
 
 ## Conventions
