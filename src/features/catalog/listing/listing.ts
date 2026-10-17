@@ -206,7 +206,7 @@ function commonLabel(counts: ReadonlyMap<string, number>): string {
 }
 
 type GroupDraft = {
-  products: number;
+  // Label spelling → products using it, one per product, so the counts sum to the products.
   readonly labels: Map<string, number>;
   // Insertion order is the order of first appearance.
   readonly values: Map<string, Map<string, number>>;
@@ -220,8 +220,7 @@ function facetDrafts(
   const drafts = new Map<string, GroupDraft>();
   for (const product of products) {
     for (const type of product.optionTypes) {
-      const draft = drafts.get(type.key) ?? { products: 0, labels: new Map(), values: new Map() };
-      draft.products += 1;
+      const draft = drafts.get(type.key) ?? { labels: new Map(), values: new Map() };
       draft.labels.set(type.label, (draft.labels.get(type.label) ?? 0) + 1);
       for (const value of type.values) {
         const labels = draft.values.get(value.key) ?? new Map<string, number>();
@@ -236,7 +235,7 @@ function facetDrafts(
     .map(([key, draft]) => ({
       key,
       label: commonLabel(draft.labels),
-      products: draft.products,
+      products: [...draft.labels.values()].reduce((sum, count) => sum + count, 0),
       values: [...draft.values].map(([valueKey, labels]) => ({
         key: valueKey,
         label: commonLabel(labels),
@@ -266,6 +265,35 @@ function toCard(product: ListingProduct): ProductCard {
   };
 }
 
+// The products a listing draws from and their default order; null for a search too short to
+// run (AC-9).
+function scopeOf(
+  index: readonly ListingProduct[],
+  scope: ListingScope,
+  q: string,
+  featured: Compare,
+): { readonly inScope: readonly ListingProduct[]; readonly defaultOrder: Compare } | null {
+  switch (scope.kind) {
+    case "search": {
+      if (!searchQueryReady(q)) return null;
+      const queryWords = searchWords(q);
+      return {
+        inScope: index.filter((product) => matchesWords(product.nameWords, queryWords)),
+        defaultOrder: bestMatch(queryWords),
+      };
+    }
+    case "category":
+      return {
+        inScope: index.filter(
+          (product) => product.categoryPositions[scope.categoryId] !== undefined,
+        ),
+        defaultOrder: featured,
+      };
+    case "home":
+      return { inScope: index, defaultOrder: featured };
+  }
+}
+
 export function buildListing(
   index: readonly ListingProduct[],
   scope: ListingScope,
@@ -276,20 +304,9 @@ export function buildListing(
   const collator = new Intl.Collator(locale);
   const featured = scope.kind === "category" ? categoryFeatured(scope.categoryId) : homeFeatured;
 
-  let inScope: readonly ListingProduct[];
-  let defaultOrder: Compare;
-  if (scope.kind === "search") {
-    if (!searchQueryReady(state.q)) return { status: "prompt" };
-    const queryWords = searchWords(state.q);
-    inScope = index.filter((product) => matchesWords(product.nameWords, queryWords));
-    defaultOrder = bestMatch(queryWords);
-  } else {
-    inScope =
-      scope.kind === "category"
-        ? index.filter((product) => product.categoryPositions[scope.categoryId] !== undefined)
-        : index;
-    defaultOrder = featured;
-  }
+  const scoped = scopeOf(index, scope, state.q, featured);
+  if (scoped === null) return { status: "prompt" };
+  const { inScope, defaultOrder } = scoped;
   // Featured order drives the facet value order (AC-13); the default order the results.
   const byFeatured = inScope.toSorted(featured);
 

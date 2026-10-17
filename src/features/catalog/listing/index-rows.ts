@@ -30,6 +30,16 @@ export type IndexRow = {
 // AC-13: types whose names fold to one key merge into one (the first spelling labels it), and
 // values merge by key inside it; a type or value with an empty key is skipped. Labels are kept
 // once per product and variants point at them by index, so the cache entry stays small.
+// The index of the entry with this key, appending a new one (the first spelling) when absent.
+function slotFor<T extends { readonly key: string }>(
+  list: T[],
+  key: string,
+  create: () => T,
+): number {
+  const found = list.findIndex((entry) => entry.key === key);
+  return found >= 0 ? found : list.push(create()) - 1;
+}
+
 export function buildIndexProduct(row: IndexRow): ListingProduct {
   const types: { key: string; label: string; values: { key: string; label: string }[] }[] = [];
   // option value id → [type index, value index]
@@ -37,21 +47,16 @@ export function buildIndexProduct(row: IndexRow): ListingProduct {
   for (const type of row.optionTypes) {
     const key = facetKey(type.name);
     if (key === "") continue;
-    let t = types.findIndex((merged) => merged.key === key);
-    if (t < 0) {
-      t = types.length;
-      types.push({ key, label: type.name.trim(), values: [] });
-    }
+    const t = slotFor(types, key, () => ({ key, label: type.name.trim(), values: [] }));
     const merged = types[t];
     if (!merged) continue;
     for (const value of type.values) {
       const valueKey = facetKey(value.value);
       if (valueKey === "") continue;
-      let v = merged.values.findIndex((existing) => existing.key === valueKey);
-      if (v < 0) {
-        v = merged.values.length;
-        merged.values.push({ key: valueKey, label: value.value.trim() });
-      }
+      const v = slotFor(merged.values, valueKey, () => ({
+        key: valueKey,
+        label: value.value.trim(),
+      }));
       place.set(value.id, [t, v]);
     }
   }
