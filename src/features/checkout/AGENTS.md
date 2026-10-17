@@ -16,6 +16,7 @@ Everything from `/checkout` to the order confirmation. The customer types their 
 | `queries.ts` | `checkoutPrefill(cartId)` for a return visit and `getCompletion(sessionId)` for the confirmation page. |
 | `components/checkout-form.tsx` | The client form (React Hook Form plus zodResolver), mapping each `StartCheckoutError` code to a message, a field error or a redirect. |
 | `components/checkout-summary.tsx`, `checkout-complete.tsx`, `complete-refresher.tsx` | The order summary with the Pay total, the confirmation page, and the refresh every 3 seconds while the webhook is on its way. |
+| `actions/apply-discount.ts`, `components/discount-field.tsx`, `checkout-payment.tsx` | `applyDiscountCode` (read only preview) and the code field with Apply, Remove and the live region (spec 0014). |
 | `log.ts`, `mask-email.ts` | `checkout.*` log events; the `k•••@gmail.com` email mask. |
 
 ## Conventions
@@ -23,6 +24,7 @@ Everything from `/checkout` to the order confirmation. The customer types their 
 - `startCheckout` takes only what the customer typed. The cart comes from the signed cookie, and prices and the delivery fee come from the database inside the transaction that locks the cart (`SELECT ... FOR UPDATE`), never from the browser or the cache.
 - Expected failures are `StartCheckoutError` codes. A validation refusal returns a `fields` map with the same messages the form shows, and the form focuses the first invalid field. Every field missing or of the wrong type still gets its own message.
 - A signed in checkout (spec 0012, AC-15) uses the account email, whatever was typed, first merges a guest cookie cart into the account cart (`cart_changed` with `merged` when the account cart already held lines), and takes the customer lock before the cart lock. Saving the address goes through `src/lib/customer/addresses.ts`.
+- A promo code (spec 0014) is rechecked on Pay under `lockCode`, taken after the customer and cart locks, and redeemed in the order's transaction. The discount reaches Stripe as a one off coupon `order_<orderId>` with our exact amount, created after the order commits; if it fails the order is expired, which frees the use. The rule lives in `src/lib/discounts/`.
 - Every schema transform must be safe to run twice: `handleSubmit` sends the parsed output and the server parses it again.
 - The address travels as one `ShipTo` value, saved with `deliveryColumns` and sent to Stripe as `payment_intent_data.shipping`. Empty optional keys are left out, never sent as `""`.
 - `orders.email` can be null on an order purged under spec 0008. `checkoutPrefill` never reaches one (the purge clears `cart_id`) and returns null with `order.email_missing` if it ever sees a null email; `getCompletion` throws on a paid order without one.
@@ -48,5 +50,6 @@ Everything from `/checkout` to the order confirmation. The customer types their 
 - [0006 Card payment and paid orders](../../../docs/specs/0006-card-payment-paid-orders/index.md)
 - [0007 Shipping address and flat rate](../../../docs/specs/0007-shipping-address-flat-rate/index.md)
 - [0008 Purge PII from expired orders](../../../docs/specs/0008-purge-expired-order-pii/index.md)
+- [0014 Discounts and promo codes](../../../docs/specs/0014-discounts-promo-codes/index.md)
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._

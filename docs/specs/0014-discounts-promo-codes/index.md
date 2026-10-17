@@ -1,7 +1,7 @@
 # 0014. Discounts and promo codes
 
 **Date**: 2026-10-17
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 

@@ -101,6 +101,7 @@ MCP servers: Supabase (connected), Stripe (connected), Vercel (connected), Playw
 - [src/features/cart/AGENTS.md](src/features/cart/AGENTS.md): the signed cart cookie, cart actions and caps, the expired cart cron
 - [src/features/checkout/AGENTS.md](src/features/checkout/AGENTS.md): the checkout form, `startCheckout` and the Stripe session, the confirmation page
 - [src/features/orders/AGENTS.md](src/features/orders/AGENTS.md): the Stripe webhook, order transitions, the reconcile cron, the expired order PII purge cron, admin orders
+- [src/features/discounts/AGENTS.md](src/features/discounts/AGENTS.md): admin promo code pages, the discount rule and caps, code lock and use counting, redemptions freed on expiry
 - [src/features/settings/AGENTS.md](src/features/settings/AGENTS.md): the admin settings page, the shipping fee and free delivery threshold
 - [src/features/account/AGENTS.md](src/features/account/AGENTS.md): customer accounts, sign up and sign in, the customer session and lock, order history, the address book, settings
 - [src/lib/shipping/AGENTS.md](src/lib/shipping/AGENTS.md): the shared delivery fee rule, address schema and settings reads

@@ -27,7 +27,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 11 | Order emails | Slice 5 | done |
 | 12 | Customer accounts | Slice 6 | done |
 | 13 | Categories, search & filters | Slice 7 | done |
-| 14 | Discounts & promo codes | Slice 8 | in-progress |
+| 14 | Discounts & promo codes | Slice 8 | done |
 | 15 | Admin sales dashboard | Slice 9 | planned |
 | 16 | Legal pages & cookie consent | Launch | planned |
 | 17 | SEO for storefront pages | Launch | planned |
@@ -264,7 +264,7 @@ spec [0013](../specs/0013-categories-search-filters/index.md) · code in [src/fe
 
 ## Slice 8: Discounts
 
-### 14. Discounts & promo codes · GA · in-progress
+### 14. Discounts & promo codes · done · GA
 Admin created promo codes (percent or fixed amount, with dates and usage limits), applied at checkout.
 **Done when:** a valid code lowers the total correctly before payment; expired, used up, or invalid codes are rejected with a clear message; the discount is saved on the order and in refunds.
 Spec: [0014](../specs/0014-discounts-promo-codes/index.md) · code in [src/features/discounts/](../../src/features/discounts/), [src/lib/discounts/](../../src/lib/discounts/)
