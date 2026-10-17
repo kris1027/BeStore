@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { cn } from "@/lib/utils";
 
@@ -56,12 +55,9 @@ function ResultsArea({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {hydrated ? <FilterSheet total={total} data={data} /> : null}
+          {/* Without JavaScript the sort joins the filter form, so the panel's one Apply
+              (AC-19) submits both. */}
           <SortSelect />
-          {hydrated ? null : (
-            <Button type="submit" form={FILTER_FORM_ID} variant="outline" className="h-11">
-              Apply
-            </Button>
-          )}
         </div>
       </div>
       <ActiveFilters groups={data.groups} />
