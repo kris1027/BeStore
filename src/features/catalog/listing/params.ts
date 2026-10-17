@@ -93,9 +93,11 @@ export function cleanQuery(text: string | undefined): string {
     .join("");
 }
 
+// A decimal comma ("10,50", as shoppers in comma locales type it) reads as a point; parseMoney
+// stays the one parser (AC-15). The URL always carries the point form.
 function price(text: string | undefined, currency: string): number | null {
   if (text === undefined) return null;
-  const parsed = parseMoney(text, currency);
+  const parsed = parseMoney(text.trim().replace(/^(\d+),(\d+)$/, "$1.$2"), currency);
   return parsed.ok ? parsed.cents : null;
 }
 

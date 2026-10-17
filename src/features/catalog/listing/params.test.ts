@@ -210,6 +210,21 @@ describe("state changes", () => {
     expect(withPrices(base, "500", "", "JPY")).toMatchObject({ minCents: 500, maxCents: null });
   });
 
+  it("reads a decimal comma as a point, and only one (AC-15)", () => {
+    expect(withPrices(base, "10,50", " 20,5 ", "PLN")).toMatchObject({
+      minCents: 1050,
+      maxCents: 2050,
+    });
+    expect(withPrices(base, "1,000,00", "1,", "PLN")).toMatchObject({
+      minCents: null,
+      maxCents: null,
+    });
+    expect(parse({ min: "9,5" }).minCents).toBe(950);
+    expect(listingHref("/", withPrices(base, "10,50", "", "PLN"), "home", "PLN")).toBe(
+      "/?min=10.50",
+    );
+  });
+
   it("clears every filter but keeps q and the sort (AC-20, AC-21)", () => {
     const sorted = { ...paged, sort: "newest" as const, minCents: 100 };
     expect(clearedFilters(sorted)).toEqual({ ...base, q: "tee", sort: "newest" });
