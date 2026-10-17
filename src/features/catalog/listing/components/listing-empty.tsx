@@ -97,8 +97,6 @@ export function NoResults({
         </EmptyTitle>
         {kind === "search" ? (
           <EmptyDescription>Try fewer or shorter words.</EmptyDescription>
-        ) : clearHref !== null ? (
-          <EmptyDescription>Remove a filter or two to see more.</EmptyDescription>
         ) : null}
       </EmptyHeader>
       <EmptyContent className="flex-row flex-wrap justify-center">
