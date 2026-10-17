@@ -322,6 +322,46 @@ describe("option groups (AC-13)", () => {
     expect(listing.state.options).toEqual([{ key: "color", values: ["red"] }]);
     expect(listing.activeFilters).toBe(1);
   });
+
+  it("applies at most 10 groups, counting only groups the listing offers (AC-18)", () => {
+    const options = Object.fromEntries(
+      Array.from({ length: 12 }, (_, i) => [`G${String(i).padStart(2, "0")}`, ["A", "B"]]),
+    );
+    const values = Object.fromEntries(Object.keys(options).map((name) => [name, "A"]));
+    const index = [product({ name: "A", options, variants: [{ values }] })];
+    const params = Object.fromEntries(Object.keys(options).map((name) => [name, "a"]));
+
+    const listing = list(index, params);
+
+    expect(listing.state.options.map((group) => group.key)).toEqual(
+      Array.from({ length: 10 }, (_, i) => `g${String(i).padStart(2, "0")}`),
+    );
+  });
+
+  it("keeps a real filter behind any number of tracking params in a shared link (AC-17)", () => {
+    const index = [
+      product({
+        name: "Red",
+        options: { Color: ["Red", "Blue"] },
+        variants: [{ values: { Color: "Red" } }],
+      }),
+      product({
+        name: "Blue",
+        options: { Color: ["Red", "Blue"] },
+        variants: [{ values: { Color: "Blue" } }],
+      }),
+    ];
+    const tracking = Object.fromEntries(
+      ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"]
+        .concat(["fbclid", "gclid", "msclkid", "mc_cid", "mc_eid", "ref"])
+        .map((key) => [key, "x"]),
+    );
+
+    const listing = list(index, { ...tracking, color: "red" });
+
+    expect(listing.state.options).toEqual([{ key: "color", values: ["red"] }]);
+    expect(names(listing)).toEqual(["Red"]);
+  });
 });
 
 describe("counts (AC-14)", () => {

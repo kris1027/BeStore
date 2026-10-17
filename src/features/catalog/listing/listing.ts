@@ -7,6 +7,7 @@ import {
   defaultSort,
   type ListingKind,
   type ListingState,
+  MAX_OPTION_GROUPS,
   type OptionFilter,
   reservedParams,
   type SortKey,
@@ -296,13 +297,15 @@ export function buildListing(
   const known = new Map(
     groupDrafts.map((group) => [group.key, new Set(group.values.map((v) => v.key))]),
   );
+  // AC-18: the group cap counts only groups this listing offers, so unrelated params never
+  // crowd out a real filter.
   const options = sortOptions(
     state.options.flatMap((group) => {
       const values = known.get(group.key);
       const kept = values ? group.values.filter((value) => values.has(value)) : [];
       return kept.length > 0 ? [{ key: group.key, values: kept }] : [];
     }),
-  );
+  ).slice(0, MAX_OPTION_GROUPS);
   const filters: VariantFilters = {
     options,
     minCents: state.minCents,

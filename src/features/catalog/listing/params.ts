@@ -100,13 +100,14 @@ function price(text: string | undefined, currency: string): number | null {
 }
 
 // Unknown groups and values are dropped later by buildListing, which knows the listing's
-// filters; here they are only normalized, deduplicated and capped.
+// filters; here they are only normalized, deduplicated and capped per group. The group cap
+// (MAX_OPTION_GROUPS) waits for buildListing too: counted here, tracking params such as
+// `utm_source` or `fbclid` would push a real filter out of a shared link (AC-17).
 function optionFilters(params: RawParams): readonly OptionFilter[] {
   const groups = new Map<string, string[]>();
   for (const [name, value] of Object.entries(params)) {
     const key = facetKey(name);
     if (key === "" || reservedParams.has(key)) continue;
-    if (!groups.has(key) && groups.size >= MAX_OPTION_GROUPS) continue;
     const values = groups.get(key) ?? [];
     for (const raw of all(value)) {
       const valueKey = facetKey(raw);

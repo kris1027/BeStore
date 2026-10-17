@@ -117,7 +117,7 @@ describe("parseListingParams (spec 0013, AC-17, AC-18)", () => {
     ]);
   });
 
-  it("reads at most 10 groups and 20 values per group", () => {
+  it("reads at most 20 values per group, and leaves the group cap to buildListing", () => {
     const params = Object.fromEntries(
       Array.from({ length: 12 }, (_, i) => [
         `g${i}`,
@@ -126,7 +126,7 @@ describe("parseListingParams (spec 0013, AC-17, AC-18)", () => {
     );
     const { options } = parse(params);
 
-    expect(options).toHaveLength(10);
+    expect(options).toHaveLength(12);
     expect(options.every((group) => group.values.length === 20)).toBe(true);
   });
 });
