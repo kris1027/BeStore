@@ -14,6 +14,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
+import { productCount } from "../format";
 import { activeFilterCount } from "../params";
 import { type FilterData, FilterPanel } from "./filter-panel";
 import { useListingNav } from "./listing-nav";
@@ -51,9 +52,7 @@ export function FilterSheet({
           <FilterPanel idPrefix="sheet-filters" formId="listing-filters-sheet" data={data} />
         </div>
         <SheetFooter>
-          <SheetClose render={<Button className="h-11" />}>
-            Show {total} {total === 1 ? "product" : "products"}
-          </SheetClose>
+          <SheetClose render={<Button className="h-11" />}>Show {productCount(total)}</SheetClose>
         </SheetFooter>
       </SheetContent>
     </Sheet>

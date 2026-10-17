@@ -2,9 +2,9 @@ import { env } from "@/lib/env";
 
 import { ProductCard } from "../../components/product-card";
 import { getListingIndex } from "../index-query";
-import { buildListing, type ListingScope } from "../listing";
-import { type ListingKind, parseListingParams } from "../params";
-import { ListingControls } from "./listing-controls";
+import { buildListing } from "../listing";
+import { clearedFilters, type ListingScope, listingLinks, parseListingParams } from "../params";
+import { ListingControls, type ListingHeading } from "./listing-controls";
 import { EmptyCatalog, EmptyScope, NoResults, SearchPrompt } from "./listing-empty";
 import { Pagination } from "./pagination";
 
@@ -26,10 +26,9 @@ export async function ListingView({
   // The listing's own path, without a query.
   readonly path: string;
   readonly searchParams: Promise<SearchParams>;
-  // The results heading: visible on home ("Shop all"), for screen readers elsewhere.
-  readonly heading: { readonly text: string; readonly visible: boolean };
+  readonly heading: ListingHeading;
 }) {
-  const kind: ListingKind = scope.kind;
+  const { kind } = scope;
   const state = parseListingParams(await searchParams, kind, env.STORE_CURRENCY);
   const listing = buildListing(await getListingIndex(), scope, state, env.STORE_LOCALE);
 
@@ -37,6 +36,7 @@ export async function ListingView({
   if (listing.scopeTotal === 0) {
     return kind === "home" ? <EmptyCatalog /> : <EmptyScope kind={kind} />;
   }
+  const href = listingLinks(path, kind, env.STORE_CURRENCY);
 
   return (
     <ListingControls
@@ -53,9 +53,7 @@ export async function ListingView({
       {listing.total === 0 ? (
         <NoResults
           kind={kind}
-          path={path}
-          state={listing.state}
-          filtered={listing.activeFilters > 0}
+          clearHref={listing.activeFilters > 0 ? href(clearedFilters(listing.state)) : null}
         />
       ) : (
         <>
@@ -68,7 +66,11 @@ export async function ListingView({
               />
             ))}
           </ul>
-          <Pagination kind={kind} path={path} state={listing.state} pageCount={listing.pageCount} />
+          <Pagination
+            page={listing.page}
+            pageCount={listing.pageCount}
+            pageHref={(page) => href({ ...listing.state, page })}
+          />
         </>
       )}
     </ListingControls>

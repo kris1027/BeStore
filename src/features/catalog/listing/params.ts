@@ -6,7 +6,12 @@ import { facetKey } from "@/lib/search-text";
 // Pure: a listing's whole state as it lives in the URL (spec 0013, AC-17, AC-18). Every input
 // maps to a valid state, never an error, so a shared or hand edited link always opens.
 
-export type ListingKind = "home" | "category" | "search";
+export type ListingScope =
+  | { readonly kind: "home" }
+  | { readonly kind: "category"; readonly categoryId: string }
+  | { readonly kind: "search" };
+
+export type ListingKind = ListingScope["kind"];
 
 export const sortKeys = [
   "relevance",
@@ -196,6 +201,15 @@ export function listingHref(
   if (state.page > 1) query.append("page", String(state.page));
   const text = query.toString();
   return text === "" ? path : `${path}?${text}`;
+}
+
+// A listing's links: its path, kind and the store currency bound once, so callers pass a state.
+export function listingLinks(
+  path: string,
+  kind: ListingKind,
+  currency: string,
+): (state: ListingState) => string {
+  return (state) => listingHref(path, state, kind, currency);
 }
 
 // Any filter or sort change starts again at page 1 (AC-17).

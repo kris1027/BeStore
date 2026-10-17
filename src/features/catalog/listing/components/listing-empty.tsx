@@ -10,10 +10,8 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { env } from "@/lib/env";
-
 import { homePath } from "../../paths";
-import { clearedFilters, type ListingKind, type ListingState, listingHref } from "../params";
+import type { ListingKind } from "../params";
 
 function AllProductsLink({ primary = false }: { readonly primary?: boolean }) {
   return (
@@ -82,14 +80,11 @@ export function EmptyScope({ kind }: { readonly kind: Exclude<ListingKind, "home
 // spec 0013, AC-21: the filters leave nothing.
 export function NoResults({
   kind,
-  path,
-  state,
-  filtered,
+  clearHref,
 }: {
   readonly kind: ListingKind;
-  readonly path: string;
-  readonly state: ListingState;
-  readonly filtered: boolean;
+  // The same listing without filters; null when none are on.
+  readonly clearHref: string | null;
 }) {
   return (
     <Empty className="border">
@@ -102,17 +97,13 @@ export function NoResults({
         </EmptyTitle>
         {kind === "search" ? (
           <EmptyDescription>Try fewer or shorter words.</EmptyDescription>
-        ) : filtered ? (
+        ) : clearHref !== null ? (
           <EmptyDescription>Remove a filter or two to see more.</EmptyDescription>
         ) : null}
       </EmptyHeader>
       <EmptyContent className="flex-row flex-wrap justify-center">
-        {filtered ? (
-          <Link
-            href={listingHref(path, clearedFilters(state), kind, env.STORE_CURRENCY)}
-            scroll={false}
-            className={buttonVariants({ className: "h-11" })}
-          >
+        {clearHref !== null ? (
+          <Link href={clearHref} scroll={false} className={buttonVariants({ className: "h-11" })}>
             Clear filters
           </Link>
         ) : null}

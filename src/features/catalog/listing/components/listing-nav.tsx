@@ -5,7 +5,7 @@ import { createContext, useContext, useOptimistic, useTransition } from "react";
 
 import { useStoreFormat } from "@/components/store-format-provider";
 
-import { type ListingKind, type ListingState, listingHref } from "../params";
+import { type ListingKind, listingLinks, type ListingState } from "../params";
 
 type ListingNav = {
   // The state on screen: the URL's, or the one a change is moving to.
@@ -38,7 +38,7 @@ export function ListingNavProvider({
   const { currency } = useStoreFormat();
   const [shown, setShown] = useOptimistic(state);
   const [pending, startTransition] = useTransition();
-  const href = (next: ListingState) => listingHref(path, next, kind, currency);
+  const href = listingLinks(path, kind, currency);
 
   function apply(next: ListingState) {
     startTransition(() => {

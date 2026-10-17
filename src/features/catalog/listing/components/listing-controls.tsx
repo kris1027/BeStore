@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { cn } from "@/lib/utils";
 
+import { productCount } from "../format";
 import type { ListingKind, ListingState } from "../params";
 import { ActiveFilters } from "./active-filters";
 import { type FilterData, FILTER_FORM_ID, FilterPanel } from "./filter-panel";
@@ -11,10 +12,13 @@ import { FilterSheet } from "./filter-sheet";
 import { ListingNavProvider, useListingNav } from "./listing-nav";
 import { SortSelect } from "./sort-select";
 
+// The results heading: visible on home ("Shop all"), for screen readers elsewhere.
+export type ListingHeading = { readonly text: string; readonly visible: boolean };
+
 type ListingControlsProps = FilterData & {
   readonly kind: ListingKind;
   readonly path: string;
-  readonly heading: { readonly text: string; readonly visible: boolean };
+  readonly heading: ListingHeading;
   readonly state: ListingState;
   readonly total: number;
   // The results: the grid and pagination, or the no results state.
@@ -27,7 +31,7 @@ function ResultsArea({
   data,
   children,
 }: {
-  readonly heading: ListingControlsProps["heading"];
+  readonly heading: ListingHeading;
   readonly total: number;
   readonly data: FilterData;
   readonly children: React.ReactNode;
@@ -47,7 +51,7 @@ function ResultsArea({
           </h2>
           {/* AC-20: announced politely after each change. */}
           <p role="status" className="text-sm text-muted-foreground tabular-nums">
-            {total} {total === 1 ? "product" : "products"}
+            {productCount(total)}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

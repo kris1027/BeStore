@@ -2,30 +2,24 @@ import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import Link from "next/link";
 
 import { buttonVariants } from "@/components/ui/button";
-import { env } from "@/lib/env";
 import { cn } from "@/lib/utils";
 
 import { pageItems } from "../pagination";
-import { type ListingKind, type ListingState, listingHref } from "../params";
 
 const pageLink = cn(buttonVariants({ variant: "ghost" }), "size-11 px-0 tabular-nums");
 
 // spec 0013, AC-5: numbered page links; none at all for a single page. Plain links, so paging
 // works without JavaScript and every page has its own URL.
 export function Pagination({
-  kind,
-  path,
-  state,
+  page: current,
   pageCount,
+  pageHref: href,
 }: {
-  readonly kind: ListingKind;
-  readonly path: string;
-  readonly state: ListingState;
+  readonly page: number;
   readonly pageCount: number;
+  readonly pageHref: (page: number) => string;
 }) {
   if (pageCount <= 1) return null;
-  const href = (page: number) => listingHref(path, { ...state, page }, kind, env.STORE_CURRENCY);
-  const current = state.page;
 
   return (
     <nav aria-label="Pagination" className="flex justify-center">

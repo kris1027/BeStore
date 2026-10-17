@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { cn } from "@/lib/utils";
 
-import type { FacetGroup } from "../listing";
+import { productCount } from "../format";
+import type { FacetGroup, PriceBounds } from "../listing";
 import { priceParam, toggleOption, withChange, withPrices } from "../params";
 import { useListingNav } from "./listing-nav";
 
@@ -18,7 +19,7 @@ export type FilterData = {
   readonly groups: readonly FacetGroup[];
   readonly inStockCount: number;
   readonly onSaleCount: number;
-  readonly priceBounds: { readonly minCents: number; readonly maxCents: number } | null;
+  readonly priceBounds: PriceBounds | null;
 };
 
 // Native checkboxes, not the Base UI one: it needs JavaScript to toggle, and the panel must also
@@ -62,9 +63,7 @@ function CheckRow({
         <span aria-hidden="true" className="ml-auto text-muted-foreground tabular-nums">
           {count}
         </span>
-        <span className="sr-only">
-          ({count} {count === 1 ? "product" : "products"})
-        </span>
+        <span className="sr-only">({productCount(count)})</span>
       </Label>
     </div>
   );

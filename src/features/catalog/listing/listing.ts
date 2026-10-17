@@ -5,10 +5,9 @@ import type { ProductCard, ProductImage } from "../queries";
 import {
   activeFilterCount,
   defaultSort,
-  type ListingKind,
+  type ListingScope,
   type ListingState,
   MAX_OPTION_GROUPS,
-  type OptionFilter,
   reservedParams,
   type SortKey,
   sortOptions,
@@ -50,11 +49,6 @@ export type ListingProduct = {
   readonly variants: readonly ListingVariant[];
 };
 
-export type ListingScope =
-  | { readonly kind: "home" }
-  | { readonly kind: "category"; readonly categoryId: string }
-  | { readonly kind: "search" };
-
 export type FacetValue = {
   readonly key: string;
   readonly label: string;
@@ -68,6 +62,9 @@ export type FacetGroup = {
   readonly values: readonly FacetValue[];
 };
 
+// The lowest and highest live variant price of the scope before filters (AC-15).
+export type PriceBounds = { readonly minCents: number; readonly maxCents: number };
+
 export type Listing = {
   readonly status: "ok";
   readonly products: readonly ProductCard[];
@@ -79,7 +76,7 @@ export type Listing = {
   readonly groups: readonly FacetGroup[];
   readonly inStockCount: number;
   readonly onSaleCount: number;
-  readonly priceBounds: { readonly minCents: number; readonly maxCents: number } | null;
+  readonly priceBounds: PriceBounds | null;
   // What was actually applied: unknown groups and values dropped, the page clamped (AC-18).
   readonly state: ListingState;
   readonly activeFilters: number;
@@ -155,13 +152,10 @@ function variantValues(
   return groups;
 }
 
-type VariantFilters = {
-  readonly options: readonly OptionFilter[];
-  readonly minCents: number | null;
-  readonly maxCents: number | null;
-  readonly inStock: boolean;
-  readonly onSale: boolean;
-};
+type VariantFilters = Pick<
+  ListingState,
+  "options" | "minCents" | "maxCents" | "inStock" | "onSale"
+>;
 
 // AC-12: one variant satisfies every active filter together. A variant without a filtered
 // group never matches it.
@@ -300,7 +294,7 @@ export function buildListing(
   state: ListingState,
   locale: string,
 ): ListingResult {
-  const kind: ListingKind = scope.kind;
+  const { kind } = scope;
   const collator = new Intl.Collator(locale);
   const featured = scope.kind === "category" ? categoryFeatured(scope.categoryId) : homeFeatured;
 
@@ -371,7 +365,7 @@ export function buildListing(
   const prices = inScope.flatMap((product) =>
     product.variants.map((variant) => variant.priceCents),
   );
-  const priceBounds =
+  const priceBounds: PriceBounds | null =
     prices.length > 0 ? { minCents: Math.min(...prices), maxCents: Math.max(...prices) } : null;
 
   const sortBy = sortCompare(state.sort, featured, collator);

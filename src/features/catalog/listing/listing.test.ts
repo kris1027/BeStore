@@ -1,14 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { buildIndexProduct } from "./index-rows";
-import {
-  buildListing,
-  type Listing,
-  type ListingProduct,
-  type ListingScope,
-  PAGE_SIZE,
-} from "./listing";
-import { parseListingParams } from "./params";
+import { buildListing, type Listing, type ListingProduct, PAGE_SIZE } from "./listing";
+import { type ListingScope, parseListingParams } from "./params";
 
 const image = { src: "/placeholder.svg", alt: "", width: null, height: null };
 
