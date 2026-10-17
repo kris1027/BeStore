@@ -53,31 +53,31 @@ function zoneOffsetMs(instant: number, timeZone: string): number {
   return asUtc - (instant - (instant % 1000));
 }
 
-// The UTC instant a calendar day starts in a time zone, safe across daylight saving: the offset
-// is read at the result itself, so a day after a clock change starts at its own midnight.
+// Wall clock fields (written as if UTC) read in a time zone, to their UTC instant. Safe across
+// daylight saving: the offset is read again at the result itself, so a time just after a clock
+// change, such as the first midnight after it, lands right.
+function wallToUtc(wall: number, timeZone: string): Date {
+  const guess = wall - zoneOffsetMs(wall, timeZone);
+  return new Date(wall - zoneOffsetMs(guess, timeZone));
+}
+
+// The UTC instant a calendar day starts in a time zone.
 export function zonedDayStart(
   day: { readonly y: number; readonly m: number; readonly d: number },
   timeZone: string,
 ): Date {
-  const wall = Date.UTC(day.y, day.m - 1, day.d);
-  let instant = wall - zoneOffsetMs(wall, timeZone);
-  instant = wall - zoneOffsetMs(instant, timeZone);
-  return new Date(instant);
+  return wallToUtc(Date.UTC(day.y, day.m - 1, day.d), timeZone);
 }
 
 // A `datetime-local` value ("2026-10-17T14:30") read as wall clock time in a time zone, to its
-// UTC instant (spec 0014, AC-11), or null when it is not a real moment. Like zonedDayStart, the
-// offset is read again at the result, so a time just after a clock change lands right.
+// UTC instant (spec 0014, AC-11), or null when it is not a real moment.
 export function zonedDateTimeToUtc(text: string, timeZone: string): Date | null {
   const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(text);
   if (!match) return null;
   const day = parseCalendarDay(match[1] ?? "");
   const [hour, minute, second] = [Number(match[2]), Number(match[3]), Number(match[4] ?? 0)];
   if (day === null || hour > 23 || minute > 59 || second > 59) return null;
-  const wall = Date.UTC(day.y, day.m - 1, day.d, hour, minute, second);
-  let instant = wall - zoneOffsetMs(wall, timeZone);
-  instant = wall - zoneOffsetMs(instant, timeZone);
-  return new Date(instant);
+  return wallToUtc(Date.UTC(day.y, day.m - 1, day.d, hour, minute, second), timeZone);
 }
 
 // The inverse, for a `datetime-local` field's value: the instant as wall clock time in the zone,
