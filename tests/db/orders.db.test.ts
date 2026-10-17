@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { expectViolation, SQLSTATE, testDb, resetDatabaseBeforeEach } from "./client";
 import {
+  codeAdminId,
   createAdmin,
   createCustomer,
   createOrder,
@@ -512,7 +513,7 @@ describe("once only records (AC-8)", () => {
   it("allows one redemption per order", async () => {
     const order = await createOrder();
     const code = await testDb.discountCode.create({
-      data: { code: "WELCOME", type: "percent", value: 10 },
+      data: { createdByAdminId: await codeAdminId(), code: "WELCOME", type: "percent", value: 10 },
     });
     const redemption = { discountCodeId: code.id, orderId: order.id, email: order.email };
     await testDb.discountRedemption.create({ data: redemption });
@@ -615,17 +616,67 @@ describe("admins and actors (AC-11)", () => {
 
 describe("promo codes (AC-5)", () => {
   it("rejects a duplicate code and a code that is not uppercase", async () => {
-    await testDb.discountCode.create({ data: { code: "SPRING", type: "percent", value: 10 } });
+    await testDb.discountCode.create({
+      data: { createdByAdminId: await codeAdminId(), code: "SPRING", type: "percent", value: 10 },
+    });
 
     await expectViolation(
-      testDb.discountCode.create({ data: { code: "SPRING", type: "fixed_amount", value: 500 } }),
+      testDb.discountCode.create({
+        data: {
+          createdByAdminId: await codeAdminId(),
+          code: "SPRING",
+          type: "fixed_amount",
+          value: 500,
+        },
+      }),
       SQLSTATE.unique,
       "discount_codes_code_key",
     );
+    // Lowercase also fails the format CHECK (spec 0014), and Postgres may name either one.
     await expectViolation(
-      testDb.discountCode.create({ data: { code: "Summer", type: "percent", value: 10 } }),
+      testDb.discountCode.create({
+        data: { createdByAdminId: await codeAdminId(), code: "Summer", type: "percent", value: 10 },
+      }),
       SQLSTATE.check,
-      "discount_codes_code_uppercase_check",
+    );
+  });
+
+  // spec 0014, AC-19.
+  it.each(["AB", "A".repeat(33), "SUMMER 10", "ZNIŻKA", "10%OFF"])(
+    "rejects the code %j, outside 3 to 32 letters, digits or hyphens",
+    async (code) => {
+      await expectViolation(
+        testDb.discountCode.create({
+          data: { createdByAdminId: await codeAdminId(), code, type: "percent", value: 10 },
+        }),
+        SQLSTATE.check,
+        "discount_codes_code_format_check",
+      );
+    },
+  );
+
+  it("keeps a note to 500 characters and needs the admin who created the code", async () => {
+    const createdByAdminId = await codeAdminId();
+    const base = { createdByAdminId, type: "percent" as const, value: 10 };
+
+    await expect(
+      testDb.discountCode.create({ data: { ...base, code: "NOTE-OK", note: "n".repeat(500) } }),
+    ).resolves.toBeDefined();
+    await expectViolation(
+      testDb.discountCode.create({ data: { ...base, code: "NOTE-LONG", note: "n".repeat(501) } }),
+      SQLSTATE.check,
+      "discount_codes_note_length_check",
+    );
+    await expectViolation(
+      testDb.discountCode.create({
+        data: { ...base, code: "NO-ADMIN", createdByAdminId: crypto.randomUUID() },
+      }),
+      SQLSTATE.foreignKey,
+      "discount_codes_created_by_admin_id_fkey",
+    );
+    await expectViolation(
+      testDb.adminUser.delete({ where: { id: createdByAdminId } }),
+      SQLSTATE.foreignKey,
     );
   });
 
@@ -635,7 +686,9 @@ describe("promo codes (AC-5)", () => {
     { type: "fixed_amount" as const, value: 0 },
   ])("rejects a $type value of $value", async ({ type, value }) => {
     await expectViolation(
-      testDb.discountCode.create({ data: { code: "BAD", type, value } }),
+      testDb.discountCode.create({
+        data: { createdByAdminId: await codeAdminId(), code: "BAD", type, value },
+      }),
       SQLSTATE.check,
       "discount_codes_value_check",
     );
@@ -646,7 +699,14 @@ describe("promo codes (AC-5)", () => {
 
     await expectViolation(
       testDb.discountCode.create({
-        data: { code: "DATES", type: "percent", value: 10, startsAt: at, endsAt: at },
+        data: {
+          createdByAdminId: await codeAdminId(),
+          code: "DATES",
+          type: "percent",
+          value: 10,
+          startsAt: at,
+          endsAt: at,
+        },
       }),
       SQLSTATE.check,
       "discount_codes_dates_check",
@@ -671,7 +731,15 @@ describe("promo codes (AC-5)", () => {
     },
   ])("rejects a code whose $field is out of range", async ({ data, constraint }) => {
     await expectViolation(
-      testDb.discountCode.create({ data: { code: "LIMITS", type: "percent", value: 10, ...data } }),
+      testDb.discountCode.create({
+        data: {
+          createdByAdminId: await codeAdminId(),
+          code: "LIMITS",
+          type: "percent",
+          value: 10,
+          ...data,
+        },
+      }),
       SQLSTATE.check,
       constraint,
     );
@@ -681,6 +749,7 @@ describe("promo codes (AC-5)", () => {
     await expect(
       testDb.discountCode.create({
         data: {
+          createdByAdminId: await codeAdminId(),
           code: "EDGE",
           type: "percent",
           value: 10,
@@ -695,7 +764,7 @@ describe("promo codes (AC-5)", () => {
   it("cannot delete a code that has been redeemed", async () => {
     const order = await createOrder();
     const code = await testDb.discountCode.create({
-      data: { code: "USED", type: "percent", value: 10 },
+      data: { createdByAdminId: await codeAdminId(), code: "USED", type: "percent", value: 10 },
     });
     await testDb.discountRedemption.create({
       data: { discountCodeId: code.id, orderId: order.id, email: order.email },
@@ -724,7 +793,13 @@ describe("promo redemption race (AC-15)", () => {
 
   it("lets exactly one of two racing checkouts take the last use of a code", async () => {
     const code = await testDb.discountCode.create({
-      data: { code: "LASTONE", type: "percent", value: 10, maxRedemptions: 2 },
+      data: {
+        createdByAdminId: await codeAdminId(),
+        code: "LASTONE",
+        type: "percent",
+        value: 10,
+        maxRedemptions: 2,
+      },
     });
     const earlier = await createOrder({ email: "early@example.com" });
     await testDb.discountRedemption.create({

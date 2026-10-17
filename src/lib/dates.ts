@@ -64,3 +64,29 @@ export function zonedDayStart(
   instant = wall - zoneOffsetMs(instant, timeZone);
   return new Date(instant);
 }
+
+// A `datetime-local` value ("2026-10-17T14:30") read as wall clock time in a time zone, to its
+// UTC instant (spec 0014, AC-11), or null when it is not a real moment. Like zonedDayStart, the
+// offset is read again at the result, so a time just after a clock change lands right.
+export function zonedDateTimeToUtc(text: string, timeZone: string): Date | null {
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(text);
+  if (!match) return null;
+  const day = parseCalendarDay(match[1] ?? "");
+  const [hour, minute, second] = [Number(match[2]), Number(match[3]), Number(match[4] ?? 0)];
+  if (day === null || hour > 23 || minute > 59 || second > 59) return null;
+  const wall = Date.UTC(day.y, day.m - 1, day.d, hour, minute, second);
+  let instant = wall - zoneOffsetMs(wall, timeZone);
+  instant = wall - zoneOffsetMs(instant, timeZone);
+  return new Date(instant);
+}
+
+// The inverse, for a `datetime-local` field's value: the instant as wall clock time in the zone,
+// to the minute.
+export function utcToZonedInput(date: Date, timeZone: string): string {
+  const local = new Date(date.getTime() + zoneOffsetMs(date.getTime(), timeZone));
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return (
+    `${local.getUTCFullYear()}-${pad(local.getUTCMonth() + 1)}-${pad(local.getUTCDate())}` +
+    `T${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}`
+  );
+}

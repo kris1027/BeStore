@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { normalizeEmail } from "@/lib/discounts/schema";
 import { shippingAddressSchema, type StoreCountry } from "@/lib/shipping/address";
 
 // Shared by the checkout form (zodResolver) and startCheckout, so both refuse the same input.
@@ -9,12 +10,13 @@ export const checkoutMessages = {
 } as const;
 
 // Lowercasing and trimming twice gives the same email, so the server can parse the form's output.
-const emailSchema = z
+// The one normaliser the per customer code limit compares by (spec 0014, AC-3).
+export const emailSchema = z
   .string({ error: checkoutMessages.emailInvalid })
   .trim()
   .max(254, checkoutMessages.emailInvalid)
   .pipe(z.email(checkoutMessages.emailInvalid))
-  .transform((email) => email.toLowerCase());
+  .transform(normalizeEmail);
 
 export function checkoutSchema(country: StoreCountry) {
   return z.object({
@@ -22,6 +24,9 @@ export function checkoutSchema(country: StoreCountry) {
     ...shippingAddressSchema(country).shape,
     // spec 0012, AC-15: "Save this address to my account"; only a signed in checkout reads it.
     saveAddress: z.boolean().default(false),
+    // spec 0014, AC-4: the applied promo code, checked again by Pay under the code lock. Any
+    // value is passed on as typed: one that is not a code is refused as "This code isn't valid."
+    discountCode: z.unknown().optional(),
   });
 }
 

@@ -9,6 +9,9 @@ import { getCustomer } from "@/lib/customer/session";
 import { type CustomerIdentity, mergeCartForCustomer } from "@/lib/customer/setup";
 import { db, type Tx } from "@/lib/db";
 import { uniqueViolation } from "@/lib/db-errors";
+import { countRedemptions, lockCode, redeem } from "@/lib/discounts/codes";
+import { type DiscountRefusal, evaluateDiscount } from "@/lib/discounts/rule";
+import { parseCodeText } from "@/lib/discounts/schema";
 import { env } from "@/lib/env";
 import { logOrderExpired } from "@/lib/orders/log";
 import { minimumChargeCents } from "@/lib/orders/minimum-charge";
@@ -20,12 +23,20 @@ import { productImageUrl } from "@/lib/product-image";
 import type { ActionResult } from "@/lib/result";
 import { deliveryColumns, type ShipTo } from "@/lib/shipping/address";
 import { readShippingSettings } from "@/lib/shipping/settings";
+import { logger } from "@/lib/logger";
 import { stripe } from "@/lib/stripe";
 import { uuidv7 } from "@/lib/uuid";
 import { variantLabel } from "@/lib/variant-label";
 
 import { type CheckoutAccount, lockAccount, orderCustomerName, saveToAccount } from "../account";
-import { logCheckoutRefused, logCheckoutStarted, logStripeFailed, stripeErrorCode } from "../log";
+import {
+  logCheckoutRefused,
+  logCheckoutStarted,
+  logCouponFailed,
+  logDiscountRefused,
+  logStripeFailed,
+  stripeErrorCode,
+} from "../log";
 import { type CheckoutFieldErrors, checkoutFieldErrors, checkoutSchema } from "../schemas";
 import { checkoutSessionParams } from "../stripe-session";
 
@@ -38,7 +49,13 @@ export type StartCheckoutError =
   | { readonly code: "payment_processing" }
   | { readonly code: "already_paid"; readonly confirmationUrl: string }
   | { readonly code: "checkout_in_progress" }
-  | { readonly code: "payment_unavailable" };
+  | { readonly code: "payment_unavailable" }
+  // spec 0014, AC-4: the code stopped applying since Apply (or never did); no order was made.
+  | {
+      readonly code: "discount_refused";
+      readonly reason: DiscountRefusal;
+      readonly minimumGapCents?: number;
+    };
 
 type Result<T> = ActionResult<T, StartCheckoutError>;
 
@@ -48,6 +65,7 @@ const expiryReasons = {
   replaced: "Replaced by a new checkout",
   sessionNotCreated: "Stripe session could not be created",
   sessionNotSaved: "Session id could not be saved",
+  couponNotCreated: "Stripe coupon could not be created",
 } as const;
 
 // spec 0006, AC-1, AC-2 and AC-9: freezes the cart into a pending order and sends the browser to
@@ -65,7 +83,12 @@ async function run(input: unknown): Promise<Result<{ readonly url: string }>> {
   if (!parsed.success) {
     return fail({ code: "validation", fields: checkoutFieldErrors(parsed.error) });
   }
-  const { email: typedEmail, saveAddress: saveRequested, ...address } = parsed.data;
+  const {
+    email: typedEmail,
+    saveAddress: saveRequested,
+    discountCode: codeInput,
+    ...address
+  } = parsed.data;
   const shipTo: ShipTo = { ...address, countryCode: env.STORE_COUNTRY };
 
   // spec 0012, AC-15: a signed in checkout uses the account email, whatever was typed, and a
@@ -80,9 +103,12 @@ async function run(input: unknown): Promise<Result<{ readonly url: string }>> {
   const cleared = await clearPendingOrder(cartId);
   if (!cleared.ok) return cleared;
 
-  const created = await createPendingOrder(cartId, email, shipTo, account);
+  const created = await createPendingOrder(cartId, email, shipTo, account, codeInput);
   if (!created.ok) return created;
   const order = created.data;
+
+  const coupon = await createCoupon(order);
+  if (!coupon.ok) return coupon;
 
   let session: Stripe.Checkout.Session;
   try {
@@ -99,6 +125,7 @@ async function run(input: unknown): Promise<Result<{ readonly url: string }>> {
           })),
           shippingCents: order.snapshot.shippingCents,
           shipping: shipTo,
+          couponId: coupon.data,
         },
         { siteUrl: env.NEXT_PUBLIC_SITE_URL, nowMs: Date.now() },
       ),
@@ -109,9 +136,15 @@ async function run(input: unknown): Promise<Result<{ readonly url: string }>> {
     logStripeFailed(order.id, error);
     // No session exists, so nothing at Stripe can take money for this order.
     await expire(order.id, expiryReasons.sessionNotCreated);
-    return stripeErrorCode(error) === "amount_too_small"
-      ? fail({ code: "below_minimum", minimumCents: minimumChargeCents(env.STORE_CURRENCY) })
-      : fail({ code: "payment_unavailable" });
+    if (stripeErrorCode(error) !== "amount_too_small") return fail({ code: "payment_unavailable" });
+    // spec 0014, AC-7: the AC-2 cap keeps a discounted total at the minimum, so this is a bug.
+    if (order.discount !== null) {
+      logger.error(
+        { event: "checkout.discount_below_minimum", orderId: order.id },
+        "checkout.discount_below_minimum",
+      );
+    }
+    return fail({ code: "below_minimum", minimumCents: minimumChargeCents(env.STORE_CURRENCY) });
   }
 
   const saved = await saveSessionId(order.id, session.id);
@@ -132,8 +165,40 @@ async function run(input: unknown): Promise<Result<{ readonly url: string }>> {
     number: order.number,
     totalCents: order.totalCents,
     shippingCents: order.snapshot.shippingCents,
+    discountCents: order.snapshot.discountCents,
+    discountCodeId: order.discount?.codeId ?? null,
   });
   return { ok: true, data: { url: session.url } };
+}
+
+// spec 0014, AC-7: after the order commits and before the session, a single use coupon with
+// the order's exact discount, so Stripe's amount_total equals our total. Its fixed id and
+// idempotency key make a retry land on the same coupon. No coupon, no session: the order is
+// expired, which frees its use of the code (AC-8).
+async function createCoupon(order: CreatedOrder): Promise<Result<string | null>> {
+  if (order.discount === null) return { ok: true, data: null };
+  const id = `order_${order.id}`;
+  try {
+    await stripe.coupons.create(
+      {
+        id,
+        amount_off: order.snapshot.discountCents,
+        currency: env.STORE_CURRENCY.toLowerCase(),
+        duration: "once",
+        max_redemptions: 1,
+        name: order.discount.code,
+        metadata: { order_id: order.id },
+      },
+      { idempotencyKey: `coupon:${order.id}` },
+    );
+  } catch (error) {
+    // A create that already happened (a retried request) left the same coupon behind.
+    if (stripeErrorCode(error) === "resource_already_exists") return { ok: true, data: id };
+    logCouponFailed(order.id, error);
+    await expire(order.id, expiryReasons.couponNotCreated);
+    return fail({ code: "payment_unavailable" });
+  }
+  return { ok: true, data: id };
 }
 
 function fail<T>(error: StartCheckoutError): Result<T> {
@@ -231,7 +296,77 @@ type CreatedOrder = {
   readonly number: number;
   readonly totalCents: number;
   readonly snapshot: OrderSnapshot;
+  // The code this order redeemed, or null for none.
+  readonly discount: { readonly codeId: string; readonly code: string } | null;
 };
+
+type AppliedCode = NonNullable<CreatedOrder["discount"]> & {
+  readonly type: "percent" | "fixed_amount";
+  readonly value: number;
+  readonly discountCents: number;
+};
+
+// spec 0014, AC-3 to AC-5: inside the order transaction, after the customer and cart locks. The
+// code row lock serializes every checkout using this code, so two racing for its last use (or
+// the last use for one email) end with one redemption. Pay counts every use: the cart's own
+// earlier pending order was already expired by clearPendingOrder.
+async function applyLockedCode(
+  tx: Tx,
+  input: {
+    readonly codeInput: unknown;
+    readonly email: string;
+    readonly subtotalCents: number;
+    readonly settings: Awaited<ReturnType<typeof readShippingSettings>>;
+    readonly minimumCents: number;
+  },
+): Promise<Result<AppliedCode>> {
+  const text = parseCodeText(input.codeInput);
+  const code = text === null ? null : await lockCode(tx, { code: text });
+  const counts =
+    code === null
+      ? { uses: 0, customerUses: 0 }
+      : await countRedemptions(tx, code.id, { email: input.email });
+  const evaluation = evaluateDiscount({
+    code,
+    subtotalCents: input.subtotalCents,
+    settings: input.settings,
+    minimumCents: input.minimumCents,
+    now: code?.now ?? new Date(),
+    uses: counts.uses,
+    customerUses: counts.customerUses ?? 0,
+  });
+  if (!evaluation.ok) {
+    logDiscountRefused({
+      stage: "pay",
+      reason: evaluation.reason,
+      discountCodeId: code?.id ?? null,
+    });
+    return fail({
+      code: "discount_refused",
+      reason: evaluation.reason,
+      ...(evaluation.minimumGapCents === undefined
+        ? {}
+        : { minimumGapCents: evaluation.minimumGapCents }),
+    });
+  }
+  // A refusal above covers a missing code; reaching here means the row exists.
+  if (code === null) throw new Error("A discount applied without a code row");
+  return {
+    ok: true,
+    data: {
+      codeId: code.id,
+      code: code.code,
+      type: code.type,
+      value: code.value,
+      discountCents: evaluation.discountCents,
+    },
+  };
+}
+
+// An absent or empty field means no code; anything else is checked, and refused if it is not one.
+function wantsCode(codeInput: unknown): boolean {
+  return !(codeInput === undefined || codeInput === null || codeInput === "");
+}
 
 // AC-1, step 3: under the cart lock, reread the cart live and freeze it into an order. Prices
 // and the delivery fee come from the database here and nowhere else (spec 0007, AC-5).
@@ -240,6 +375,7 @@ async function createPendingOrder(
   email: string,
   shipTo: ShipTo,
   account: CheckoutAccount | null,
+  codeInput: unknown,
 ): Promise<Result<CreatedOrder>> {
   try {
     const created = await db.$transaction(
@@ -273,13 +409,33 @@ async function createPendingOrder(
         // Read here, never from the cache: an admin change made while the customer sat on
         // /checkout applies to this Pay (AC-7), and Stripe's page shows that total.
         const settings = await readShippingSettings(tx);
-        const snapshot = snapshotOrder(
-          sources.map((source) => source.snapshot),
-          settings,
-        );
+        const lines = sources.map((source) => source.snapshot);
         const minimumCents = minimumChargeCents(env.STORE_CURRENCY);
-        if (snapshot.totalCents < minimumCents)
+        // spec 0014, Key invariants: below the minimum without a code is answered before any
+        // code check.
+        if (snapshotOrder(lines, settings, null).totalCents < minimumCents) {
           return fail({ code: "below_minimum", minimumCents });
+        }
+
+        // spec 0014, AC-4: the code lock comes after the customer and cart locks, and before the
+        // order, line and redemption inserts that touch the code row's foreign keys.
+        let applied: AppliedCode | null = null;
+        if (wantsCode(codeInput)) {
+          const locked = await applyLockedCode(tx, {
+            codeInput,
+            email,
+            subtotalCents: snapshotOrder(lines, settings, null).subtotalCents,
+            settings,
+            minimumCents,
+          });
+          if (!locked.ok) return locked;
+          applied = locked.data;
+        }
+        const snapshot = snapshotOrder(lines, settings, applied);
+        // The AC-2 cap keeps a discounted total at the minimum; this is the backstop.
+        if (snapshot.totalCents < minimumCents) {
+          throw new Error("A discounted order fell below the minimum charge");
+        }
 
         const customerName = orderCustomerName(profileName, shipTo.fullName);
         const order = await tx.order.create({
@@ -295,6 +451,15 @@ async function createPendingOrder(
             discountCents: snapshot.discountCents,
             shippingCents: snapshot.shippingCents,
             totalCents: snapshot.totalCents,
+            // spec 0014, AC-4: the code's snapshot, written once and never changed.
+            ...(applied === null
+              ? {}
+              : {
+                  discountCodeId: applied.codeId,
+                  discountCode: applied.code,
+                  discountType: applied.type,
+                  discountValue: applied.value,
+                }),
             lines: {
               create: snapshot.lines.map((line) => ({
                 variantId: line.variantId,
@@ -315,9 +480,13 @@ async function createPendingOrder(
           },
           select: { id: true, number: true, totalCents: true },
         });
+        if (applied !== null) {
+          await redeem(tx, { codeId: applied.codeId, orderId: order.id, email });
+        }
         const addressSaved =
           account === null ? false : await saveToAccount(tx, account, shipTo, customerName);
-        return { ok: true, data: { ...order, snapshot, addressSaved } };
+        const discount = applied === null ? null : { codeId: applied.codeId, code: applied.code };
+        return { ok: true, data: { ...order, snapshot, discount, addressSaved } };
       },
     );
     if (!created.ok) return created;

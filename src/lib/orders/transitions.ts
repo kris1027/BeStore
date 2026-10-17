@@ -173,7 +173,7 @@ export async function markExpired(tx: Tx, orderId: string, reason: string): Prom
     UPDATE orders SET status = 'expired', expired_at = now(), updated_at = now()
     WHERE id = ${orderId}::uuid AND status = 'pending_payment'`;
   if (moved === 0) return false;
-  // Frees any discount use (spec 0002); none exist until feature 14.
+  // Frees the order's hold on a promo code use (spec 0014, AC-8).
   await tx.discountRedemption.deleteMany({ where: { orderId } });
   await tx.orderEvent.create({
     data: {

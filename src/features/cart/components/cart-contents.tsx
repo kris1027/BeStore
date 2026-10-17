@@ -16,7 +16,6 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { loadOwnedCart } from "@/lib/cart/owned";
-import { NO_DISCOUNT_CENTS } from "@/lib/orders/snapshot";
 import { freeDeliveryGapCents, orderCharges } from "@/lib/shipping/rule";
 import { getShippingSettings } from "@/lib/shipping/settings";
 
@@ -51,7 +50,8 @@ export async function CartContents() {
     );
   }
 
-  const basis = { subtotalCents: cart.subtotalCents, discountCents: NO_DISCOUNT_CENTS };
+  // A promo code is typed on /checkout only (spec 0014), so the cart never shows a discount.
+  const basis = { subtotalCents: cart.subtotalCents, discountCents: 0 };
   const { shippingCents: shipping, totalCents } = orderCharges(basis, settings);
   const gap = freeDeliveryGapCents(basis, settings);
 

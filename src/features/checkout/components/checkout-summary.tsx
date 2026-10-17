@@ -2,7 +2,6 @@ import { InfoIcon } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { DeliveryRow } from "@/components/delivery-row";
 import { Price } from "@/components/price";
 import { ProductImage } from "@/components/product-image";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -12,15 +11,17 @@ import { loadOwnedCart } from "@/lib/cart/owned";
 import { addressNeedsCheck } from "@/lib/customer/address-rules";
 import { listSavedAddresses, type SavedAddress } from "@/lib/customer/addresses";
 import { getCustomer } from "@/lib/customer/session";
+import { previewDiscount } from "@/lib/discounts/codes";
+import { refusalMessage } from "@/lib/discounts/rule";
 import { env } from "@/lib/env";
-import { NO_DISCOUNT_CENTS } from "@/lib/orders/snapshot";
 import { countryDisplayName } from "@/lib/shipping/address";
 import { orderCharges } from "@/lib/shipping/rule";
 import { getShippingSettings } from "@/lib/shipping/settings";
 
-import { checkoutPrefill } from "../queries";
+import { checkoutPrefill, prefillDiscountCode } from "../queries";
 import { type CheckoutPrefill, emptyPrefill } from "../schemas";
-import { type CheckoutAccount, CheckoutForm } from "./checkout-form";
+import type { CheckoutAccount } from "./checkout-form";
+import { CheckoutPayment, type InitialDiscount } from "./checkout-payment";
 
 // spec 0012, AC-16: where a signed out visitor signs in and comes back.
 const signInToCheckout = "/account/sign-in?next=/checkout";
@@ -43,6 +44,8 @@ const cartPath = "/cart";
 // email form and Pay button, and the notice after coming back from Stripe without paying. spec
 // 0007 adds the address fields, prefilled from the cart's last order, and the delivery row. The
 // fee shown here is for display; Pay computes it again from the live settings row (AC-5).
+// spec 0014 adds the promo code field and, for a return visit, the code from the last Pay
+// (AC-9); Pay checks the code again under its lock.
 export async function CheckoutSummary({
   searchParams,
 }: {
@@ -51,9 +54,10 @@ export async function CheckoutSummary({
   const [cart, params] = await Promise.all([loadOwnedCart(), searchParams]);
   if (!cart || !cart.canCheckout) redirect(cartPath);
   const cancelled = params.cancelled === "1";
-  const [settings, orderPrefill, customer] = await Promise.all([
+  const [settings, orderPrefill, returningCode, customer] = await Promise.all([
     getShippingSettings(),
     checkoutPrefill(cart.id),
+    prefillDiscountCode(cart.id),
     getCustomer(),
   ]);
   // spec 0012, AC-15: a signed in customer's form starts with the pending order's address for this
@@ -81,9 +85,17 @@ export async function CheckoutSummary({
     (defaultAddress ? { email: "", ...addressValues(defaultAddress) } : null) ??
     emptyPrefill;
   const { shippingCents: shipping, totalCents } = orderCharges(
-    { subtotalCents: cart.subtotalCents, discountCents: NO_DISCOUNT_CENTS },
+    { subtotalCents: cart.subtotalCents, discountCents: 0 },
     settings,
   );
+  const initialDiscount =
+    returningCode === null
+      ? null
+      : await returningDiscount(
+          cart.id,
+          returningCode.code,
+          customer?.email ?? returningCode.email,
+        );
 
   return (
     <div className="flex flex-col gap-8">
@@ -140,36 +152,27 @@ export async function CheckoutSummary({
           <h2 id="checkout-summary-heading" className="font-heading text-2xl">
             Summary
           </h2>
-          <div className="flex items-center justify-between">
-            <span>Subtotal</span>
-            <span className="font-medium">
-              <Price cents={cart.subtotalCents} />
-            </span>
-          </div>
-          <DeliveryRow cents={shipping} />
-          <Separator />
-          <div className="flex items-center justify-between text-lg">
-            <span className="font-medium">Total</span>
-            <span className="font-semibold">
-              <Price cents={totalCents} />
-            </span>
-          </div>
-          {customer === null ? (
-            <p className="text-sm text-muted-foreground">
-              Have an account?{" "}
-              <Link
-                href={signInToCheckout}
-                className="text-foreground underline underline-offset-4 hover:text-foreground/80"
-              >
-                Sign in
-              </Link>
-            </p>
-          ) : null}
           {/* Keyed by who is paying: signing in and coming back (a client navigation that keeps
               the old form around) starts the form over with the account's email and address. */}
-          <CheckoutForm
+          <CheckoutPayment
             key={customer?.id ?? "guest"}
+            subtotalCents={cart.subtotalCents}
+            shippingCents={shipping}
             totalCents={totalCents}
+            initialDiscount={initialDiscount}
+            signInHint={
+              customer === null ? (
+                <p className="text-sm text-muted-foreground">
+                  Have an account?{" "}
+                  <Link
+                    href={signInToCheckout}
+                    className="text-foreground underline underline-offset-4 hover:text-foreground/80"
+                  >
+                    Sign in
+                  </Link>
+                </p>
+              ) : null
+            }
             country={env.STORE_COUNTRY}
             countryName={countryDisplayName(env.STORE_COUNTRY, env.STORE_LOCALE)}
             prefill={prefill}
@@ -179,6 +182,39 @@ export async function CheckoutSummary({
       </div>
     </div>
   );
+}
+
+// spec 0014, AC-9: a code from an earlier Pay shows applied when it still passes, else in the
+// field with its refusal. The same previewDiscount as Apply, so the render and the button agree.
+async function returningDiscount(
+  cartId: string,
+  code: string,
+  email: string | null,
+): Promise<InitialDiscount> {
+  const preview = await previewDiscount({ cartId, codeText: code, email });
+  switch (preview.kind) {
+    case "applied":
+      return {
+        kind: "applied",
+        applied: {
+          code: preview.code,
+          discountCents: preview.discountCents,
+          shippingCents: preview.shippingCents,
+          totalCents: preview.totalCents,
+        },
+      };
+    case "refused":
+      return {
+        kind: "refused",
+        text: code,
+        message: refusalMessage(preview, {
+          currency: env.STORE_CURRENCY,
+          locale: env.STORE_LOCALE,
+        }),
+      };
+    default:
+      return null;
+  }
 }
 
 export function CheckoutSummarySkeleton() {
