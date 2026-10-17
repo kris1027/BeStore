@@ -29,6 +29,15 @@ export function logDiscountRefused(fields: {
   logger.info({ event: "checkout.discount_refused", ...fields }, "checkout.discount_refused");
 }
 
+// spec 0014, AC-7: Stripe answered amount_too_small for an order with a code. The AC-2 cap keeps
+// a discounted total at the minimum, so this is a bug.
+export function logDiscountBelowMinimum(orderId: string) {
+  logger.error(
+    { event: "checkout.discount_below_minimum", orderId },
+    "checkout.discount_below_minimum",
+  );
+}
+
 export function logCouponFailed(orderId: string, error: unknown) {
   logger.error(
     { event: "checkout.coupon_failed", orderId, stripeCode: stripeErrorCode(error) ?? null },

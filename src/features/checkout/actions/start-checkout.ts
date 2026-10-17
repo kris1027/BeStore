@@ -23,7 +23,6 @@ import { productImageUrl } from "@/lib/product-image";
 import type { ActionResult } from "@/lib/result";
 import { deliveryColumns, type ShipTo } from "@/lib/shipping/address";
 import { readShippingSettings } from "@/lib/shipping/settings";
-import { logger } from "@/lib/logger";
 import { stripe } from "@/lib/stripe";
 import { uuidv7 } from "@/lib/uuid";
 import { variantLabel } from "@/lib/variant-label";
@@ -33,6 +32,7 @@ import {
   logCheckoutRefused,
   logCheckoutStarted,
   logCouponFailed,
+  logDiscountBelowMinimum,
   logDiscountRefused,
   logStripeFailed,
   stripeErrorCode,
@@ -137,13 +137,7 @@ async function run(input: unknown): Promise<Result<{ readonly url: string }>> {
     // No session exists, so nothing at Stripe can take money for this order.
     await expire(order.id, expiryReasons.sessionNotCreated);
     if (stripeErrorCode(error) !== "amount_too_small") return fail({ code: "payment_unavailable" });
-    // spec 0014, AC-7: the AC-2 cap keeps a discounted total at the minimum, so this is a bug.
-    if (order.discount !== null) {
-      logger.error(
-        { event: "checkout.discount_below_minimum", orderId: order.id },
-        "checkout.discount_below_minimum",
-      );
-    }
+    if (order.discount !== null) logDiscountBelowMinimum(order.id);
     return fail({ code: "below_minimum", minimumCents: minimumChargeCents(env.STORE_CURRENCY) });
   }
 
