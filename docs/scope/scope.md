@@ -274,10 +274,10 @@ Spec: [0014](../specs/0014-discounts-promo-codes/index.md) · code in [src/featu
   - [x] Refusals and prefill: every refusal message on Apply and Pay, focus and live region, coupon failure, logs, returning to checkout with the code (AC-1, AC-3, AC-4, AC-7, AC-9, AC-18)
   - [x] Admin list, edit, delete and the orders filter: uses, discount given, status, search, edit lock, stale check, delete refusal, nav (AC-10, AC-12 to AC-14, AC-17, AC-18)
   - [x] Customer views and safety net: code on the complete page, account order page and email, refund check, e2e with axe and keyboard (AC-15, AC-16, AC-20)
-- [ ] Verify it: `/check verify discounts & promo codes`
-- [ ] Test it: `/test discounts & promo codes`
-- [ ] Review it (fresh model): `/check review discounts & promo codes`
-- [ ] Document it: `/document discounts & promo codes`
+- [x] Verify it: `/check verify discounts & promo codes`
+- [x] Test it: `/test discounts & promo codes`
+- [x] Review it (fresh model): `/check review discounts & promo codes`
+- [x] Document it: `/document discounts & promo codes`
 
 ## Slice 9: Insights
 

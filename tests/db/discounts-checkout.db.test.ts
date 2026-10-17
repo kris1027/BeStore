@@ -622,6 +622,80 @@ describe("Apply (AC-1, AC-3, AC-17)", () => {
   });
 });
 
+describe("Pay reads every value again from the database (value sourcing)", () => {
+  it("discounts the price the variant has at Pay, not the one shown at Apply", async () => {
+    await createCode();
+    const cart = await cartWith([{ priceCents: 5000, quantity: 1 }]);
+    expect(await applyDiscountCode({ code: "SUMMER10" })).toMatchObject({
+      data: { discountCents: 500, totalCents: 4500 },
+    });
+    const [item] = await testDb.cartItem.findMany({ where: { cartId: cart.id } });
+    await testDb.productVariant.update({
+      where: { id: item!.variantId },
+      data: { priceCents: 8000 },
+    });
+
+    expect((await pay("SUMMER10")).ok).toBe(true);
+
+    expect(await testDb.order.findFirstOrThrow()).toMatchObject({
+      subtotalCents: 8000,
+      discountCents: 800,
+      totalCents: 7200,
+    });
+    const [params] = mocks.create.mock.calls[0]!;
+    expect(params.line_items[0].price_data.unit_amount).toBe(8000);
+  });
+
+  it("charges the delivery fee set after Apply", async () => {
+    await createCode({ type: "fixed_amount", value: 500 });
+    await cartWith([{ priceCents: 3000, quantity: 1 }]);
+    expect(await applyDiscountCode({ code: "SUMMER10" })).toMatchObject({
+      data: { shippingCents: 0, totalCents: 2500 },
+    });
+    await testDb.storeSettings.update({ where: { id: 1 }, data: { flatShippingCents: 1200 } });
+
+    expect((await pay("SUMMER10")).ok).toBe(true);
+
+    expect(await testDb.order.findFirstOrThrow()).toMatchObject({
+      discountCents: 500,
+      shippingCents: 1200,
+      totalCents: 3700,
+    });
+  });
+
+  it("checks and records the account email on a signed in Pay, whatever was typed", async () => {
+    const code = await createCode({ code: "MINE", perCustomerLimit: 1 });
+    const fresh = await createCode({ code: "FRESH", perCustomerLimit: 1 });
+    const customer = await createCustomer("acct@example.com");
+    await usedBy(code.id, { email: "acct@example.com" });
+    await cartWith([{ priceCents: 5000, quantity: 1 }]);
+    mocks.customer = { id: customer.id, email: customer.email };
+
+    expect(await pay("MINE", "someone-else@example.com")).toMatchObject({
+      error: { code: "discount_refused", reason: "customer_limit" },
+    });
+    expect((await pay("FRESH", "someone-else@example.com")).ok).toBe(true);
+    expect(
+      await testDb.discountRedemption.findFirstOrThrow({ where: { discountCodeId: fresh.id } }),
+    ).toMatchObject({ email: "acct@example.com" });
+  });
+
+  it("lets the database clock, not the server clock, decide a code has expired", async () => {
+    await createCode({ endsAt: minutesAgo(1) });
+    await cartWith([{ priceCents: 5000, quantity: 1 }]);
+    // The app server's clock runs an hour behind; by it the code would still be open.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(minutesAgo(60));
+    try {
+      expect(await applyDiscountCode({ code: "SUMMER10" })).toMatchObject({
+        error: { code: "discount_refused", reason: "expired" },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe("refunds use the discounted lines (AC-16)", () => {
   async function ledgerOf(orderId: string) {
     const order = await testDb.order.findUniqueOrThrow({
