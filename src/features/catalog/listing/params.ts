@@ -70,7 +70,7 @@ const emptyState: ListingState = {
   options: [],
 };
 
-type RawParams = Readonly<Record<string, string | readonly string[] | undefined>>;
+export type RawParams = Readonly<Record<string, string | readonly string[] | undefined>>;
 
 // AC-18: a repeated scalar param keeps its first value.
 const first = (value: string | readonly string[] | undefined): string | undefined =>
@@ -86,11 +86,30 @@ const pageSchema = z
   .transform((text) => Math.max(1, Math.min(Number(text), Number.MAX_SAFE_INTEGER)))
   .catch(1);
 
+// Only the exact "1" turns a toggle on; anything else is off.
+const flagSchema = z
+  .literal("1")
+  .transform(() => true)
+  .catch(false);
+
+const sortSchema = (kind: ListingKind) =>
+  z
+    .enum(sortKeys)
+    .refine((key) => sortsFor(kind).includes(key))
+    .catch(defaultSort(kind));
+
+// The bounds stay text here: withPrices parses and repairs them like the typed inputs.
+const priceTextSchema = z.string().catch("");
+
 // AC-6: trimmed, then capped at whole characters, never a split surrogate pair.
-export function cleanQuery(text: string | undefined): string {
-  return Array.from((text ?? "").trim())
-    .slice(0, SEARCH_QUERY_MAX)
-    .join("");
+const querySchema = z
+  .string()
+  .transform((text) => Array.from(text.trim()).slice(0, SEARCH_QUERY_MAX).join(""))
+  .catch("");
+
+// The search query as the listing and the search page's own box read it.
+export function searchQuery(params: RawParams): string {
+  return querySchema.parse(first(params.q));
 }
 
 // A decimal comma ("10,50", as shoppers in comma locales type it) reads as a point; parseMoney
@@ -134,16 +153,20 @@ export function parseListingParams(
   kind: ListingKind,
   currency: string,
 ): ListingState {
-  const sort = sortsFor(kind).find((key) => key === first(params.sort)) ?? defaultSort(kind);
-  const prices = withPrices(emptyState, first(params.min) ?? "", first(params.max) ?? "", currency);
+  const prices = withPrices(
+    emptyState,
+    priceTextSchema.parse(first(params.min)),
+    priceTextSchema.parse(first(params.max)),
+    currency,
+  );
   return {
-    q: kind === "search" ? cleanQuery(first(params.q)) : "",
-    sort,
+    q: kind === "search" ? searchQuery(params) : "",
+    sort: sortSchema(kind).parse(first(params.sort)),
     page: pageSchema.parse(first(params.page)),
     minCents: prices.minCents,
     maxCents: prices.maxCents,
-    inStock: first(params.stock) === "1",
-    onSale: first(params.sale) === "1",
+    inStock: flagSchema.parse(first(params.stock)),
+    onSale: flagSchema.parse(first(params.sale)),
     options: optionFilters(params),
   };
 }

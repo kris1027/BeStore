@@ -5,7 +5,7 @@ import { storeContainer } from "@/components/layout/container";
 import { ListingSkeleton } from "@/features/catalog/listing/components/listing-skeleton";
 import { ListingView } from "@/features/catalog/listing/components/listing-view";
 import { SearchForm } from "@/features/catalog/listing/components/search-box";
-import { cleanQuery } from "@/features/catalog/listing/params";
+import { searchQuery } from "@/features/catalog/listing/params";
 import { searchPath } from "@/features/catalog/paths";
 import { cn } from "@/lib/utils";
 
@@ -16,8 +16,7 @@ export const metadata: Metadata = {
 };
 
 async function SearchResults({ searchParams }: Pick<PageProps<"/search">, "searchParams">) {
-  const { q } = await searchParams;
-  const query = cleanQuery(typeof q === "string" ? q : q?.[0]);
+  const query = searchQuery(await searchParams);
   return (
     <div className="flex flex-col gap-10">
       {/* Keyed by the query, so a new search shows its own text in the box. */}
