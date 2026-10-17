@@ -24,12 +24,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { type DateFormat, formatDateTime } from "@/lib/dates";
+import { discountLabel } from "@/lib/discounts/rule";
 import { deliveryLabel } from "@/lib/shipping/rule";
 import { cn } from "@/lib/utils";
 import { orderStatusLabels } from "@/lib/orders/status-labels";
 
 import type { AdminOrderDetail as Detail } from "../admin-queries";
-import { adminOrdersPath } from "../paths";
+import { adminDiscountPath, adminOrdersPath } from "../paths";
 import { EmailsSection } from "./emails-section";
 import { NoteForm } from "./note-form";
 import { OrderActionsPanel } from "./order-actions-panel";
@@ -82,6 +83,27 @@ function eventTitle(event: Event): string {
 function actorLabel(event: Event): string {
   if (event.actorType === "admin") return event.adminName ?? "Admin";
   return event.actorType === "customer" ? "Customer" : "Stripe";
+}
+
+// spec 0014, AC-14: "Discount (SUMMER10, 10%)" from the order's own snapshot, linking to the
+// code while it still exists.
+function DiscountName({ order, locale }: { readonly order: Detail; readonly locale: string }) {
+  if (order.discount === null) return <>Discount</>;
+  const { codeId, code, type, value } = order.discount;
+  const name = `${code}, ${discountLabel({ type, value }, { currency: order.currency, locale })}`;
+  return (
+    <>
+      Discount (
+      {codeId === null ? (
+        name
+      ) : (
+        <Link href={adminDiscountPath(codeId)} className="underline underline-offset-4">
+          {name}
+        </Link>
+      )}
+      )
+    </>
+  );
 }
 
 // spec 0006, AC-13 and spec 0010, AC-21.
@@ -187,7 +209,9 @@ export function AdminOrderDetail({
               </dd>
               {order.discountCents > 0 ? (
                 <>
-                  <dt>Discount</dt>
+                  <dt>
+                    <DiscountName order={order} locale={dateFormat.locale} />
+                  </dt>
                   <dd className="text-right">
                     −<Price cents={order.discountCents} currency={order.currency} />
                   </dd>

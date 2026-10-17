@@ -1,4 +1,4 @@
-import { ReceiptIcon } from "lucide-react";
+import { ReceiptIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 
 import { Price } from "@/components/price";
@@ -36,10 +36,13 @@ import { RefundStateBadge } from "./refund-state-badge";
 export function AdminOrdersList({
   page,
   params,
+  discountCode,
   dateFormat,
 }: {
   readonly page: AdminOrdersPage;
   readonly params: AdminOrdersParams;
+  // spec 0014, AC-14: the code the list is filtered by, for its chip.
+  readonly discountCode: string | null;
   readonly dateFormat: DateFormat;
 }) {
   const { rows, olderBefore } = page;
@@ -58,6 +61,19 @@ export function AdminOrdersList({
         </div>
       </div>
       <OrdersFilters params={params} />
+      {discountCode !== null ? (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Promo code:</span>
+          <Link
+            href={adminOrdersHref({ ...params, discount: null })}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+            aria-label={`Remove the promo code filter ${discountCode}`}
+          >
+            <span className="font-mono">{discountCode}</span>
+            <XIcon data-icon="inline-end" aria-hidden="true" />
+          </Link>
+        </div>
+      ) : null}
       {rows.length === 0 ? (
         <Empty className="border">
           <EmptyHeader>

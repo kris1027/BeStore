@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 
 import { adminMetadata, requireAdmin } from "@/features/admin-auth/require-admin";
-import { getAdminOrders, parseAdminOrdersParams } from "@/features/orders/admin-queries";
+import {
+  getAdminOrders,
+  parseAdminOrdersParams,
+  resolveDiscountFilter,
+} from "@/features/orders/admin-queries";
 import { AdminOrdersList } from "@/features/orders/components/admin-orders-list";
 import { env } from "@/lib/env";
 
@@ -15,12 +19,15 @@ export function generateMetadata(): Promise<Metadata> {
 
 export default async function AdminOrdersPage({ searchParams }: PageProps<"/admin/orders">) {
   await requireAdmin();
-  const params = parseAdminOrdersParams(await searchParams);
+  const { params, discountCode } = await resolveDiscountFilter(
+    parseAdminOrdersParams(await searchParams),
+  );
   const page = await getAdminOrders(params);
   return (
     <AdminOrdersList
       page={page}
       params={params}
+      discountCode={discountCode}
       dateFormat={{ locale: env.STORE_LOCALE, timeZone: env.STORE_TIMEZONE }}
     />
   );

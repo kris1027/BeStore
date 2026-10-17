@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { adminOrdersHref, hasFilters, parseAdminOrdersParams, searchNumber } from "./list-params";
 
-// spec 0010, AC-1 to AC-3: the /admin/orders filters in the URL.
+// spec 0010, AC-1 to AC-3 and spec 0014, AC-14: the /admin/orders filters in the URL.
 
 const defaults = {
   q: "",
@@ -12,6 +12,7 @@ const defaults = {
   from: null,
   to: null,
   before: null,
+  discount: null,
 };
 
 describe("parseAdminOrdersParams", () => {
@@ -29,6 +30,7 @@ describe("parseAdminOrdersParams", () => {
         from: "2026-09-01",
         to: "2026-09-30",
         before: "1050",
+        discount: "0192f1c2-0000-7000-8000-000000000001",
       }),
     ).toEqual({
       q: "ada",
@@ -38,6 +40,7 @@ describe("parseAdminOrdersParams", () => {
       from: "2026-09-01",
       to: "2026-09-30",
       before: 1050,
+      discount: "0192f1c2-0000-7000-8000-000000000001",
     });
   });
 
@@ -55,6 +58,7 @@ describe("parseAdminOrdersParams", () => {
         from: "2026-02-30",
         to: "tomorrow",
         before: "abc",
+        discount: "SUMMER10",
       }),
     ).toEqual(defaults);
   });
@@ -82,6 +86,16 @@ describe("adminOrdersHref", () => {
   it("says when a filter is set", () => {
     expect(hasFilters(parseAdminOrdersParams({}))).toBe(false);
     expect(hasFilters(parseAdminOrdersParams({ refund: "none" }))).toBe(true);
+    expect(
+      hasFilters(parseAdminOrdersParams({ discount: "0192f1c2-0000-7000-8000-000000000001" })),
+    ).toBe(true);
+  });
+
+  it("keeps the promo code filter", () => {
+    const params = parseAdminOrdersParams({ discount: "0192f1c2-0000-7000-8000-000000000001" });
+    expect(adminOrdersHref(params)).toBe(
+      "/admin/orders?discount=0192f1c2-0000-7000-8000-000000000001",
+    );
   });
 });
 

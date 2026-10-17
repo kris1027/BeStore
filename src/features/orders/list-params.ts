@@ -33,6 +33,9 @@ export type AdminOrdersParams = {
   readonly from: string | null;
   readonly to: string | null;
   readonly before: number | null;
+  // spec 0014, AC-14: only orders that used this promo code (its id). The page drops an id that
+  // is not a code.
+  readonly discount: string | null;
 };
 
 const schema = z.object({
@@ -43,6 +46,7 @@ const schema = z.object({
   from: z.string().optional().catch(undefined),
   to: z.string().optional().catch(undefined),
   before: z.coerce.number().int().min(1).max(maxOrderNumber).optional().catch(undefined),
+  discount: z.uuid().optional().catch(undefined),
 });
 
 function day(text: string | undefined): string | null {
@@ -60,6 +64,7 @@ export function parseAdminOrdersParams(
     from: firstValue(params.from),
     to: firstValue(params.to),
     before: firstValue(params.before),
+    discount: firstValue(params.discount),
   });
   const from = day(parsed.from);
   const to = day(parsed.to);
@@ -74,6 +79,7 @@ export function parseAdminOrdersParams(
     from: backwards ? null : from,
     to: backwards ? null : to,
     before: parsed.before ?? null,
+    discount: parsed.discount ?? null,
   };
 }
 
@@ -84,7 +90,8 @@ export function hasFilters(params: AdminOrdersParams): boolean {
     params.attention ||
     params.refund !== null ||
     params.from !== null ||
-    params.to !== null
+    params.to !== null ||
+    params.discount !== null
   );
 }
 
@@ -97,6 +104,7 @@ export function adminOrdersHref(params: AdminOrdersParams, before: number | null
   if (params.refund !== null) query.set("refund", params.refund);
   if (params.from !== null) query.set("from", params.from);
   if (params.to !== null) query.set("to", params.to);
+  if (params.discount !== null) query.set("discount", params.discount);
   if (before !== null) query.set("before", String(before));
   const search = query.toString();
   return search ? `${adminOrdersPath}?${search}` : adminOrdersPath;

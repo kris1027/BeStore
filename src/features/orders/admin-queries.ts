@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import type {
   ActorType,
+  DiscountType,
   OrderEventType,
   OrderStatus,
   RefundStatus,
@@ -121,6 +122,21 @@ export async function getAdminOrders(params: AdminOrdersParams): Promise<AdminOr
   };
 }
 
+// spec 0014, AC-14: the code a `discount` filter names, for its chip. An id that is not a code
+// is dropped from the params, like the list's other bad values.
+export async function resolveDiscountFilter(
+  params: AdminOrdersParams,
+): Promise<{ readonly params: AdminOrdersParams; readonly discountCode: string | null }> {
+  if (params.discount === null) return { params, discountCode: null };
+  const code = await db.discountCode.findUnique({
+    where: { id: params.discount },
+    select: { code: true },
+  });
+  return code === null
+    ? { params: { ...params, discount: null }, discountCode: null }
+    : { params, discountCode: code.code };
+}
+
 export type AdminOrderLine = {
   readonly id: string;
   readonly productName: string;
@@ -179,6 +195,7 @@ function filterWhere(params: AdminOrdersParams): Prisma.OrderWhereInput[] {
   if (params.status === "settled") terms.push({ status: { in: [...settledStatuses] } });
   else if (params.status !== "all") terms.push({ status: params.status });
   if (params.attention) terms.push({ needsAttention: true });
+  if (params.discount !== null) terms.push({ discountCodeId: params.discount });
   if (params.refund === "none") terms.push({ refundedCents: 0 });
   if (params.refund === "full") {
     terms.push({ refundedCents: { gt: 0, gte: db.order.fields.totalCents } });
@@ -219,6 +236,13 @@ export type AdminOrderDetail = {
   readonly currency: string;
   readonly subtotalCents: number;
   readonly discountCents: number;
+  // spec 0014, AC-14: the code's snapshot from Pay; codeId is null once the code was deleted.
+  readonly discount: {
+    readonly codeId: string | null;
+    readonly code: string;
+    readonly type: DiscountType;
+    readonly value: number;
+  } | null;
   readonly shippingCents: number;
   readonly totalCents: number;
   readonly refundedCents: number;
@@ -289,6 +313,10 @@ export async function getAdminOrder(
       currency: true,
       subtotalCents: true,
       discountCents: true,
+      discountCodeId: true,
+      discountCode: true,
+      discountType: true,
+      discountValue: true,
       shippingCents: true,
       totalCents: true,
       refundedCents: true,
@@ -423,6 +451,15 @@ export async function getAdminOrder(
     currency: order.currency,
     subtotalCents: order.subtotalCents,
     discountCents: order.discountCents,
+    discount:
+      order.discountCode === null || order.discountType === null || order.discountValue === null
+        ? null
+        : {
+            codeId: order.discountCodeId,
+            code: order.discountCode,
+            type: order.discountType,
+            value: order.discountValue,
+          },
     shippingCents: order.shippingCents,
     totalCents: order.totalCents,
     refundedCents: order.refundedCents,
