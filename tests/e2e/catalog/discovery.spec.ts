@@ -222,7 +222,9 @@ test.describe("a category with options", () => {
   }) => {
     const { category } = await setup(page, "Nojs");
     const shopper = await (await browser.newContext()).newPage();
-    await shopper.route("**/_next/static/chunks/**", (route) => route.abort());
+    // Scripts only: a production build serves its CSS from chunks/ too, and an unstyled page
+    // lets the fill images cover the panel.
+    await shopper.route(/\/_next\/static\/chunks\/.+\.js(\?|$)/, (route) => route.abort());
 
     await shopper.goto(`/categories/${category.slug}`);
     await shopper
