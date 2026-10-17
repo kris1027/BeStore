@@ -19,6 +19,7 @@ const secret = "c".repeat(32);
 const mocks = vi.hoisted(() => ({
   jar: new Map<string, string>(),
   create: vi.fn(),
+  createCoupon: vi.fn(),
   retrieve: vi.fn(),
   expire: vi.fn(),
   info: vi.fn(),
@@ -44,6 +45,7 @@ vi.mock("@/lib/stripe", () => ({
     checkout: {
       sessions: { create: mocks.create, retrieve: mocks.retrieve, expire: mocks.expire },
     },
+    coupons: { create: mocks.createCoupon },
   },
 }));
 vi.mock("@/lib/logger", () => ({

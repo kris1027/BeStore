@@ -8,6 +8,7 @@ import { ProductImage } from "@/components/product-image";
 import { buttonVariants } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { discountRowLabel } from "@/lib/discounts/rule";
 import { orderStatusLabels } from "@/lib/orders/status-labels";
 
 import { type CompletedOrder, type Completion, getCompletion } from "../queries";
@@ -156,6 +157,14 @@ function PaidOrder({ order }: { readonly order: CompletedOrder }) {
           <span>Subtotal</span>
           <Price cents={order.subtotalCents} currency={order.currency} />
         </div>
+        {order.discountCents > 0 ? (
+          <div className="flex items-center justify-between">
+            <span>{discountRowLabel(order.discountCode)}</span>
+            <span>
+              −<Price cents={order.discountCents} currency={order.currency} />
+            </span>
+          </div>
+        ) : null}
         <DeliveryRow cents={order.shippingCents} currency={order.currency} />
         <Separator />
         <div className="flex items-center justify-between text-lg">

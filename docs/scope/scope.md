@@ -27,7 +27,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 11 | Order emails | Slice 5 | done |
 | 12 | Customer accounts | Slice 6 | done |
 | 13 | Categories, search & filters | Slice 7 | done |
-| 14 | Discounts & promo codes | Slice 8 | planned |
+| 14 | Discounts & promo codes | Slice 8 | done |
 | 15 | Admin sales dashboard | Slice 9 | planned |
 | 16 | Legal pages & cookie consent | Launch | planned |
 | 17 | SEO for storefront pages | Launch | planned |
@@ -264,10 +264,20 @@ spec [0013](../specs/0013-categories-search-filters/index.md) · code in [src/fe
 
 ## Slice 8: Discounts
 
-### 14. Discounts & promo codes · needs a decision · GA
+### 14. Discounts & promo codes · done · GA
 Admin created promo codes (percent or fixed amount, with dates and usage limits), applied at checkout.
 **Done when:** a valid code lowers the total correctly before payment; expired, used up, or invalid codes are rejected with a clear message; the discount is saved on the order and in refunds.
-- [ ] Design it (spec): `/architect discounts & promo codes`
+Spec: [0014](../specs/0014-discounts-promo-codes/index.md) · code in [src/features/discounts/](../../src/features/discounts/), [src/lib/discounts/](../../src/lib/discounts/)
+- [x] Design it (spec): `/architect discounts & promo codes`
+- [x] Build it: `/develop discounts & promo codes`
+  - [x] Thin thread: migration, the pure discount rule and split, code lock, counts and redemption lifecycle, admin create, Apply and Pay with the Stripe coupon, the admin order row, e2e through Stripe test mode (AC-1, AC-2, AC-4 to AC-8, AC-11, AC-14, AC-17, AC-19)
+  - [x] Refusals and prefill: every refusal message on Apply and Pay, focus and live region, coupon failure, logs, returning to checkout with the code (AC-1, AC-3, AC-4, AC-7, AC-9, AC-18)
+  - [x] Admin list, edit, delete and the orders filter: uses, discount given, status, search, edit lock, stale check, delete refusal, nav (AC-10, AC-12 to AC-14, AC-17, AC-18)
+  - [x] Customer views and safety net: code on the complete page, account order page and email, refund check, e2e with axe and keyboard (AC-15, AC-16, AC-20)
+- [x] Verify it: `/check verify discounts & promo codes`
+- [x] Test it: `/test discounts & promo codes`
+- [x] Review it (fresh model): `/check review discounts & promo codes`
+- [x] Document it: `/document discounts & promo codes`
 
 ## Slice 9: Insights
 
@@ -299,6 +309,7 @@ The last step: ship to Vercel and the production Supabase project, and turn on t
 - [ ] Build it: `/develop production deploy`
   - [ ] Admin sign in, from the runbook [docs/runbooks/admin-accounts.md](../runbooks/admin-accounts.md): production Supabase auth settings, Resend SMTP, recovery template, redirect URLs, asymmetric JWT keys, the first real admin (spec 0004 AC-10, AC-11)
   - [ ] Vercel Firewall rate limit on `POST` to `/admin/sign-in`, `/admin/mfa`, `/admin/forgot-password`: 10 per minute per IP, deny 10 minutes (spec 0004 AC-15)
+  - [ ] Vercel Firewall rate limit on `POST /checkout` (promo code Apply and Pay), generous enough for real Pay clicks (spec 0014 Follow-up)
 - [ ] Verify it: `/check verify production deploy`
 
 ## Deferred

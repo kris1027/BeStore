@@ -31,8 +31,8 @@ export type OrderConfirmationProps = {
   readonly paidDate: string;
   readonly lines: readonly OrderConfirmationLine[];
   readonly subtotal: string;
-  // Null when the order has no discount.
-  readonly discount: string | null;
+  // Null when the order has no discount. The label names the code (spec 0014, AC-15).
+  readonly discount: { readonly label: string; readonly amount: string } | null;
   // "Free" when the delivery fee is 0.
   readonly delivery: string;
   readonly total: string;
@@ -92,7 +92,7 @@ export function OrderConfirmationEmail(props: OrderConfirmationProps) {
           <tbody>
             <SummaryRow label="Subtotal" value={props.subtotal} />
             {props.discount === null ? null : (
-              <SummaryRow label="Discount" value={props.discount} />
+              <SummaryRow label={props.discount.label} value={`−${props.discount.amount}`} />
             )}
             <SummaryRow label="Delivery" value={props.delivery} />
             <SummaryRow label="Total" value={props.total} strong />
@@ -144,9 +144,9 @@ OrderConfirmationEmail.PreviewProps = {
     { name: "Canvas tote", variant: null, quantity: 1, unitPrice: "€19.00", lineTotal: "€19.00" },
   ],
   subtotal: "€97.00",
-  discount: null,
+  discount: { label: "Discount (SUMMER10)", amount: "€9.70" },
   delivery: "€9.99",
-  total: "€106.99",
+  total: "€97.29",
   address: {
     fullName: "Anna Kowalska",
     line1: "ul. Długa 12",

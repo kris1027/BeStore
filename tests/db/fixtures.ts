@@ -159,6 +159,13 @@ export async function createAdmin(email = "admin@example.com") {
   return testDb.adminUser.create({ data: { id: crypto.randomUUID(), email, name: "Admin" } });
 }
 
+// A promo code needs the admin who created it (spec 0014, AC-19); one shared admin per test.
+export async function codeAdminId(): Promise<string> {
+  const email = "codes@example.com";
+  const existing = await testDb.adminUser.findUnique({ where: { email }, select: { id: true } });
+  return existing?.id ?? (await createAdmin(email)).id;
+}
+
 // A transaction that runs `first` (takes its locks), waits for release(), then runs `then` and
 // commits. Await `locked` before starting the action that should meet those locks.
 export function holding(first: (tx: Tx) => Promise<unknown>, then: (tx: Tx) => Promise<unknown>) {

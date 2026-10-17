@@ -56,6 +56,7 @@ function confirmation(overrides: Partial<Parameters<typeof confirmationProps>[0]
       paidAt: new Date("2026-10-13T22:30:00Z"),
       subtotalCents: 9700,
       discountCents: 0,
+      discountCode: null,
       shippingCents: 999,
       totalCents: 10699,
       lines,
@@ -105,12 +106,18 @@ describe("the confirmation", () => {
   it("shows Free delivery, the discount, and Hello without a name", async () => {
     const email = await renderEmail({
       kind: "order_confirmation",
-      props: confirmation({ shippingCents: 0, discountCents: 500, customerName: null }),
+      props: confirmation({
+        shippingCents: 0,
+        discountCents: 500,
+        discountCode: "SUMMER10",
+        customerName: null,
+      }),
     });
     expect(email.text).toContain("Hello,");
     expect(email.text).toContain("Free");
-    expect(email.text).toContain("Discount");
-    expect(email.text).toContain("€5.00");
+    // spec 0014, AC-15: the code is named on the discount row.
+    expect(email.text).toContain("Discount (SUMMER10)");
+    expect(email.text).toContain("−€5.00");
   });
 
   it("leaves the address section out when the order has none", async () => {
@@ -131,6 +138,7 @@ describe("the confirmation", () => {
         paidAt: new Date("2026-10-13T10:00:00Z"),
         subtotalCents: 1000,
         discountCents: 0,
+        discountCode: null,
         shippingCents: 0,
         totalCents: 1000,
         lines: [],

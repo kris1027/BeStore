@@ -3,7 +3,14 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LockIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useSyncExternalStore, useTransition } from "react";
+import {
+  type RefObject,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+} from "react";
 import {
   Controller,
   type FieldError as FormFieldError,
@@ -49,11 +56,17 @@ const mergedMessage =
 
 const noSubscription = () => () => {};
 
+export function minimumMessage(minimum: string): string {
+  return `Your total is below the minimum card payment of ${minimum}. Add more to your cart to pay.`;
+}
+
+type DiscountRefused = Extract<StartCheckoutError, { readonly code: "discount_refused" }>;
+
 // spec 0006, Result shapes and copy.
 function formError(error: StartCheckoutError, money: (cents: number) => string): string | null {
   switch (error.code) {
     case "below_minimum":
-      return `Your total is below the minimum card payment of ${money(error.minimumCents)}. Add more to your cart to pay.`;
+      return minimumMessage(money(error.minimumCents));
     case "payment_processing":
       return "A payment for this cart is still processing. We will confirm your order once it completes.";
     case "checkout_in_progress":
@@ -63,6 +76,7 @@ function formError(error: StartCheckoutError, money: (cents: number) => string):
     case "validation":
     case "cart_changed":
     case "already_paid":
+    case "discount_refused":
       return null;
   }
 }
@@ -75,6 +89,9 @@ export function CheckoutForm({
   countryName,
   prefill,
   account = null,
+  discountCode,
+  emailRef,
+  onDiscountRefused,
 }: {
   readonly totalCents: number;
   readonly country: StoreCountry;
@@ -82,6 +99,12 @@ export function CheckoutForm({
   readonly prefill: CheckoutPrefill;
   // The signed in customer: the email is theirs, and saved addresses can fill the form.
   readonly account?: CheckoutAccount | null;
+  // spec 0014, AC-4: the applied promo code Pay sends, or null.
+  readonly discountCode: string | null;
+  // Lets the promo code field read the email as typed, for its per customer check.
+  readonly emailRef: RefObject<() => string>;
+  // Pay refused the code: the field shows why and the summary drops it.
+  readonly onDiscountRefused: (error: DiscountRefused) => void;
 }) {
   const router = useRouter();
   const format = useStoreFormat();
@@ -108,6 +131,10 @@ export function CheckoutForm({
   });
   const { errors } = form.formState;
 
+  useEffect(() => {
+    emailRef.current = () => form.getValues("email");
+  }, [emailRef, form]);
+
   // Back from Stripe can restore this page from the back/forward cache with the button still
   // saying it is redirecting; a restored page starts over.
   useEffect(() => {
@@ -121,7 +148,10 @@ export function CheckoutForm({
   const onSubmit = form.handleSubmit((values) => {
     setNotice(null);
     startTransition(async () => {
-      const result = await startCheckout(values);
+      const result = await startCheckout({
+        ...values,
+        ...(discountCode === null ? {} : { discountCode }),
+      });
       if (result.ok) {
         setRedirecting(true);
         window.location.assign(result.data.url);
@@ -143,6 +173,8 @@ export function CheckoutForm({
         router.refresh();
       } else if (error.code === "cart_changed") {
         router.push("/cart");
+      } else if (error.code === "discount_refused") {
+        onDiscountRefused(error);
       } else if (error.code === "already_paid") {
         setRedirecting(true);
         window.location.assign(error.confirmationUrl);

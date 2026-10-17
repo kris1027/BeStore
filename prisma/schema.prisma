@@ -280,9 +280,11 @@ model AdminUser {
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  orderEvents    OrderEvent[]
-  refunds        Refund[]
-  stockMovements StockMovement[]
+  orderEvents          OrderEvent[]
+  refunds              Refund[]
+  stockMovements       StockMovement[]
+  discountCodesCreated DiscountCode[] @relation("DiscountCodeCreatedBy")
+  discountCodesUpdated DiscountCode[] @relation("DiscountCodeUpdatedBy")
 
   @@map("admin_users")
 }
@@ -526,7 +528,8 @@ model RefundLine {
   @@map("refund_lines")
 }
 
-// Codes are uppercased by Zod before any write; a CHECK in the migration enforces it.
+// Codes are uppercased by Zod before any write; CHECKs in the migration SQL enforce the case and
+// the format (spec 0014, AC-19). Code, type and value never change once a redemption exists.
 model DiscountCode {
   id               String       @id @default(uuid(7)) @db.Uuid
   code             String       @unique
@@ -539,11 +542,20 @@ model DiscountCode {
   perCustomerLimit Int?         @map("per_customer_limit")
   minSubtotalCents Int?         @map("min_subtotal_cents")
   active           Boolean      @default(true)
+  // Admin only, at most 500 characters (a CHECK); never shown to customers or logged.
+  note             String?
+  createdByAdminId String       @map("created_by_admin_id") @db.Uuid
+  updatedByAdminId String?      @map("updated_by_admin_id") @db.Uuid
   createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
+  createdBy   AdminUser            @relation("DiscountCodeCreatedBy", fields: [createdByAdminId], references: [id], onDelete: Restrict)
+  updatedBy   AdminUser?           @relation("DiscountCodeUpdatedBy", fields: [updatedByAdminId], references: [id], onDelete: Restrict)
   orders      Order[]
   redemptions DiscountRedemption[]
+
+  @@index([createdByAdminId])
+  @@index([updatedByAdminId])
 
   @@map("discount_codes")
 }

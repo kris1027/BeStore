@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDate, formatDateTime, parseCalendarDay, zonedDayStart } from "./dates";
+import {
+  formatDate,
+  formatDateTime,
+  parseCalendarDay,
+  utcToZonedInput,
+  zonedDateTimeToUtc,
+  zonedDayStart,
+} from "./dates";
 
 describe("formatDate", () => {
   // 23:30 UTC on 31 March is already 1 April in Warsaw (UTC+2 in summer time).
@@ -59,6 +66,41 @@ describe("zonedDayStart", () => {
     );
     expect(zonedDayStart({ y: 2026, m: 10, d: 26 }, "UTC").toISOString()).toBe(
       "2026-10-26T00:00:00.000Z",
+    );
+  });
+});
+
+// spec 0014, AC-11: the promo code dates, typed in the store's time zone.
+describe("zonedDateTimeToUtc and utcToZonedInput", () => {
+  it("reads wall clock time in the zone, on both sides of a clock change", () => {
+    expect(zonedDateTimeToUtc("2026-07-01T09:30", "Europe/Warsaw")?.toISOString()).toBe(
+      "2026-07-01T07:30:00.000Z",
+    );
+    expect(zonedDateTimeToUtc("2026-12-01T09:30", "Europe/Warsaw")?.toISOString()).toBe(
+      "2026-12-01T08:30:00.000Z",
+    );
+    // Just after the spring change (02:00 becomes 03:00 on 29 March 2026).
+    expect(zonedDateTimeToUtc("2026-03-29T03:30", "Europe/Warsaw")?.toISOString()).toBe(
+      "2026-03-29T01:30:00.000Z",
+    );
+  });
+
+  it("refuses anything that is not a real moment", () => {
+    for (const text of ["", "2026-02-30T10:00", "2026-01-01T24:00", "2026-01-01 10:00", "soon"]) {
+      expect(zonedDateTimeToUtc(text, "Europe/Warsaw")).toBeNull();
+    }
+  });
+
+  it("turns an instant back into the field's value, to the minute", () => {
+    expect(utcToZonedInput(new Date("2026-07-01T07:30:59Z"), "Europe/Warsaw")).toBe(
+      "2026-07-01T09:30",
+    );
+    expect(utcToZonedInput(new Date("2026-12-31T23:30:00Z"), "Europe/Warsaw")).toBe(
+      "2027-01-01T00:30",
+    );
+    const text = "2026-10-25T12:05";
+    expect(utcToZonedInput(zonedDateTimeToUtc(text, "America/New_York")!, "America/New_York")).toBe(
+      text,
     );
   });
 });

@@ -4,6 +4,7 @@ import {
   PackageIcon,
   ReceiptIcon,
   SettingsIcon,
+  TicketPercentIcon,
 } from "lucide-react";
 
 import type { NavItem } from "./nav";
@@ -17,5 +18,6 @@ export const adminNavItems: readonly AdminNavItem[] = [
   { href: "/admin/products", label: "Products", icon: PackageIcon },
   { href: "/admin/categories", label: "Categories", icon: FolderTreeIcon },
   { href: "/admin/orders", label: "Orders", icon: ReceiptIcon },
+  { href: "/admin/discounts", label: "Discounts", icon: TicketPercentIcon },
   { href: "/admin/settings", label: "Settings", icon: SettingsIcon },
 ];

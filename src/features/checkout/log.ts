@@ -1,5 +1,7 @@
 import { logger } from "@/lib/logger";
 
+import type { DiscountRefusal } from "@/lib/discounts/rule";
+
 import type { StartCheckoutError } from "./actions/start-checkout";
 
 // spec 0006, Observability and AC-17: order ids, numbers and amounts, never the email. spec
@@ -10,8 +12,37 @@ export function logCheckoutStarted(fields: {
   readonly number: number;
   readonly totalCents: number;
   readonly shippingCents: number;
+  // spec 0014, AC-18.
+  readonly discountCents: number;
+  readonly discountCodeId: string | null;
 }) {
   logger.info({ event: "checkout.started", ...fields }, "checkout.started");
+}
+
+// spec 0014, AC-18: the reason and, when the code exists, its id. Never the email, and never the
+// text typed for a code that does not exist.
+export function logDiscountRefused(fields: {
+  readonly stage: "apply" | "pay";
+  readonly reason: DiscountRefusal;
+  readonly discountCodeId: string | null;
+}) {
+  logger.info({ event: "checkout.discount_refused", ...fields }, "checkout.discount_refused");
+}
+
+// spec 0014, AC-7: Stripe answered amount_too_small for an order with a code. The AC-2 cap keeps
+// a discounted total at the minimum, so this is a bug.
+export function logDiscountBelowMinimum(orderId: string) {
+  logger.error(
+    { event: "checkout.discount_below_minimum", orderId },
+    "checkout.discount_below_minimum",
+  );
+}
+
+export function logCouponFailed(orderId: string, error: unknown) {
+  logger.error(
+    { event: "checkout.coupon_failed", orderId, stripeCode: stripeErrorCode(error) ?? null },
+    "checkout.coupon_failed",
+  );
 }
 
 // Only the code, and for a validation refusal the names of the fields: the messages, the values

@@ -54,12 +54,36 @@ export async function checkoutPrefill(cartId: string): Promise<CheckoutPrefill |
   };
 }
 
+// spec 0014, AC-9: how long a code from an earlier Pay comes back to /checkout.
+const PREFILL_CODE_HOURS = 24;
+
+// spec 0014, AC-9: the code of this cart's latest order, when that order is still pending or
+// expired and was made in the last 24 hours, with that order's email (the page uses the account
+// email instead when signed in). The page shows it through previewDiscount.
+export async function prefillDiscountCode(
+  cartId: string,
+  nowMs: number = Date.now(),
+): Promise<{ readonly code: string; readonly email: string | null } | null> {
+  const order = await db.order.findFirst({
+    where: { cartId },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { status: true, createdAt: true, discountCode: true, email: true },
+  });
+  if (order === null || order.discountCode === null) return null;
+  if (order.status !== "pending_payment" && order.status !== "expired") return null;
+  if (order.createdAt.getTime() <= nowMs - PREFILL_CODE_HOURS * 60 * 60 * 1000) return null;
+  return { code: order.discountCode, email: order.email };
+}
+
 export type CompletedOrder = {
   readonly number: number;
   readonly status: "paid" | "shipped" | "delivered" | "cancelled";
   readonly maskedEmail: string;
   readonly currency: string;
   readonly subtotalCents: number;
+  // spec 0014, AC-15: the discount and the code's snapshot text.
+  readonly discountCents: number;
+  readonly discountCode: string | null;
   readonly shippingCents: number;
   readonly totalCents: number;
   // null for an order made before spec 0007: the page then hides the block (AC-13).
@@ -95,6 +119,8 @@ export async function getCompletion(sessionIdParam: unknown): Promise<Completion
       email: true,
       currency: true,
       subtotalCents: true,
+      discountCents: true,
+      discountCode: true,
       shippingCents: true,
       totalCents: true,
       ...deliveryAddressColumns,

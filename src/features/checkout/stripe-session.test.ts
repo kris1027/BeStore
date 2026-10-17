@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { checkoutSessionParams, type SessionOrder } from "./stripe-session";
 
-// spec 0006, AC-1 and API surface; spec 0007, AC-6.
+// spec 0006, AC-1 and API surface; spec 0007, AC-6; spec 0014, AC-7.
 
 const order: SessionOrder = {
   orderId: "0192f1c2-0000-7000-8000-000000000001",
@@ -35,6 +35,7 @@ const order: SessionOrder = {
     countryCode: "PL",
     phone: "+48 600 100 200",
   },
+  couponId: null,
 };
 
 const nowMs = Date.UTC(2026, 8, 27, 12, 0, 0);
@@ -143,5 +144,18 @@ describe("checkoutSessionParams", () => {
 
     expect(pln.line_items?.map((item) => item.price_data?.currency)).toEqual(["pln", "pln"]);
     expect(pln.shipping_options?.[0]?.shipping_rate_data?.fixed_amount?.currency).toBe("pln");
+  });
+
+  it("sends no discounts without a code, and the order's coupon with one", () => {
+    expect(params).not.toHaveProperty("discounts");
+
+    const discounted = checkoutSessionParams(
+      { ...order, couponId: "order_0192f1c2-0000-7000-8000-000000000001" },
+      { siteUrl: "", nowMs },
+    );
+    expect(discounted.discounts).toEqual([
+      { coupon: "order_0192f1c2-0000-7000-8000-000000000001" },
+    ]);
+    expect(discounted.line_items).toEqual(params.line_items);
   });
 });

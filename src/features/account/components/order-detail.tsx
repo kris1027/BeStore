@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requireCustomer } from "@/lib/customer/session";
 import { formatDate } from "@/lib/dates";
+import { discountRowLabel } from "@/lib/discounts/rule";
 import { env } from "@/lib/env";
 import { orderStatusLabels } from "@/lib/orders/status-labels";
 
@@ -106,7 +107,7 @@ export async function OrderDetail({ params }: { readonly params: Promise<{ numbe
           </div>
           {order.discountCents > 0 ? (
             <div className="flex items-center justify-between">
-              <span>Discount</span>
+              <span>{discountRowLabel(order.discountCode)}</span>
               <span>
                 −<Price cents={order.discountCents} currency={order.currency} />
               </span>

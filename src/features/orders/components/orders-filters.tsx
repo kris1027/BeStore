@@ -139,6 +139,10 @@ export function OrdersFilters({ params }: { readonly params: AdminOrdersParams }
           Needs attention only
         </Label>
       </div>
+      {/* spec 0014, AC-14: a search keeps the promo code filter; its chip removes it. */}
+      {params.discount !== null ? (
+        <input type="hidden" name="discount" value={params.discount} />
+      ) : null}
       <Button type="submit" variant="outline">
         <SearchIcon data-icon="inline-start" aria-hidden="true" />
         Find orders

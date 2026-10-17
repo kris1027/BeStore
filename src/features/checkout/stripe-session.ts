@@ -21,6 +21,8 @@ export type SessionOrder = {
   }[];
   readonly shippingCents: number;
   readonly shipping: ShipTo;
+  // spec 0014, AC-7: the one off coupon holding the order's exact discount, or null for none.
+  readonly couponId: string | null;
 };
 
 // Stripe's shortest allowed lifetime is 30 minutes from when it receives the request, so the
@@ -50,6 +52,8 @@ export function checkoutSessionParams(
         },
       },
     })),
+    // The coupon carries our amount; Stripe never computes the discount itself.
+    ...(order.couponId === null ? {} : { discounts: [{ coupon: order.couponId }] }),
     customer_email: order.email,
     client_reference_id: order.orderId,
     metadata,
