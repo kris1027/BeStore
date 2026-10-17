@@ -55,20 +55,21 @@ export function SearchForm({
 }
 
 // The header box never prefills: that would need the search params in the layout (spec 0013,
-// Decision). Below lg it sits behind a Search button; before hydration that button is a plain
-// link to /search, which has its own box.
+// Decision). It shows from md, where the desktop nav does (AC-6: always visible on desktop);
+// below that it sits behind a Search button, which before hydration is a plain link to /search,
+// which has its own box.
 export function HeaderSearch() {
   const hydrated = useHydrated();
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <SearchForm id="header-search" label="Store search" className="hidden w-64 lg:flex" />
+      <SearchForm id="header-search" label="Store search" className="hidden w-48 md:flex lg:w-64" />
       {hydrated ? (
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger
             aria-label="Search"
-            render={<Button variant="ghost" size="icon" className="size-11 lg:hidden" />}
+            render={<Button variant="ghost" size="icon" className="size-11 md:hidden" />}
           >
             <SearchIcon className="size-5" aria-hidden="true" />
           </SheetTrigger>
@@ -83,7 +84,7 @@ export function HeaderSearch() {
         <Link
           href={searchPath}
           aria-label="Search"
-          className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "size-11 lg:hidden")}
+          className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "size-11 md:hidden")}
         >
           <SearchIcon className="size-5" aria-hidden="true" />
         </Link>
