@@ -285,6 +285,54 @@ test.describe("a category with options", () => {
     await expect(page.getByRole("link", { name: category.name })).toHaveCount(0);
   });
 
+  // verify.md, Value sourcing: the category's own fields, titles, canonicals and the count.
+  test("the page reads the category's fields, titles and canonical from their sources", async ({
+    page,
+    browser,
+    isMobile,
+  }) => {
+    const { category } = await setup(page, "Source");
+    const shopper = await (await browser.newContext()).newPage();
+
+    // No meta_title: the title is the name; any page or filter keeps the plain canonical.
+    await shopper.goto(`/categories/${category.slug}?page=2&color=red`);
+    await expect(shopper).toHaveTitle(`${category.name} · BeStore`);
+    await expect(shopper.locator('link[rel="canonical"]')).toHaveAttribute(
+      "href",
+      new RegExp(`/categories/${category.slug}$`),
+    );
+
+    // A meta_title wins; the rename and new description show on the next request.
+    await withDb((db) =>
+      db.query("UPDATE categories SET meta_title = $2 WHERE id = $1", [category.id, "Cool shelf"]),
+    );
+    const renamed = `${category.name} renamed`;
+    await page.goto(`/admin/categories/${category.id}`);
+    await expect(page.getByRole("button", { name: "Save category" })).toBeEnabled();
+    await page.getByLabel("Name", { exact: true }).fill(renamed);
+    await page.getByLabel("Description").fill("Fresh copy.");
+    await page.getByRole("button", { name: "Save category" }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(renamed);
+
+    await shopper.goto(`/categories/${category.slug}`);
+    await expect(shopper.getByRole("heading", { level: 1 })).toHaveText(renamed);
+    await expect(shopper.getByText("Fresh copy.")).toBeVisible();
+    await expect(shopper).toHaveTitle("Cool shelf · BeStore");
+
+    await shopper.goto("/");
+    await expect(shopper).toHaveTitle("BeStore");
+    await shopper.goto("/search?q=shelf");
+    await expect(shopper).toHaveTitle("Search · BeStore");
+
+    // Two values, a Min and In stock: four active filters.
+    await shopper.goto(`/categories/${category.slug}?color=red&color=blue&min=10&stock=1`);
+    const filters = isMobile
+      ? shopper.getByRole("button", { name: /^Filters/ })
+      : shopper.getByRole("list", { name: "Active filters" }).getByRole("listitem");
+    if (isMobile) await expect(filters).toContainText("(4)");
+    else await expect(filters).toHaveCount(4);
+  });
+
   test("home, category and search pass axe with the filters open", async ({ page, isMobile }) => {
     const { category, cheap } = await setup(page, "Axe");
     const openFilters = async () => {
