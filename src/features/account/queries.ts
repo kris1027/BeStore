@@ -91,6 +91,8 @@ export type AccountOrder = {
   readonly currency: string;
   readonly subtotalCents: number;
   readonly discountCents: number;
+  // spec 0014, AC-15: the code's snapshot text, or null.
+  readonly discountCode: string | null;
   readonly shippingCents: number;
   readonly totalCents: number;
   readonly refundedCents: number;
@@ -123,6 +125,7 @@ export async function getAccountOrder(
       currency: true,
       subtotalCents: true,
       discountCents: true,
+      discountCode: true,
       shippingCents: true,
       totalCents: true,
       refundedCents: true,

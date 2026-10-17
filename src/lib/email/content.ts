@@ -50,6 +50,7 @@ export async function loadEmailContent(row: ContentRow): Promise<EmailContent> {
           paidAt: true,
           subtotalCents: true,
           discountCents: true,
+          discountCode: true,
           shippingCents: true,
           totalCents: true,
           ...deliveryAddressColumns,

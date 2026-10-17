@@ -3,6 +3,7 @@ import type { OrderConfirmationProps } from "../../../emails/order-confirmation"
 import type { OrderRefundedProps } from "../../../emails/order-refunded";
 import type { OrderShippedProps } from "../../../emails/order-shipped";
 import { formatDate } from "@/lib/dates";
+import { discountRowLabel } from "@/lib/discounts/rule";
 import { formatMoney } from "@/lib/money";
 import type { DeliveryAddress } from "@/lib/shipping/address";
 
@@ -60,6 +61,8 @@ export type ConfirmationSource = OrderBasics & {
   readonly paidAt: Date;
   readonly subtotalCents: number;
   readonly discountCents: number;
+  // The code's snapshot text, or null for an order without one.
+  readonly discountCode: string | null;
   readonly shippingCents: number;
   readonly totalCents: number;
   readonly lines: readonly (SourceItem & {
@@ -84,7 +87,13 @@ export function confirmationProps(
       lineTotal: money(line.lineTotalCents),
     })),
     subtotal: money(order.subtotalCents),
-    discount: order.discountCents > 0 ? money(order.discountCents) : null,
+    discount:
+      order.discountCents > 0
+        ? {
+            label: discountRowLabel(order.discountCode),
+            amount: money(order.discountCents),
+          }
+        : null,
     delivery: order.shippingCents === 0 ? "Free" : money(order.shippingCents),
     total: money(order.totalCents),
     address: order.address,
