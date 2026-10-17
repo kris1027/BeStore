@@ -9,20 +9,33 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Hooks are for local commits only.
+  SKIP_INSTALL_SIMPLE_GIT_HOOKS: "1"
+  # spec 0011, AC-16: nothing in CI sends a real email. Unit and db tests log them; the e2e app
+  # hands them to the stack's Mailpit (spec 0012, AC-23, set in playwright.config.ts).
+  EMAIL_TRANSPORT: log
+  MAILPIT_URL: http://127.0.0.1:55324
+
 jobs:
-  check:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm typecheck
+      - run: pnpm test
+
+  db:
     runs-on: ubuntu-latest
     env:
-      # Hooks are for local commits only.
-      SKIP_INSTALL_SIMPLE_GIT_HOOKS: "1"
-      # spec 0011, AC-16: nothing in CI sends a real email. Unit and db tests log them; the e2e app
-      # hands them to the stack's Mailpit (spec 0012, AC-23, set in playwright.config.ts).
-      EMAIL_TRANSPORT: log
-      MAILPIT_URL: http://127.0.0.1:55324
-      # spec 0012, AC-8: the Send Email Hook. `supabase start` reads both through env() in
-      # supabase/config.toml, and the app checks the signature with the secret. A CI only value.
-      SEND_EMAIL_HOOK_SECRET: v1,whsec_Y2ktb25seS1zZW5kLWVtYWlsLWhvb2stc2VjcmV0LTAx
-      SEND_EMAIL_HOOK_URI: http://host.docker.internal:3000/api/auth/send-email
       # Only the db suites use a database. DIRECT_URL stays unset on purpose: the test:db
       # guard refuses a TEST_DATABASE_URL that matches it, and the runner migrates the test DB itself.
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bestore_test
@@ -48,11 +61,30 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm format:check
-      - run: pnpm typecheck
-      - run: pnpm test
       - run: pnpm test:db
+
+  # Playwright shards balance the suite across jobs; each job boots its own Supabase stack and
+  # production build. The local stack's keys are fixed defaults, so every shard bakes in the same ones.
+  e2e:
+    runs-on: ubuntu-latest
+    strategy:
+      # One failing shard must not cancel the rest: the PR should show every failure at once.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      # spec 0012, AC-8: the Send Email Hook. `supabase start` reads both through env() in
+      # supabase/config.toml, and the app checks the signature with the secret. A CI only value.
+      SEND_EMAIL_HOOK_SECRET: v1,whsec_Y2ktb25seS1zZW5kLWVtYWlsLWhvb2stc2VjcmV0LTAx
+      SEND_EMAIL_HOOK_URI: http://host.docker.internal:3000/api/auth/send-email
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       # Admin sign in e2e runs against a real local Supabase stack (spec 0004), never a mock.
       # Services the app does not use stay off; Mailpit stays on for the password reset and
@@ -90,13 +122,26 @@ jobs:
             echo "EMAIL_FROM=BeStore <orders@example.com>"
           } >> "$GITHUB_ENV"
       - run: pnpm exec prisma migrate deploy
-      - run: pnpm test:stack
+      # The stack suites take seconds, so they ride on one shard instead of booting their own stack.
+      - if: matrix.shard == 1
+        run: pnpm test:stack
       # Accessibility, keyboard and admin sign in tests against a production build. VERCEL_ENV
       # stays unset, so /style-guide is served.
-      - run: pnpm test:e2e
+      - run: pnpm test:e2e --shard=${{ matrix.shard }}/${{ strategy.job-total }}
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: playwright-traces
+          name: playwright-traces-${{ matrix.shard }}
           path: test-results/
           retention-days: 7
+
+  # The `Protect main` ruleset requires a check named `check`. This gate keeps that one name
+  # stable however the jobs above are split, so the ruleset never needs editing.
+  check:
+    if: always()
+    needs: [static, db, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
+        run: exit 1
+      - run: echo "All CI jobs passed"
