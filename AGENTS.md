@@ -69,7 +69,7 @@ Stored in `docs/specs/`. Format: `docs/specs/NNNN-title/index.md`. Scope lives i
 Installed:
 - ESLint (Next.js config, `@typescript-eslint/no-explicit-any: error`) + Prettier with `prettier-plugin-tailwindcss`; scripts `format`, `format:check`, `test`, `test:e2e`. Prettier skips `*.md` on purpose (skills and `next dev` own those files).
 - Pre commit (simple-git-hooks + lint-staged): lint and format staged files, then `pnpm typecheck`. `SKIP_SIMPLE_GIT_HOOKS=1` bypasses it in an emergency.
-- CI: [.github/workflows/ci.yml](.github/workflows/ci.yml), on pushes to `main` and on every PR: install, lint, format check, typecheck, Vitest (Playwright once flows exist).
+- CI: [.github/workflows/ci.yml](.github/workflows/ci.yml), on pushes to `main` and on every PR, as parallel jobs: `static` (lint, format check, typecheck, unit), `db` (`test:db`), `e2e` (4 Playwright shards, each with its own Supabase stack and build; shard 1 also runs `test:stack`), and a `check` gate that needs them all (the ruleset's required check, so it keeps that name).
 
 ## Git
 
