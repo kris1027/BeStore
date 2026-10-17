@@ -10,7 +10,7 @@ import { type CustomerIdentity, mergeCartForCustomer } from "@/lib/customer/setu
 import { db, type Tx } from "@/lib/db";
 import { uniqueViolation } from "@/lib/db-errors";
 import { countRedemptions, lockCode, redeem } from "@/lib/discounts/codes";
-import { type DiscountRefusal, evaluateDiscount } from "@/lib/discounts/rule";
+import { type DiscountRefused, evaluateDiscount, refusedDiscount } from "@/lib/discounts/rule";
 import { parseCodeText } from "@/lib/discounts/schema";
 import { env } from "@/lib/env";
 import { logOrderExpired } from "@/lib/orders/log";
@@ -51,11 +51,7 @@ export type StartCheckoutError =
   | { readonly code: "checkout_in_progress" }
   | { readonly code: "payment_unavailable" }
   // spec 0014, AC-4: the code stopped applying since Apply (or never did); no order was made.
-  | {
-      readonly code: "discount_refused";
-      readonly reason: DiscountRefusal;
-      readonly minimumGapCents?: number;
-    };
+  | ({ readonly code: "discount_refused" } & DiscountRefused);
 
 type Result<T> = ActionResult<T, StartCheckoutError>;
 
@@ -335,13 +331,7 @@ async function applyLockedCode(
       reason: evaluation.reason,
       discountCodeId: code?.id ?? null,
     });
-    return fail({
-      code: "discount_refused",
-      reason: evaluation.reason,
-      ...(evaluation.minimumGapCents === undefined
-        ? {}
-        : { minimumGapCents: evaluation.minimumGapCents }),
-    });
+    return fail({ code: "discount_refused", ...refusedDiscount(evaluation) });
   }
   // A refusal above covers a missing code; reaching here means the row exists.
   if (code === null) throw new Error("A discount applied without a code row");

@@ -105,14 +105,22 @@ export function refusal(
   return null;
 }
 
+// A refusal as Apply, the prefill and Pay answer it.
+export type DiscountRefused = {
+  readonly reason: DiscountRefusal;
+  // Only for below_minimum_subtotal: how much more the items must come to.
+  readonly minimumGapCents?: number;
+};
+
+// The refusal alone, to spread into an error or a preview: no other keys, and no
+// minimumGapCents key when there is no gap.
+export function refusedDiscount({ reason, minimumGapCents }: DiscountRefused): DiscountRefused {
+  return minimumGapCents === undefined ? { reason } : { reason, minimumGapCents };
+}
+
 export type DiscountEvaluation =
   | { readonly ok: true; readonly discountCents: number }
-  | {
-      readonly ok: false;
-      readonly reason: DiscountRefusal;
-      // Only for below_minimum_subtotal: how much more the items must come to.
-      readonly minimumGapCents?: number;
-    };
+  | ({ readonly ok: false } & DiscountRefused);
 
 // AC-2 and AC-3 together, the one call Apply, the prefill and Pay make.
 export function evaluateDiscount(input: {
@@ -202,10 +210,7 @@ export function discountLabel(terms: DiscountTerms, format: MoneyFormat): string
 }
 
 // AC-3: the exact words the customer sees.
-export function refusalMessage(
-  refused: { readonly reason: DiscountRefusal; readonly minimumGapCents?: number },
-  format: MoneyFormat,
-): string {
+export function refusalMessage(refused: DiscountRefused, format: MoneyFormat): string {
   switch (refused.reason) {
     case "invalid":
       return "This code isn't valid.";

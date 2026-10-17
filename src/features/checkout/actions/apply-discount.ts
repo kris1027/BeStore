@@ -6,7 +6,7 @@ import { readOwnedCartId } from "@/lib/cart/owned";
 import { getCustomer } from "@/lib/customer/session";
 import { db } from "@/lib/db";
 import { previewDiscount } from "@/lib/discounts/codes";
-import type { DiscountRefusal } from "@/lib/discounts/rule";
+import { type DiscountRefused, refusedDiscount } from "@/lib/discounts/rule";
 import type { ActionResult } from "@/lib/result";
 
 import { logDiscountRefused } from "../log";
@@ -21,11 +21,7 @@ export type AppliedDiscount = {
 
 export type ApplyDiscountError =
   | { readonly code: "below_minimum"; readonly minimumCents: number }
-  | {
-      readonly code: "discount_refused";
-      readonly reason: DiscountRefusal;
-      readonly minimumGapCents?: number;
-    }
+  | ({ readonly code: "discount_refused" } & DiscountRefused)
   // `merged`: a guest cart still waits to join the account cart, so Pay would reload the form.
   | { readonly code: "cart_changed"; readonly merged?: true };
 
@@ -67,13 +63,7 @@ export async function applyDiscountCode(
       });
       return {
         ok: false,
-        error: {
-          code: "discount_refused",
-          reason: preview.reason,
-          ...(preview.minimumGapCents === undefined
-            ? {}
-            : { minimumGapCents: preview.minimumGapCents }),
-        },
+        error: { code: "discount_refused", ...refusedDiscount(preview) },
       };
     case "applied":
       return {

@@ -12,6 +12,7 @@ import {
   refusal,
   type RefusalFacts,
   refusalMessage,
+  refusedDiscount,
   splitDiscount,
 } from "./rule";
 
@@ -218,6 +219,25 @@ describe("evaluateDiscount", () => {
     expect(
       evaluateDiscount({ ...base, subtotalCents: 50, code: code({ type: "fixed_amount" }) }),
     ).toEqual({ ok: false, reason: "too_small" });
+  });
+});
+
+describe("refusedDiscount", () => {
+  it("keeps the reason and the gap, and drops everything else", () => {
+    const evaluation = {
+      ok: false,
+      reason: "below_minimum_subtotal",
+      minimumGapCents: 1250,
+    } as const;
+    expect(refusedDiscount(evaluation)).toStrictEqual({
+      reason: "below_minimum_subtotal",
+      minimumGapCents: 1250,
+    });
+  });
+
+  it("leaves out the gap key when there is none", () => {
+    const evaluation = { ok: false, reason: "expired" } as const;
+    expect(refusedDiscount(evaluation)).toStrictEqual({ reason: "expired" });
   });
 });
 

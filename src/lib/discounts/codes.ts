@@ -11,9 +11,10 @@ import { readShippingSettings } from "@/lib/shipping/settings";
 
 import {
   type DiscountCodeRules,
-  type DiscountRefusal,
+  type DiscountRefused,
   type DiscountType,
   evaluateDiscount,
+  refusedDiscount,
 } from "./rule";
 import { normalizeEmail, parseCodeText } from "./schema";
 
@@ -149,14 +150,12 @@ export type DiscountPreview =
       readonly shippingCents: number;
       readonly totalCents: number;
     }
-  | {
+  | ({
       readonly kind: "refused";
       // Null when no such code exists: its typed text is never logged (AC-18).
       readonly codeId: string | null;
       readonly code: string | null;
-      readonly reason: DiscountRefusal;
-      readonly minimumGapCents?: number;
-    };
+    } & DiscountRefused);
 
 // AC-1, AC-3 and AC-9: what the summary shows for a code, read live (no lock; Pay rechecks under
 // one). One function for Apply and the prefill, so the page and the button never disagree.
@@ -200,10 +199,7 @@ export async function previewDiscount(input: {
       kind: "refused",
       codeId: code.id,
       code: code.code,
-      reason: evaluation.reason,
-      ...(evaluation.minimumGapCents === undefined
-        ? {}
-        : { minimumGapCents: evaluation.minimumGapCents }),
+      ...refusedDiscount(evaluation),
     };
   }
   const charges = orderCharges(
