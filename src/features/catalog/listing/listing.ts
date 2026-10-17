@@ -1,6 +1,6 @@
 import { matchesWords, searchWords } from "@/lib/search-text";
 
-import { isOnSale, summarizeVariants } from "../product-summary";
+import { isSaleVariant, summarizeCard } from "../product-summary";
 import type { ProductCard, ProductImage } from "../queries";
 import {
   activeFilterCount,
@@ -167,7 +167,7 @@ function variantMatches(
   if (filters.minCents !== null && variant.priceCents < filters.minCents) return false;
   if (filters.maxCents !== null && variant.priceCents > filters.maxCents) return false;
   if (filters.inStock && !variant.inStock) return false;
-  if (filters.onSale && !(variant.inStock && variant.compareAtPriceCents !== null)) return false;
+  if (filters.onSale && !isSaleVariant(variant)) return false;
   return filters.options.every((group) => {
     const has = values.get(group.key);
     return has !== undefined && group.values.some((value) => has.has(value));
@@ -240,22 +240,12 @@ function facetDrafts(
 }
 
 function toCard(product: ListingProduct): ProductCard {
-  // The card rules read stock counts; an in stock variant stands in as 1, sold out as 0.
-  const facts = product.variants.map((variant) => ({
-    priceCents: variant.priceCents,
-    compareAtPriceCents: variant.compareAtPriceCents,
-    stockQuantity: variant.inStock ? 1 : 0,
-  }));
-  const summary = summarizeVariants(facts);
   return {
     id: product.id,
     name: product.name,
     slug: product.slug,
     image: product.image,
-    minPriceCents: summary.minPriceCents,
-    maxPriceCents: summary.maxPriceCents,
-    soldOut: summary.soldOut,
-    onSale: isOnSale(facts),
+    ...summarizeCard(product.variants),
   };
 }
 
