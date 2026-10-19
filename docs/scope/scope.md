@@ -300,12 +300,12 @@ Spec: [0015](../specs/0015-admin-sales-dashboard/index.md) · code in [src/featu
 ### 23. Native controls in GET forms · in-progress
 Every filter, period picker and search box uses native controls (`NativeSelect`, native checkbox and radio) and a submit button, so it works before the app's JavaScript loads. The admin orders, discounts and products filters move off the Base UI Select and Checkbox, and the hand rolled selects move to `NativeSelect`. from spec 0016
 **Done when:** no GET form uses a Base UI control, ESLint bans `@/components/ui/select` outside the style guide, and every GET form has a passing e2e test with the app's scripts blocked.
-spec [0016](../specs/0016-native-controls-get-forms.md)
+spec [0016](../specs/0016-native-controls-get-forms.md) · code in [src/components/ui/native-select.tsx](../../src/components/ui/native-select.tsx)
 - [x] Design it (spec): `/architect native controls in GET forms`
-- [ ] Build it: `/develop native controls in GET forms`
-  - [ ] `NativeSelect` from the shadcn registry, with its states on `/style-guide`
-  - [ ] Move the orders, discounts, products, dashboard, sort and checkout country controls to native ones, with the e2e steps that open them updated
-  - [ ] `blockAppScripts` helper and one no JavaScript e2e test per GET form, then the ESLint ban
+- [x] Build it: `/develop native controls in GET forms`
+  - [x] `NativeSelect` from the shadcn registry, with its states on `/style-guide`
+  - [x] Move the orders, discounts, products, dashboard, sort and checkout country controls to native ones, with the e2e steps that open them updated
+  - [x] `blockAppScripts` helper and one no JavaScript e2e test per GET form, then the ESLint ban
 - [ ] Verify it: `/check verify native controls in GET forms`
 - [ ] Test it: `/test native controls in GET forms`
 
