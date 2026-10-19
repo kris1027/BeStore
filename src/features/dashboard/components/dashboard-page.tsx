@@ -9,7 +9,7 @@ import { formatMoney, type MoneyFormat } from "@/lib/money";
 
 import { averageChange, averageOrderValue, figureChange } from "../change";
 import { paidOrdersPath } from "../paths";
-import { bucketLabel, formatStoreDay, type SalesWindow } from "../period";
+import { bucketLabel, formatStoreDay, type SalesWindow, type StoreDays } from "../period";
 import { getSalesDashboard } from "../queries";
 import { BestSellersTable } from "./best-sellers-table";
 import { PeriodPicker } from "./period-picker";
@@ -23,10 +23,10 @@ type DashboardPageProps = {
   readonly money: MoneyFormat;
 };
 
-function rangeText(first: string, last: string, locale: string): string {
-  return first === last
-    ? formatStoreDay(first, locale)
-    : `${formatStoreDay(first, locale)} to ${formatStoreDay(last, locale)}`;
+function rangeText({ firstDay, lastDay }: StoreDays, locale: string): string {
+  return firstDay === lastDay
+    ? formatStoreDay(firstDay, locale)
+    : `${formatStoreDay(firstDay, locale)} to ${formatStoreDay(lastDay, locale)}`;
 }
 
 // spec 0015, AC-1: the admin landing page.
@@ -48,8 +48,8 @@ export function DashboardPage({ adminName, window, today, money }: DashboardPage
           today={today}
         />
         <p className="text-sm text-muted-foreground">
-          Showing {rangeText(current.firstDay, current.lastDay, money.locale)}, compared with{" "}
-          {rangeText(previous.firstDay, previous.lastDay, money.locale)}.
+          Showing {rangeText(current, money.locale)}, compared with{" "}
+          {rangeText(previous, money.locale)}.
         </p>
         {window.rejectedRange ? (
           <FormNotice

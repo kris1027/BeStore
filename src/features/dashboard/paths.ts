@@ -1,4 +1,4 @@
-import type { DayRange } from "./period";
+import type { StoreDays } from "./period";
 
 export const dashboardPath = "/admin";
 
@@ -8,7 +8,7 @@ export function adminProductPath(id: string): string {
 }
 
 // spec 0015, AC-13: every order paid in the window, whatever its status now.
-export function paidOrdersPath(range: Pick<DayRange, "firstDay" | "lastDay">): string {
+export function paidOrdersPath(range: StoreDays): string {
   const query = new URLSearchParams({
     status: "all",
     dates: "paid",

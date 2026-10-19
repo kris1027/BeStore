@@ -24,11 +24,15 @@ export const MAX_RANGE_DAYS = 366;
 
 export type BucketUnit = "day" | "week" | "month";
 
-// Whole store days, first and last inclusive (YYYY-MM-DD), and the UTC instants they span:
-// from the start of the first day to the start of the day after the last, half open.
-export type DayRange = {
+// Whole store days, first and last inclusive (YYYY-MM-DD), as the URL and the page show them.
+export type StoreDays = {
   readonly firstDay: string;
   readonly lastDay: string;
+};
+
+// The same days with the UTC instants they span: from the start of the first day to the start
+// of the day after the last, half open.
+export type DayRange = StoreDays & {
   readonly start: Date;
   readonly end: Date;
 };
