@@ -15,7 +15,7 @@ This already caused a shipped bug. The dashboard's period picker (spec 0015, AC-
 
 Today the codebase has two competing patterns in GET forms:
 - **Base UI controls**: the orders list filters (`orders-filters.tsx`: Status, Refund and Date selects, plus the "Needs attention only" Checkbox), the discount codes Status filter (`status-filter.tsx`) and the products Category filter (`category-filter.tsx`). All four are dead before hydration (the moment React takes over the server HTML).
-- **Hand rolled native controls**: the storefront sort (`sort-select.tsx`), the dashboard period picker (`period-picker.tsx`), the storefront filter panel checkboxes (`filter-panel.tsx`), and the checkout country select (`checkout-form.tsx`, a POST form). Each one styles its own `<select>` with slightly different classes.
+- **Hand rolled native controls**: the storefront sort (`sort-select.tsx`), the dashboard period picker (`period-picker.tsx`), the storefront filter panel checkboxes (`filter-panel.tsx`), and the checkout saved addresses select (`checkout-form.tsx`, a POST form; the country is shown as text, not a select). Each one styles its own `<select>` with slightly different classes.
 
 Admin sign in and TOTP already need JavaScript (React Hook Form), so an admin can't reach the panel with JavaScript turned off. In admin, "works without JavaScript" really means "works before the bundles load, and when they fail". That is still worth having on list pages an admin opens many times a day, and it costs almost nothing.
 
@@ -134,8 +134,8 @@ Rules the pattern carries:
 
 **Rollout**: one migration change.
 1. `pnpm dlx shadcn@latest add native-select`, then review it as the `shadcn` skill says. Add a `NativeSelect` section with its default, focus, disabled and invalid states to `/style-guide`, next to the Base UI Select it stays beside.
-2. Move to `NativeSelect` and native checkboxes: `orders-filters.tsx` (Status, Refund, Date, and the "Needs attention only" checkbox), `status-filter.tsx`, `category-filter.tsx`, `period-picker.tsx`, `sort-select.tsx` and the checkout country select in `checkout-form.tsx`. Keep each control's `id`, `name` and label, so URLs and accessible names don't change.
-3. Add `blockAppScripts` and one no JavaScript test per GET form: admin orders, admin discounts, admin products, the dashboard picker, and the storefront filter panel and search box. Move the existing tests in `tests/e2e/catalog/discovery.spec.ts` and `tests/e2e/admin/dashboard.spec.ts` onto the helper.
+2. Move to `NativeSelect` and native checkboxes: `orders-filters.tsx` (Status, Refund, Date, and the "Needs attention only" checkbox), `status-filter.tsx`, `category-filter.tsx`, `period-picker.tsx`, `sort-select.tsx` and the checkout saved addresses select in `checkout-form.tsx`. Keep each control's `id`, `name` and label, so URLs and accessible names don't change.
+3. Add `blockAppScripts` and one no JavaScript test per GET form: admin orders, admin discounts, admin products, the category page's "Find products to add" search, the dashboard picker, and the storefront filter panel and search box. Move the existing tests in `tests/e2e/catalog/discovery.spec.ts` and `tests/e2e/admin/dashboard.spec.ts` onto the helper.
 4. Update the e2e tests that open these selects by clicking the combobox and an option. They switch to `selectOption` and `toHaveValue` (for example the orders "Date" check in `dashboard.spec.ts`).
 5. Add the ESLint ban last, so the change lands with lint clean.
 
