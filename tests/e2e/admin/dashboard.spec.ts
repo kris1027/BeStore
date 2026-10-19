@@ -131,6 +131,23 @@ test("without the app's JavaScript the picker still picks a preset", async ({ pa
   await expect(picker.getByLabel("Period")).toHaveValue("7d");
 });
 
+// AC-3: the date inputs keep the custom range, since nothing can clear them without JavaScript,
+// so the preset only wins because the form says the page showed a custom range.
+test("without the app's JavaScript a preset replaces a custom range", async ({ page }) => {
+  await signedInAdmin(page);
+  await blockAppScripts(page);
+  await page.goto("/admin?from=1999-01-01&to=1999-01-31");
+
+  const picker = page.getByRole("form", { name: "Choose a period" });
+  await expect(picker.getByLabel("Period")).toHaveValue("");
+  await picker.getByLabel("Period").selectOption("7d");
+  await picker.getByRole("button", { name: "Apply" }).click();
+
+  await expect(page).toHaveURL(/period=7d/);
+  await expect(picker.getByLabel("Period")).toHaveValue("7d");
+  await expect(picker.getByRole("textbox", { name: "From" })).toHaveValue("");
+});
+
 // spec 0016, "Uncontrolled by default": the period stays a controlled NativeSelect because, with
 // JavaScript, a preset must clear the dates (they would otherwise win on the server).
 test("with JavaScript, picking a preset clears a custom range's dates", async ({ page }) => {

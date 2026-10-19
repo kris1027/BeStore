@@ -101,6 +101,24 @@ describe("parseSalesWindow custom ranges", () => {
     expect(window.current.firstDay).toBe("2026-09-19");
   });
 
+  it("lets a preset win over the dates when the form came from a custom range", () => {
+    const window = parse({ period: "7d", shown: "custom", from: "2026-08-01", to: "2026-08-31" });
+    expect(window.preset).toBe("7d");
+    expect(window.current.firstDay).toBe("2026-10-12");
+    expect(window.rejectedRange).toBe(false);
+  });
+
+  it("keeps the dates when the form came from a custom range with no preset picked", () => {
+    const window = parse({ period: "", shown: "custom", from: "2026-08-01", to: "2026-08-31" });
+    expect(window.preset).toBeNull();
+    expect(window.current.firstDay).toBe("2026-08-01");
+  });
+
+  it("ignores an unknown shown value", () => {
+    const window = parse({ period: "7d", shown: "x", from: "2026-08-01", to: "2026-08-31" });
+    expect(window.preset).toBeNull();
+  });
+
   it("treats empty date fields as missing", () => {
     const window = parse({ period: "7d", from: "", to: "" });
     expect(window.preset).toBe("7d");

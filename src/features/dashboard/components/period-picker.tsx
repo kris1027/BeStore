@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 
 import { dashboardPath } from "../paths";
-import { presetLabels, salesPresets, type SalesPreset } from "../period";
+import { presetLabels, salesPresets, shownCustom, type SalesPreset } from "../period";
 
 // An empty select sends period="", which the parser reads as the default; the dates win
 // whenever both are filled (spec 0015, AC-3).
@@ -34,7 +34,8 @@ type PeriodPickerProps = {
 // The period is a native select (spec 0016): the Base UI Select only opens with JavaScript, so
 // without it the preset could not be changed.
 // With JavaScript, picking a preset clears the dates (which would otherwise win) and typing a
-// date switches the select to "Custom range".
+// date switches the select to "Custom range". Without it, the hidden `shown` field below does
+// the preset's part.
 export function PeriodPicker({ preset, from, to, today }: PeriodPickerProps) {
   const [period, setPeriod] = useState<string>(preset ?? customValue);
   const [dates, setDates] = useState({ from, to });
@@ -95,6 +96,12 @@ export function PeriodPicker({ preset, from, to, today }: PeriodPickerProps) {
           className="w-40"
         />
       </div>
+      {/* Without JavaScript the dates above stay filled when a preset is picked; this tells the
+          server the page showed a custom range, so the preset wins. With JavaScript the dates
+          are cleared instead, and the field goes with them. */}
+      {preset === null && (dates.from !== "" || dates.to !== "") ? (
+        <input type="hidden" name="shown" value={shownCustom} />
+      ) : null}
       <Button type="submit" variant="outline">
         <CalendarRangeIcon data-icon="inline-start" aria-hidden="true" />
         Apply

@@ -151,6 +151,9 @@ function salesWindow(
 
 const presetSchema = z.enum(salesPresets).optional().catch(undefined);
 
+// The picker's hidden `shown` field on a page showing a custom range.
+export const shownCustom = "custom";
+
 // An empty field (the picker's date inputs left blank) counts as missing.
 function textParam(value: unknown): string | null {
   const first = firstValue(value);
@@ -175,16 +178,24 @@ export function parseSalesWindow(
   today: CalendarDay,
   timeZone: string,
 ): SalesWindow {
-  const t = dayNumber(today);
+  const todayNumber = dayNumber(today);
+  const picked = presetSchema.parse(firstValue(params.period));
+  const presetWindow = (preset: SalesPreset, rejectedRange: boolean) =>
+    salesWindow(preset, presetFirstDay(preset, today), todayNumber, rejectedRange, timeZone);
+  // Without JavaScript the picker cannot clear its date inputs, so from a custom range a preset
+  // picked in the select arrives with the old dates. The form marks that page with
+  // shown=custom, and then the preset wins (AC-3).
+  if (picked !== undefined && firstValue(params.shown) === shownCustom) {
+    return presetWindow(picked, false);
+  }
   const from = textParam(params.from);
   const to = textParam(params.to);
   if (from !== null || to !== null) {
-    const range = customRange(from, to, t);
+    const range = customRange(from, to, todayNumber);
     if (range !== null) return salesWindow(null, range.first, range.last, false, timeZone);
-    return salesWindow(defaultPreset, presetFirstDay(defaultPreset, today), t, true, timeZone);
+    return presetWindow(defaultPreset, true);
   }
-  const preset = presetSchema.parse(firstValue(params.period)) ?? defaultPreset;
-  return salesWindow(preset, presetFirstDay(preset, today), t, false, timeZone);
+  return presetWindow(picked ?? defaultPreset, false);
 }
 
 function utcDate(text: string): Date {
