@@ -3,17 +3,9 @@
 import { SearchIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { SEARCH_MAX_LENGTH } from "@/lib/admin-search";
 
 import type { AdminOrdersParams } from "../list-params";
@@ -61,26 +53,20 @@ function FilterSelect({
   return (
     <div className="flex flex-col gap-2">
       <Label htmlFor={id}>{label}</Label>
-      <Select items={items} name={name} defaultValue={value}>
-        <SelectTrigger id={id} className="w-44">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            {items.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
+      <NativeSelect id={id} name={name} defaultValue={value} className="w-44">
+        {items.map((item) => (
+          <NativeSelectOption key={item.value} value={item.value}>
+            {item.label}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
     </div>
   );
 }
 
 // spec 0010, AC-1 and AC-2: a plain GET form, so every filter lives in the URL and a filtered
 // view can be shared or reloaded. Submitting starts again at the newest page.
+// spec 0016: a GET form works before the app's JavaScript loads, so its controls are native.
 export function OrdersFilters({ params }: { readonly params: AdminOrdersParams }) {
   return (
     <form
@@ -141,16 +127,15 @@ export function OrdersFilters({ params }: { readonly params: AdminOrdersParams }
         />
       </div>
       <div className="flex h-9 items-center gap-2">
-        <Checkbox
+        <input
+          type="checkbox"
           id="orders-attention"
           name="attention"
           value="1"
           defaultChecked={params.attention}
-          aria-labelledby="orders-attention-label"
+          className="size-4 shrink-0 accent-primary disabled:cursor-not-allowed"
         />
-        <Label id="orders-attention-label" htmlFor="orders-attention">
-          Needs attention only
-        </Label>
+        <Label htmlFor="orders-attention">Needs attention only</Label>
       </div>
       {/* spec 0014, AC-14: a search keeps the promo code filter; its chip removes it. */}
       {params.discount !== null ? (

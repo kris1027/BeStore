@@ -1,6 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoA11yViolations, tabTo } from "../a11y";
+import { blockAppScripts } from "../no-js";
 import { createTestUser, signInFully, withDb } from "./support";
 
 // spec 0015: the sales dashboard on /admin. The exact sums are proven in tests/db; here, the
@@ -82,7 +83,7 @@ test("shows a period's figures, best sellers and chart table, and links to its o
     await expect(page).toHaveURL(
       `/admin/orders?status=all&dates=paid&from=${year}-03-01&to=${year}-03-31`,
     );
-    await expect(page.getByRole("combobox", { name: "Date" })).toContainText("Paid");
+    await expect(page.getByRole("combobox", { name: "Date" })).toHaveValue("paid");
     await expect(
       page.getByRole("row").filter({ hasText: "dashboard-e2e@example.com" }),
     ).toHaveCount(2);
@@ -115,11 +116,11 @@ test("a range that can't be used falls back to the last 30 days with a notice", 
   await expect(page.getByRole("combobox", { name: "Period" })).toHaveValue("30d");
 });
 
-// AC-3: the app's bundles never load, as in the storefront's no JavaScript test, so the period
-// can only change through native controls.
+// AC-3 and spec 0016: the app's bundles never load, so the period can only change through
+// native controls.
 test("without the app's JavaScript the picker still picks a preset", async ({ page }) => {
   await signedInAdmin(page);
-  await page.route(/\/_next\/static\/chunks\/.+\.js(\?|$)/, (route) => route.abort());
+  await blockAppScripts(page);
   await page.goto("/admin?period=30d");
 
   const picker = page.getByRole("form", { name: "Choose a period" });

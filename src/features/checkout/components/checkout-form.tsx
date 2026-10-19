@@ -32,6 +32,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Spinner } from "@/components/ui/spinner";
 import { formatMoney } from "@/lib/money";
 import type { StoreCountry } from "@/lib/shipping/address";
@@ -361,22 +362,22 @@ function SavedAddressPicker({
   return (
     <Field>
       <FieldLabel htmlFor="checkout-saved-address">Saved addresses</FieldLabel>
-      <select
+      <NativeSelect
         id="checkout-saved-address"
         defaultValue=""
         onChange={(event) => {
           const picked = addresses.find((address) => address.id === event.target.value);
           if (picked) onPick(picked.values);
         }}
-        className="h-10 w-full min-w-0 rounded-md border border-input bg-transparent px-3 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm"
+        className="w-full"
       >
-        <option value="">Choose a saved address</option>
+        <NativeSelectOption value="">Choose a saved address</NativeSelectOption>
         {addresses.map((address) => (
-          <option key={address.id} value={address.id}>
+          <NativeSelectOption key={address.id} value={address.id}>
             {address.label}
-          </option>
+          </NativeSelectOption>
         ))}
-      </select>
+      </NativeSelect>
       <FieldDescription>Picking one fills in the fields below.</FieldDescription>
     </Field>
   );

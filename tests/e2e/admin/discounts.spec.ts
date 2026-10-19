@@ -5,6 +5,7 @@ import { type Browser, expect, type Page, test } from "@playwright/test";
 import { expectNoA11yViolations, tabTo } from "../a11y";
 import { seedProduct } from "../catalog/support";
 import { seedCode, seedPaidOrderWithCode } from "../checkout/support";
+import { blockAppScripts } from "../no-js";
 import { createTestUser, disableAdmin, injectSession, signInFully } from "./support";
 
 // spec 0014, AC-10 to AC-14, AC-17 and AC-20: the promo code admin. Codes are shared by every
@@ -184,4 +185,19 @@ test("a disabled admin's code save changes nothing", async ({ browser }) => {
   await page.getByRole("button", { name: "Add code" }).click();
 
   await expect(page.getByRole("heading", { name: "We can't find that page" })).toBeVisible();
+});
+
+// spec 0016: the list's search is a GET form, so its Status filter works before the app's
+// JavaScript loads.
+test("without the app's JavaScript the codes list still filters by status", async ({ browser }) => {
+  const page = await signedInAdmin(browser);
+  await blockAppScripts(page);
+  await page.goto("/admin/discounts");
+
+  const search = page.getByRole("form", { name: "Find codes" });
+  await search.getByLabel("Status").selectOption("inactive");
+  await search.getByRole("button", { name: "Find codes" }).click();
+
+  await expect(page).toHaveURL(/status=inactive/);
+  await expect(search.getByLabel("Status")).toHaveValue("inactive");
 });

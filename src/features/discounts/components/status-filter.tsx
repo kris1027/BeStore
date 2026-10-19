@@ -1,17 +1,10 @@
 "use client";
 
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 
 // spec 0014, AC-10: part of a plain GET form, so the filter lives in the URL. "Any" sends "",
-// which the parser ignores.
+// which the parser ignores. Native (spec 0016), so it works before the app's JavaScript loads.
 export function StatusFilter({
   value,
   items,
@@ -22,20 +15,13 @@ export function StatusFilter({
   return (
     <div className="flex flex-col gap-2">
       <Label htmlFor="discounts-status">Status</Label>
-      <Select items={items} name="status" defaultValue={value}>
-        <SelectTrigger id="discounts-status" className="w-44">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            {items.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
+      <NativeSelect id="discounts-status" name="status" defaultValue={value} className="w-44">
+        {items.map((item) => (
+          <NativeSelectOption key={item.value} value={item.value}>
+            {item.label}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
     </div>
   );
 }

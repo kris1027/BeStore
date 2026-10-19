@@ -4,10 +4,24 @@ import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoA11yViolations } from "../a11y";
 import { createTestUser, signInFully, withDb } from "../admin/support";
+import { blockAppScripts } from "../no-js";
 import { seedProduct, setProductStatus, waitForEditor } from "./support";
 
 // spec 0009, milestone 4: categories from both sides, arranging by keyboard, the filtered and
 // paged product list, and delete.
+
+async function seedCategory(): Promise<{ id: string }> {
+  const suffix = randomUUID().slice(0, 6);
+  return withDb(async (db) => {
+    const row = await db.query<{ id: string }>(
+      `INSERT INTO categories (id, name, slug, visible, position, updated_at)
+       VALUES (gen_random_uuid(), $1, $2, false, 1000000 + floor(random() * 1000)::int, now())
+       RETURNING id`,
+      [`Filter ${suffix}`, `filter-${suffix}`],
+    );
+    return { id: row.rows[0]!.id };
+  });
+}
 
 async function signIn(page: Page) {
   const admin = await createTestUser({ enrolled: true });
@@ -166,6 +180,41 @@ test("the list searches by SKU, filters by category and status, and keeps it in 
   await page.getByRole("link", { name: "Clear filters" }).click();
   await expect(page).toHaveURL("/admin/products");
   await expectNoA11yViolations(page);
+});
+
+// spec 0016: the products search is a GET form, so its Category filter works before the app's
+// JavaScript loads.
+test("without the app's JavaScript the products list still filters by category", async ({
+  page,
+}) => {
+  const category = await seedCategory();
+  await signIn(page);
+  await blockAppScripts(page);
+  await page.goto("/admin/products");
+
+  const search = page.getByRole("form", { name: "Search products" });
+  await search.getByLabel("Category").selectOption(category.id);
+  await search.getByRole("button", { name: "Search" }).click();
+
+  await expect(page).toHaveURL(new RegExp(`category=${category.id}`));
+  await expect(search.getByLabel("Category")).toHaveValue(category.id);
+});
+
+// spec 0016: the category page's product search is a GET form too.
+test("without the app's JavaScript the category page still finds products to add", async ({
+  page,
+}) => {
+  const category = await seedCategory();
+  await signIn(page);
+  await blockAppScripts(page);
+  await page.goto(`/admin/categories/${category.id}`);
+
+  const search = page.getByRole("form", { name: "Find products to add" });
+  await search.getByLabel("Add products").fill("linen");
+  await search.getByRole("button", { name: "Find" }).click();
+
+  await expect(page).toHaveURL(/q=linen/);
+  await expect(search.getByLabel("Add products")).toHaveValue("linen");
 });
 
 test("a draft never ordered is deleted after confirming", async ({ page }) => {

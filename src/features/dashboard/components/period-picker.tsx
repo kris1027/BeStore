@@ -1,11 +1,12 @@
 "use client";
 
-import { CalendarRangeIcon, ChevronDownIcon } from "lucide-react";
+import { CalendarRangeIcon } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 
 import { dashboardPath } from "../paths";
 import { presetLabels, salesPresets, type SalesPreset } from "../period";
@@ -30,8 +31,8 @@ type PeriodPickerProps = {
 };
 
 // spec 0015, AC-3: a plain GET form, so it works without JavaScript and every period is a link.
-// The period is a native select: the Base UI Select only opens with JavaScript, so without it
-// the preset could not be changed.
+// The period is a native select (spec 0016): the Base UI Select only opens with JavaScript, so
+// without it the preset could not be changed.
 // With JavaScript, picking a preset clears the dates (which would otherwise win) and typing a
 // date switches the select to "Custom range".
 export function PeriodPicker({ preset, from, to, today }: PeriodPickerProps) {
@@ -56,25 +57,19 @@ export function PeriodPicker({ preset, from, to, today }: PeriodPickerProps) {
     >
       <div className="flex flex-col gap-2">
         <Label htmlFor="dashboard-period">Period</Label>
-        <div className="relative">
-          <select
-            id="dashboard-period"
-            name="period"
-            value={period}
-            onChange={(event) => pickPeriod(event.target.value)}
-            className="h-9 w-44 appearance-none rounded-md border border-input bg-background py-2 pr-9 pl-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            {periodItems.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDownIcon
-            aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground"
-          />
-        </div>
+        <NativeSelect
+          id="dashboard-period"
+          name="period"
+          value={period}
+          onChange={(event) => pickPeriod(event.target.value)}
+          className="w-44"
+        >
+          {periodItems.map((item) => (
+            <NativeSelectOption key={item.value} value={item.value}>
+              {item.label}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="dashboard-from">From</Label>

@@ -71,8 +71,7 @@ test("an image tied to a value shows only when that value is picked", async ({ p
 
   await upload(page, 1, "Beanie on a shelf");
   await upload(page, 2, "Small beanie worn");
-  await page.getByLabel("Image 2 shows").click();
-  await page.getByRole("option", { name: "Size / S" }).click();
+  await page.getByLabel("Image 2 shows").selectOption({ label: "Size / S" });
   await page.getByRole("button", { name: "Save images" }).click();
   await expect(page.getByText("Images saved")).toBeVisible();
 

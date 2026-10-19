@@ -1,20 +1,14 @@
 "use client";
 
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 
 import type { CategoryOption } from "../admin-queries";
 
 const anyCategory = "";
 
 // The list's category filter, sent with the search form as `category` (spec 0009, AC-1).
+// Native (spec 0016), so it works before the app's JavaScript loads.
 export function CategoryFilter({
   categories,
   value,
@@ -29,20 +23,18 @@ export function CategoryFilter({
   return (
     <div className="flex flex-col gap-2">
       <Label htmlFor="products-category">Category</Label>
-      <Select items={items} name="category" defaultValue={value ?? anyCategory}>
-        <SelectTrigger id="products-category" className="w-48">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            {items.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
+      <NativeSelect
+        id="products-category"
+        name="category"
+        defaultValue={value ?? anyCategory}
+        className="w-48"
+      >
+        {items.map((item) => (
+          <NativeSelectOption key={item.value} value={item.value}>
+            {item.label}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
     </div>
   );
 }

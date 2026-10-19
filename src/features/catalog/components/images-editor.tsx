@@ -8,14 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Spinner } from "@/components/ui/spinner";
 
 import { MAX_IMAGES } from "../schemas";
@@ -169,34 +162,21 @@ export function ImagesEditor({
                   {choices.length > 0 ? (
                     <Field data-invalid={optionError ? true : undefined}>
                       <FieldLabel htmlFor={`${base}-option`}>Image {index + 1} shows</FieldLabel>
-                      <Select
-                        items={items}
+                      <NativeSelect
+                        id={`${base}-option`}
                         value={image.optionKey}
                         disabled={disabled}
-                        onValueChange={(value) =>
-                          update(image.key, {
-                            optionKey: typeof value === "string" ? value : noOption,
-                          })
-                        }
+                        onChange={(event) => update(image.key, { optionKey: event.target.value })}
+                        aria-invalid={optionError ? true : undefined}
+                        aria-describedby={optionError ? `${base}-option-error` : undefined}
+                        className="w-full sm:w-64"
                       >
-                        <SelectTrigger
-                          id={`${base}-option`}
-                          className="w-full sm:w-64"
-                          aria-invalid={optionError ? true : undefined}
-                          aria-describedby={optionError ? `${base}-option-error` : undefined}
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            {items.map((entry) => (
-                              <SelectItem key={entry.value} value={entry.value}>
-                                {entry.label}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
+                        {items.map((entry) => (
+                          <NativeSelectOption key={entry.value} value={entry.value}>
+                            {entry.label}
+                          </NativeSelectOption>
+                        ))}
+                      </NativeSelect>
                       <FieldError id={`${base}-option-error`}>{optionError}</FieldError>
                     </Field>
                   ) : null}
