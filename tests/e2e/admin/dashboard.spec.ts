@@ -95,8 +95,10 @@ test("an empty period shows zeros and empty texts, with no axe violations", asyn
   await signedInAdmin(page);
   await page.goto("/admin?from=1999-06-01&to=1999-06-30");
 
-  await expect(page.getByText("No orders", { exact: true })).toBeVisible();
-  await expect(page.getByText("No products sold in this period.")).toBeVisible();
+  // Inside main: until Next swaps the streamed figures in, a hidden copy waits at the end of body.
+  const main = page.getByRole("main");
+  await expect(main.getByText("No orders", { exact: true })).toBeVisible();
+  await expect(main.getByText("No products sold in this period.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Net revenue per day" })).toBeVisible();
   await expectNoA11yViolations(page);
 });
@@ -110,7 +112,22 @@ test("a range that can't be used falls back to the last 30 days with a notice", 
   await expect(
     page.getByText("That date range can't be used. Showing the last 30 days."),
   ).toBeVisible();
-  await expect(page.getByRole("combobox", { name: "Period" })).toContainText("Last 30 days");
+  await expect(page.getByRole("combobox", { name: "Period" })).toHaveValue("30d");
+});
+
+// AC-3: the app's bundles never load, as in the storefront's no JavaScript test, so the period
+// can only change through native controls.
+test("without the app's JavaScript the picker still picks a preset", async ({ page }) => {
+  await signedInAdmin(page);
+  await page.route(/\/_next\/static\/chunks\/.+\.js(\?|$)/, (route) => route.abort());
+  await page.goto("/admin?period=30d");
+
+  const picker = page.getByRole("form", { name: "Choose a period" });
+  await picker.getByLabel("Period").selectOption("7d");
+  await picker.getByRole("button", { name: "Apply" }).click();
+
+  await expect(page).toHaveURL(/period=7d/);
+  await expect(picker.getByLabel("Period")).toHaveValue("7d");
 });
 
 test("the picker and the table toggle work by keyboard", async ({ page }) => {
@@ -125,7 +142,7 @@ test("the picker and the table toggle work by keyboard", async ({ page }) => {
   await tabTo(page, page.getByRole("button", { name: "Apply" }));
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/from=1999-01-01&to=1999-01-31/);
-  await expect(page.getByRole("combobox", { name: "Period" })).toContainText("Custom range");
+  await expect(page.getByRole("combobox", { name: "Period" })).toHaveValue("");
 
   const toggle = page.getByRole("button", { name: "Show as table" });
   await tabTo(page, toggle);
