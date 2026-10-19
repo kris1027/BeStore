@@ -20,7 +20,7 @@ vi.mock("@/lib/logger", async (importOriginal) => {
   return { ...actual, logger: actual.createLogger(sink) };
 });
 
-const { logDashboardQueryFailed } = await import("./log");
+const { logDashboardQueryFailed, logDashboardSlow } = await import("./log");
 
 beforeEach(() => {
   lines.length = 0;
@@ -51,5 +51,28 @@ describe("logDashboardQueryFailed", () => {
       pgCode: "55P03",
     });
     expect(lines[0]).not.toMatch(/canceling statement|lock timeout|\[redacted\]/);
+  });
+
+  it("logs a null pgCode for an error that did not come from Postgres, without its message", () => {
+    logDashboardQueryFailed({ period: "7d", days: 7 }, new Error("customer jane@example.com"));
+
+    const entry = JSON.parse(lines[0] ?? "{}") as Record<string, unknown>;
+    expect(entry).toMatchObject({ event: "dashboard.query_failed", pgCode: null });
+    expect(lines[0]).not.toContain("jane@example.com");
+  });
+});
+
+describe("logDashboardSlow", () => {
+  it("warns with the period, day count and duration", () => {
+    logDashboardSlow({ period: "12m", days: 352 }, 1_234);
+
+    expect(lines).toHaveLength(1);
+    expect(JSON.parse(lines[0] ?? "{}")).toMatchObject({
+      level: 40,
+      event: "dashboard.slow",
+      period: "12m",
+      days: 352,
+      durationMs: 1_234,
+    });
   });
 });

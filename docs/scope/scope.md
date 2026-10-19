@@ -28,7 +28,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 12 | Customer accounts | Slice 6 | done |
 | 13 | Categories, search & filters | Slice 7 | done |
 | 14 | Discounts & promo codes | Slice 8 | done |
-| 15 | Admin sales dashboard | Slice 9 | in-progress |
+| 15 | Admin sales dashboard | Slice 9 | done |
 | 23 | Native controls in GET forms | Slice 9 follow up | done |
 | 16 | Legal pages & cookie consent | Launch | planned |
 | 17 | SEO for storefront pages | Launch | planned |
@@ -282,7 +282,7 @@ Spec: [0014](../specs/0014-discounts-promo-codes/index.md) · code in [src/featu
 
 ## Slice 9: Insights
 
-### 15. Admin sales dashboard · in-progress
+### 15. Admin sales dashboard · done
 The admin landing page: revenue, order count, average order value, and best sellers over a chosen period.
 **Done when:** numbers match the orders in the database for the chosen period, refunds are subtracted, and the page loads fast with a year of orders.
 Spec: [0015](../specs/0015-admin-sales-dashboard/index.md) · code in [src/features/dashboard/](../../src/features/dashboard/)
@@ -293,7 +293,7 @@ Spec: [0015](../specs/0015-admin-sales-dashboard/index.md) · code in [src/featu
   - [x] Best sellers and chart: the top 10 table, shadcn Chart with day, week and month buckets, the table toggle (AC-8, AC-9, AC-11, AC-12)
   - [x] Orders link and safety net: `dates=paid` on the orders list, the seeded year speed and exactness test, e2e with axe and keyboard (AC-13, AC-15, AC-16)
 - [x] Verify it: `/check verify admin sales dashboard`
-- [ ] Test it: `/test admin sales dashboard`
+- [x] Test it: `/test admin sales dashboard`
 
 ## Slice 9 follow ups (from spec 0016)
 

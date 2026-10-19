@@ -165,3 +165,110 @@ describe("formatStoreDay", () => {
     expect(formatStoreDay("2026-10-18", "en")).toBe("Oct 18, 2026");
   });
 });
+
+describe("calendar edges", () => {
+  const on = (y: number, m: number, d: number, params: Record<string, unknown>) =>
+    parseSalesWindow(params, { y, m, d }, zone);
+
+  // covers: AC-2
+  it("12m reaches back into the previous year from January and February", () => {
+    expect(on(2027, 1, 5, { period: "12m" }).current.firstDay).toBe("2026-02-01");
+    expect(on(2027, 2, 10, { period: "12m" }).current.firstDay).toBe("2026-03-01");
+    expect(on(2027, 1, 5, { period: "12m" }).buckets).toHaveLength(12);
+  });
+
+  // covers: AC-2, AC-4
+  it("This month on the 1st is one day, compared with the last day of the month before", () => {
+    const window = on(2026, 11, 1, { period: "month" });
+    expect(window.dayCount).toBe(1);
+    expect(window.current.firstDay).toBe("2026-11-01");
+    expect(window.previous.firstDay).toBe("2026-10-31");
+    expect(window.previous.lastDay).toBe("2026-10-31");
+  });
+
+  // covers: AC-4
+  it("a previous window can cross a year boundary", () => {
+    const window = on(2027, 1, 3, { period: "7d" });
+    expect(window.current.firstDay).toBe("2026-12-28");
+    expect(window.previous.firstDay).toBe("2026-12-21");
+    expect(window.previous.lastDay).toBe("2026-12-27");
+  });
+
+  // covers: AC-3
+  it("knows 29 February only in a leap year", () => {
+    expect(on(2028, 3, 1, { from: "2028-02-01", to: "2028-02-29" }).dayCount).toBe(29);
+    expect(on(2027, 3, 1, { from: "2027-02-01", to: "2027-02-29" }).rejectedRange).toBe(true);
+  });
+
+  // covers: AC-3
+  it("allows a full leap year of 366 days", () => {
+    const window = on(2028, 12, 31, { from: "2028-01-01", to: "2028-12-31" });
+    expect(window.rejectedRange).toBe(false);
+    expect(window.dayCount).toBe(366);
+    expect(window.unit).toBe("month");
+    expect(window.buckets).toHaveLength(12);
+  });
+
+  // covers: AC-3
+  it("accepts a range of one day that ends today", () => {
+    const window = on(2026, 10, 18, { from: "2026-10-18", to: "2026-10-18" });
+    expect(window.preset).toBeNull();
+    expect(window.dayCount).toBe(1);
+    expect(window.unit).toBe("day");
+  });
+
+  // covers: AC-3. Clamping can't rescue a range that starts in the future.
+  it("refuses a range wholly in the future even though its end would clamp", () => {
+    expect(on(2026, 10, 18, { from: "2026-10-20", to: "2027-01-01" }).rejectedRange).toBe(true);
+  });
+});
+
+describe("repeated and malformed params", () => {
+  // covers: AC-2, AC-3. `?period=7d&period=12m` arrives as an array; the first value wins.
+  it("takes the first value of a repeated param", () => {
+    expect(parse({ period: ["7d", "12m"] }).preset).toBe("7d");
+    const window = parse({ from: ["2026-08-01", "bogus"], to: ["2026-08-31"] });
+    expect(window.current.firstDay).toBe("2026-08-01");
+    expect(window.rejectedRange).toBe(false);
+  });
+
+  it.each([
+    ["a date in another format", { from: "01/08/2026", to: "2026-08-31" }],
+    ["a date with a time", { from: "2026-08-01T00:00", to: "2026-08-31" }],
+    ["a missing to", { from: "2026-08-01", to: "" }],
+    ["a missing from", { to: "2026-08-31" }],
+  ])("refuses %s with the notice, never an error", (_, params) => {
+    expect(parse(params).rejectedRange).toBe(true);
+  });
+
+  it("ignores a period that is not a string", () => {
+    expect(parse({ period: 7 }).preset).toBe("30d");
+    expect(parse({ period: { x: 1 } }).preset).toBe("30d");
+  });
+});
+
+describe("bucket coverage", () => {
+  // covers: AC-11. Every day of the window sits in exactly one bucket, so the chart's bars add
+  // up to the cards.
+  it.each([
+    ["30 days", { period: "30d" }, "day", 30],
+    ["91 days, Monday to Sunday", { from: "2026-07-20", to: "2026-10-18" }, "week", 13],
+    ["12 months", { period: "12m" }, "month", 12],
+  ])("splits %s into contiguous buckets", (_, params, unit, count) => {
+    const window = parse(params);
+    expect(window.unit).toBe(unit);
+    expect(window.buckets).toHaveLength(count);
+    expect(window.buckets[0]?.firstDay).toBe(window.current.firstDay);
+    const firstDays = window.buckets.map((bucket) => bucket.firstDay);
+    expect([...firstDays].sort()).toEqual(firstDays);
+    expect(new Set(window.buckets.map((bucket) => bucket.key)).size).toBe(count);
+  });
+
+  it("starts every later week on a Monday", () => {
+    const window = parse({ from: "2026-07-20", to: "2026-10-18" });
+    for (const bucket of window.buckets.slice(1)) {
+      expect(new Date(`${bucket.firstDay}T00:00:00Z`).getUTCDay()).toBe(1);
+      expect(bucket.firstDay).toBe(bucket.key);
+    }
+  });
+});
