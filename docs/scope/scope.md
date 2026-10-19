@@ -29,6 +29,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 13 | Categories, search & filters | Slice 7 | done |
 | 14 | Discounts & promo codes | Slice 8 | done |
 | 15 | Admin sales dashboard | Slice 9 | in-progress |
+| 23 | Native controls in GET forms | Slice 9 follow up | in-progress |
 | 16 | Legal pages & cookie consent | Launch | planned |
 | 17 | SEO for storefront pages | Launch | planned |
 | 18 | Analytics & error tracking | Launch | planned |
@@ -293,6 +294,20 @@ Spec: [0015](../specs/0015-admin-sales-dashboard/index.md) · code in [src/featu
   - [x] Orders link and safety net: `dates=paid` on the orders list, the seeded year speed and exactness test, e2e with axe and keyboard (AC-13, AC-15, AC-16)
 - [ ] Verify it: `/check verify admin sales dashboard`
 - [ ] Test it: `/test admin sales dashboard`
+
+## Slice 9 follow ups (from spec 0016)
+
+### 23. Native controls in GET forms · in-progress
+Every filter, period picker and search box uses native controls (`NativeSelect`, native checkbox and radio) and a submit button, so it works before the app's JavaScript loads. The admin orders, discounts and products filters move off the Base UI Select and Checkbox, and the hand rolled selects move to `NativeSelect`. from spec 0016
+**Done when:** no GET form uses a Base UI control, ESLint bans `@/components/ui/select` outside the style guide, and every GET form has a passing e2e test with the app's scripts blocked.
+spec [0016](../specs/0016-native-controls-get-forms.md)
+- [x] Design it (spec): `/architect native controls in GET forms`
+- [ ] Build it: `/develop native controls in GET forms`
+  - [ ] `NativeSelect` from the shadcn registry, with its states on `/style-guide`
+  - [ ] Move the orders, discounts, products, dashboard, sort and checkout country controls to native ones, with the e2e steps that open them updated
+  - [ ] `blockAppScripts` helper and one no JavaScript e2e test per GET form, then the ESLint ban
+- [ ] Verify it: `/check verify native controls in GET forms`
+- [ ] Test it: `/test native controls in GET forms`
 
 ## Launch readiness
 
