@@ -1,13 +1,21 @@
 // Pure: the line under each figure that compares it with the previous window (spec 0015, AC-4
 // and AC-7). The words carry the meaning, never the colour.
 
+// Which way the figure moved, for the arrow; "flat" also covers no figure to compare.
+export type Trend = "up" | "down" | "flat";
+
 export type Change = {
   readonly text: string;
+  readonly trend: Trend;
   // "vs previous 30 days", only after a percent.
   readonly suffix: string | null;
 };
 
-const noEarlierFigure: Change = { text: "No earlier figure to compare", suffix: null };
+const noEarlierFigure: Change = {
+  text: "No earlier figure to compare",
+  trend: "flat",
+  suffix: null,
+};
 
 function previousDays(dayCount: number): string {
   return `vs previous ${dayCount} ${dayCount === 1 ? "day" : "days"}`;
@@ -19,8 +27,10 @@ export function figureChange(current: number, previous: number, dayCount: number
   if (previous <= 0) return noEarlierFigure;
   const percent = ((current - previous) * 100) / previous;
   const rounded = Math.sign(percent) * Math.round(Math.abs(percent));
-  const text = rounded > 0 ? `Up ${rounded}%` : rounded < 0 ? `Down ${-rounded}%` : "No change";
-  return { text, suffix: previousDays(dayCount) };
+  const suffix = previousDays(dayCount);
+  if (rounded > 0) return { text: `Up ${rounded}%`, trend: "up", suffix };
+  if (rounded < 0) return { text: `Down ${-rounded}%`, trend: "down", suffix };
+  return { text: "No change", trend: "flat", suffix };
 }
 
 // Gross over orders, to a whole cent, half up (AC-7); null with no orders.
@@ -40,7 +50,7 @@ export function averageChange(
   const before = averageOrderValue(previous.grossCents, previous.orders);
   if (now === null) {
     return previous.orders > 0
-      ? { text: "No orders in this period", suffix: null }
+      ? { text: "No orders in this period", trend: "flat", suffix: null }
       : noEarlierFigure;
   }
   return before === null ? noEarlierFigure : figureChange(now, before, dayCount);

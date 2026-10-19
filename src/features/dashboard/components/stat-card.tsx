@@ -3,7 +3,7 @@ import { MinusIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import type { Change } from "../change";
+import type { Change, Trend } from "../change";
 
 type StatCardProps = {
   readonly title: string;
@@ -15,10 +15,11 @@ type StatCardProps = {
 };
 
 // The arrow only repeats what the words say (spec 0015, AC-4: never colour or shape alone).
-function ChangeIcon({ text }: { readonly text: string }) {
-  if (text.startsWith("Up ")) return <TrendingUpIcon aria-hidden="true" className="size-4" />;
-  if (text.startsWith("Down ")) return <TrendingDownIcon aria-hidden="true" className="size-4" />;
-  return <MinusIcon aria-hidden="true" className="size-4" />;
+const trendIcons = { up: TrendingUpIcon, down: TrendingDownIcon, flat: MinusIcon } as const;
+
+function ChangeIcon({ trend }: { readonly trend: Trend }) {
+  const Icon = trendIcons[trend];
+  return <Icon aria-hidden="true" className="size-4" />;
 }
 
 export function StatCard({ title, value, details = [], change, footer }: StatCardProps) {
@@ -39,7 +40,7 @@ export function StatCard({ title, value, details = [], change, footer }: StatCar
           </ul>
         ) : null}
         <p className="flex items-center gap-1.5 text-sm">
-          <ChangeIcon text={change.text} />
+          <ChangeIcon trend={change.trend} />
           <span>
             {change.text}
             {change.suffix ? <span className="text-muted-foreground"> {change.suffix}</span> : null}
