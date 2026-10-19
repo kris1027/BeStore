@@ -1,5 +1,6 @@
 import "server-only";
 
+import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 
@@ -122,6 +123,23 @@ function centsByBucket(
   );
 }
 
+// AC-9: a line's best seller group, its product, or its name snapshot once the product is gone.
+const lineGroupKey = Prisma.sql`CASE WHEN l.product_id IS NULL THEN 'name:' || l.product_name
+  ELSE l.product_id::text END`;
+
+// AC-5: an order (alias o) paid in [start, end). The currency test is left to the caller, since
+// AC-10 counts the other currencies.
+function paidBetween(start: Date, end: Date): Prisma.Sql {
+  return Prisma.sql`o.paid_at >= ${start}::timestamptz AND o.paid_at < ${end}::timestamptz`;
+}
+
+// AC-6: a refund (alias r) that succeeded in [start, end).
+function refundSucceededBetween(start: Date, end: Date): Prisma.Sql {
+  return Prisma.sql`r.status = 'succeeded'
+    AND r.succeeded_at >= ${start}::timestamptz
+    AND r.succeeded_at < ${end}::timestamptz`;
+}
+
 async function readDashboard(window: SalesWindow): Promise<SalesDashboard> {
   const { current, previous, unit } = window;
   const currency = env.STORE_CURRENCY;
@@ -147,8 +165,7 @@ async function readDashboard(window: SalesWindow): Promise<SalesDashboard> {
         CROSS JOIN LATERAL (
           SELECT sum(ol.quantity) AS units FROM order_lines ol WHERE ol.order_id = o.id
         ) l
-        WHERE o.paid_at >= ${previous.start}::timestamptz
-          AND o.paid_at < ${current.end}::timestamptz
+        WHERE ${paidBetween(previous.start, current.end)}
           AND o.currency = ${currency}
         GROUP BY 1, 2`;
 
@@ -167,9 +184,7 @@ async function readDashboard(window: SalesWindow): Promise<SalesDashboard> {
         CROSS JOIN LATERAL (
           SELECT sum(x.quantity) AS units FROM refund_lines x WHERE x.refund_id = r.id
         ) rl
-        WHERE r.status = 'succeeded'
-          AND r.succeeded_at >= ${previous.start}::timestamptz
-          AND r.succeeded_at < ${current.end}::timestamptz
+        WHERE ${refundSucceededBetween(previous.start, current.end)}
           AND o.paid_at IS NOT NULL
           AND o.currency = ${currency}
         GROUP BY 1, 2`;
@@ -181,8 +196,7 @@ async function readDashboard(window: SalesWindow): Promise<SalesDashboard> {
       const bestRows = await tx.$queryRaw<BestSellerRow[]>`
         WITH sold AS (
           SELECT
-            CASE WHEN l.product_id IS NULL THEN 'name:' || l.product_name
-              ELSE l.product_id::text END AS key,
+            ${lineGroupKey} AS key,
             l.product_id,
             sum(l.quantity)::bigint AS units,
             sum(l.line_total_cents)::bigint AS sales,
@@ -190,15 +204,13 @@ async function readDashboard(window: SalesWindow): Promise<SalesDashboard> {
             (array_agg(l.product_name ORDER BY l.created_at DESC, l.id DESC))[1] AS last_name
           FROM orders o
           JOIN order_lines l ON l.order_id = o.id
-          WHERE o.paid_at >= ${current.start}::timestamptz
-            AND o.paid_at < ${current.end}::timestamptz
+          WHERE ${paidBetween(current.start, current.end)}
             AND o.currency = ${currency}
           GROUP BY 1, 2
         ),
         refunded AS (
           SELECT
-            CASE WHEN l.product_id IS NULL THEN 'name:' || l.product_name
-              ELSE l.product_id::text END AS key,
+            ${lineGroupKey} AS key,
             l.product_id,
             sum(rl.quantity)::bigint AS units,
             max(l.created_at) AS last_at,
@@ -207,9 +219,7 @@ async function readDashboard(window: SalesWindow): Promise<SalesDashboard> {
           JOIN orders o ON o.id = r.order_id
           JOIN refund_lines rl ON rl.refund_id = r.id
           JOIN order_lines l ON l.id = rl.order_line_id
-          WHERE r.status = 'succeeded'
-            AND r.succeeded_at >= ${current.start}::timestamptz
-            AND r.succeeded_at < ${current.end}::timestamptz
+          WHERE ${refundSucceededBetween(current.start, current.end)}
             AND o.paid_at IS NOT NULL
             AND o.currency = ${currency}
           GROUP BY 1, 2
@@ -245,15 +255,12 @@ async function readDashboard(window: SalesWindow): Promise<SalesDashboard> {
       const [foreign] = await tx.$queryRaw<{ readonly count: bigint }[]>`
         SELECT count(*)::bigint AS count FROM (
           SELECT o.id FROM orders o
-          WHERE o.paid_at >= ${current.start}::timestamptz
-            AND o.paid_at < ${current.end}::timestamptz
+          WHERE ${paidBetween(current.start, current.end)}
             AND o.currency <> ${currency}
           UNION
           SELECT r.order_id FROM refunds r
           JOIN orders o ON o.id = r.order_id
-          WHERE r.status = 'succeeded'
-            AND r.succeeded_at >= ${current.start}::timestamptz
-            AND r.succeeded_at < ${current.end}::timestamptz
+          WHERE ${refundSucceededBetween(current.start, current.end)}
             AND o.currency <> ${currency}
         ) foreign_orders`;
 
