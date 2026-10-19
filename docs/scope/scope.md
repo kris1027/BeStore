@@ -28,7 +28,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 12 | Customer accounts | Slice 6 | done |
 | 13 | Categories, search & filters | Slice 7 | done |
 | 14 | Discounts & promo codes | Slice 8 | done |
-| 15 | Admin sales dashboard | Slice 9 | planned |
+| 15 | Admin sales dashboard | Slice 9 | in-progress |
 | 16 | Legal pages & cookie consent | Launch | planned |
 | 17 | SEO for storefront pages | Launch | planned |
 | 18 | Analytics & error tracking | Launch | planned |
@@ -281,10 +281,18 @@ Spec: [0014](../specs/0014-discounts-promo-codes/index.md) · code in [src/featu
 
 ## Slice 9: Insights
 
-### 15. Admin sales dashboard
+### 15. Admin sales dashboard · in-progress
 The admin landing page: revenue, order count, average order value, and best sellers over a chosen period.
 **Done when:** numbers match the orders in the database for the chosen period, refunds are subtracted, and the page loads fast with a year of orders.
-- [ ] Build it: `/develop admin sales dashboard`
+Spec: [0015](../specs/0015-admin-sales-dashboard/index.md) · code in [src/features/dashboard/](../../src/features/dashboard/)
+- [x] Design it (spec): `/architect admin sales dashboard`
+- [x] Build it: `/develop admin sales dashboard`
+  - [x] Thin thread: store day helper, default period, live totals, the four cards on `/admin`, the Dashboard nav item, skeletons and failure logging (AC-1, AC-2, AC-5 to AC-8, AC-14)
+  - [x] Period picker and comparison: presets, custom range with clamp and fallback, previous window, change text, currency notice (AC-2 to AC-4, AC-7, AC-10)
+  - [x] Best sellers and chart: the top 10 table, shadcn Chart with day, week and month buckets, the table toggle (AC-8, AC-9, AC-11, AC-12)
+  - [x] Orders link and safety net: `dates=paid` on the orders list, the seeded year speed and exactness test, e2e with axe and keyboard (AC-13, AC-15, AC-16)
+- [ ] Verify it: `/check verify admin sales dashboard`
+- [ ] Test it: `/test admin sales dashboard`
 
 ## Launch readiness
 
