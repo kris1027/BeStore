@@ -292,7 +292,7 @@ Spec: [0015](../specs/0015-admin-sales-dashboard/index.md) · code in [src/featu
   - [x] Period picker and comparison: presets, custom range with clamp and fallback, previous window, change text, currency notice (AC-2 to AC-4, AC-7, AC-10)
   - [x] Best sellers and chart: the top 10 table, shadcn Chart with day, week and month buckets, the table toggle (AC-8, AC-9, AC-11, AC-12)
   - [x] Orders link and safety net: `dates=paid` on the orders list, the seeded year speed and exactness test, e2e with axe and keyboard (AC-13, AC-15, AC-16)
-- [ ] Verify it: `/check verify admin sales dashboard`
+- [x] Verify it: `/check verify admin sales dashboard`
 - [ ] Test it: `/test admin sales dashboard`
 
 ## Slice 9 follow ups (from spec 0016)
