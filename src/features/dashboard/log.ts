@@ -11,8 +11,9 @@ export type DashboardLogFields = {
 };
 
 export function logDashboardQueryFailed(fields: DashboardLogFields, error: unknown) {
+  // `pgCode`, not `code`: the logger censors any `code` key (TOTP codes, spec 0004).
   logger.error(
-    { event: "dashboard.query_failed", ...fields, code: pgErrorCode(error) },
+    { event: "dashboard.query_failed", ...fields, pgCode: pgErrorCode(error) },
     "dashboard.query_failed",
   );
 }

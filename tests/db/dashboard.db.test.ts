@@ -366,7 +366,7 @@ describe("failures", () => {
     await expect(getSalesDashboard(window({ period: "7d" }))).rejects.toBe(failure);
 
     expect(mocks.error).toHaveBeenCalledWith(
-      { event: "dashboard.query_failed", period: "7d", days: 7, code: "57014" },
+      { event: "dashboard.query_failed", period: "7d", days: 7, pgCode: "57014" },
       "dashboard.query_failed",
     );
     spy.mockRestore();
