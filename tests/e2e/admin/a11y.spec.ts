@@ -109,7 +109,7 @@ test("reset password has no axe violations, with errors", async ({ page }) => {
   await expectNoA11yViolations(page);
 });
 
-test("the welcome page has no axe violations", async ({ page }) => {
+test("the dashboard has no axe violations", async ({ page }) => {
   const admin = await createTestUser({ enrolled: true });
   await signInFully(page, admin);
   await expectNoA11yViolations(page);

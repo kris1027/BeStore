@@ -4,6 +4,7 @@ import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoA11yViolations, tabTo } from "../a11y";
 import { createTestUser, signInFully, withDb } from "../admin/support";
+import { blockAppScripts } from "../no-js";
 import { seedProduct, type SeededProduct } from "./support";
 
 // spec 0013: category pages, search, filters and sort, and arranging inside a category.
@@ -213,30 +214,25 @@ test.describe("a category with options", () => {
     await expect(page.getByRole("status").filter({ hasText: /products?$/ })).toBeVisible();
   });
 
-  // The app's bundles never load, so React never takes over: the state before hydration, or
-  // after a failed download. The streamed results still show (Next reveals them with inline
-  // scripts); a browser with JavaScript fully off keeps the Suspense fallback instead.
+  // A browser with JavaScript fully off keeps the Suspense fallback instead of the results.
   test("without the app's JavaScript the panel is a GET form with Apply", async ({
     browser,
     page,
   }) => {
     const { category } = await setup(page, "Nojs");
     const shopper = await (await browser.newContext()).newPage();
-    // Scripts only: a production build serves its CSS from chunks/ too, and an unstyled page
-    // lets the fill images cover the panel.
-    await shopper.route(/\/_next\/static\/chunks\/.+\.js(\?|$)/, (route) => route.abort());
+    await blockAppScripts(shopper);
 
     await shopper.goto(`/categories/${category.slug}`);
-    await shopper
-      .getByRole("form", { name: "Filters" })
-      .getByRole("checkbox", { name: /^Blue/ })
-      .check();
-    await shopper
-      .getByRole("form", { name: "Filters" })
-      .getByRole("button", { name: "Apply" })
-      .click();
+    const panel = shopper.getByRole("form", { name: "Filters" });
+    await panel.getByRole("checkbox", { name: /^Blue/ }).check();
+    // spec 0016: the sort joins the panel's form, so Apply sends it too.
+    await shopper.getByLabel("Sort by").selectOption("price-asc");
+    await panel.getByRole("button", { name: "Apply" }).click();
 
     await expect(shopper).toHaveURL(/color=blue/);
+    await expect(shopper).toHaveURL(/sort=price-asc/);
+    await expect(shopper.getByLabel("Sort by")).toHaveValue("price-asc");
     await expect(shopper.getByRole("list", { name: "Active filters" })).toContainText(
       "Color: Blue",
     );
@@ -407,4 +403,19 @@ test.describe("search", () => {
     await expect(page.getByText("Type at least 2 characters to search")).toBeVisible();
     await expect(page.getByRole("searchbox", { name: "Search products" }).last()).toHaveValue("k");
   });
+});
+
+// spec 0016: the /search box is a GET form, so it searches before the app's JavaScript loads.
+test("without the app's JavaScript the search box still searches", async ({ page }) => {
+  await blockAppScripts(page);
+  await page.goto("/search");
+
+  const box = page.getByRole("search", { name: "Search products" });
+  await box.getByRole("searchbox", { name: "Search products" }).fill("shelf");
+  await box.getByRole("button", { name: "Search" }).click();
+
+  await expect(page).toHaveURL(/\/search\?q=shelf$/);
+  await expect(page.getByRole("searchbox", { name: "Search products" }).last()).toHaveValue(
+    "shelf",
+  );
 });

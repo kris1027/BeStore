@@ -2,18 +2,10 @@
 
 import { SearchIcon } from "lucide-react";
 
+import { NativeSelectField } from "@/components/native-select-field";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { SEARCH_MAX_LENGTH } from "@/lib/admin-search";
 
 import type { AdminOrdersParams } from "../list-params";
@@ -32,6 +24,12 @@ const statusItems = [
   { value: "expired", label: "Expired" },
 ];
 
+// spec 0015, AC-13: which date From and To filter. "" is the default, when the order was placed.
+const dateItems = [
+  { value: "", label: "Order placed" },
+  { value: "paid", label: "Paid" },
+];
+
 const refundItems = [
   { value: "", label: "Any" },
   { value: "none", label: "Not refunded" },
@@ -39,42 +37,9 @@ const refundItems = [
   { value: "full", label: "Fully refunded" },
 ];
 
-function FilterSelect({
-  id,
-  name,
-  label,
-  items,
-  value,
-}: {
-  readonly id: string;
-  readonly name: string;
-  readonly label: string;
-  readonly items: readonly { readonly value: string; readonly label: string }[];
-  readonly value: string;
-}) {
-  return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={id}>{label}</Label>
-      <Select items={items} name={name} defaultValue={value}>
-        <SelectTrigger id={id} className="w-44">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            {items.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
-
 // spec 0010, AC-1 and AC-2: a plain GET form, so every filter lives in the URL and a filtered
 // view can be shared or reloaded. Submitting starts again at the newest page.
+// spec 0016: a GET form works before the app's JavaScript loads, so its controls are native.
 export function OrdersFilters({ params }: { readonly params: AdminOrdersParams }) {
   return (
     <form
@@ -93,22 +58,32 @@ export function OrdersFilters({ params }: { readonly params: AdminOrdersParams }
           autoComplete="off"
         />
       </div>
-      <FilterSelect
+      <NativeSelectField
         id="orders-status"
         name="status"
         label="Status"
         items={statusItems}
-        value={params.status === "settled" ? "" : params.status}
+        defaultValue={params.status === "settled" ? "" : params.status}
+        className="w-44"
       />
-      <FilterSelect
+      <NativeSelectField
         id="orders-refund"
         name="refund"
         label="Refunds"
         items={refundItems}
-        value={params.refund ?? ""}
+        defaultValue={params.refund ?? ""}
+        className="w-44"
+      />
+      <NativeSelectField
+        id="orders-dates"
+        name="dates"
+        label="Date"
+        items={dateItems}
+        defaultValue={params.dates === "created" ? "" : params.dates}
+        className="w-44"
       />
       <div className="flex flex-col gap-2">
-        <Label htmlFor="orders-from">Placed from</Label>
+        <Label htmlFor="orders-from">From</Label>
         <Input
           id="orders-from"
           type="date"
@@ -118,7 +93,7 @@ export function OrdersFilters({ params }: { readonly params: AdminOrdersParams }
         />
       </div>
       <div className="flex flex-col gap-2">
-        <Label htmlFor="orders-to">Placed to</Label>
+        <Label htmlFor="orders-to">To</Label>
         <Input
           id="orders-to"
           type="date"
@@ -128,16 +103,15 @@ export function OrdersFilters({ params }: { readonly params: AdminOrdersParams }
         />
       </div>
       <div className="flex h-9 items-center gap-2">
-        <Checkbox
+        <input
+          type="checkbox"
           id="orders-attention"
           name="attention"
           value="1"
           defaultChecked={params.attention}
-          aria-labelledby="orders-attention-label"
+          className="size-4 shrink-0 accent-primary disabled:cursor-not-allowed"
         />
-        <Label id="orders-attention-label" htmlFor="orders-attention">
-          Needs attention only
-        </Label>
+        <Label htmlFor="orders-attention">Needs attention only</Label>
       </div>
       {/* spec 0014, AC-14: a search keeps the promo code filter; its chip removes it. */}
       {params.discount !== null ? (

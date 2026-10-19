@@ -25,7 +25,7 @@ test("a signed in non admin gets a 404 on admin pages", async ({ page }) => {
   // The served HTML too, before any script runs: no admin title or title template in it.
   const html = await (await page.request.get("/admin")).text();
   expect(html).toContain("<title>Page not found · BeStore</title>");
-  expect(html).not.toMatch(/Welcome|· Admin/);
+  expect(html).not.toMatch(/Dashboard|· Admin/);
 
   const mfa = await page.goto("/admin/mfa");
   expect(mfa?.status()).toBe(404);

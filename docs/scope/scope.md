@@ -28,7 +28,8 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 12 | Customer accounts | Slice 6 | done |
 | 13 | Categories, search & filters | Slice 7 | done |
 | 14 | Discounts & promo codes | Slice 8 | done |
-| 15 | Admin sales dashboard | Slice 9 | planned |
+| 15 | Admin sales dashboard | Slice 9 | done |
+| 23 | Native controls in GET forms | Slice 9 follow up | done |
 | 16 | Legal pages & cookie consent | Launch | planned |
 | 17 | SEO for storefront pages | Launch | planned |
 | 18 | Analytics & error tracking | Launch | planned |
@@ -281,10 +282,32 @@ Spec: [0014](../specs/0014-discounts-promo-codes/index.md) · code in [src/featu
 
 ## Slice 9: Insights
 
-### 15. Admin sales dashboard
+### 15. Admin sales dashboard · done
 The admin landing page: revenue, order count, average order value, and best sellers over a chosen period.
 **Done when:** numbers match the orders in the database for the chosen period, refunds are subtracted, and the page loads fast with a year of orders.
-- [ ] Build it: `/develop admin sales dashboard`
+Spec: [0015](../specs/0015-admin-sales-dashboard/index.md) · code in [src/features/dashboard/](../../src/features/dashboard/)
+- [x] Design it (spec): `/architect admin sales dashboard`
+- [x] Build it: `/develop admin sales dashboard`
+  - [x] Thin thread: store day helper, default period, live totals, the four cards on `/admin`, the Dashboard nav item, skeletons and failure logging (AC-1, AC-2, AC-5 to AC-8, AC-14)
+  - [x] Period picker and comparison: presets, custom range with clamp and fallback, previous window, change text, currency notice (AC-2 to AC-4, AC-7, AC-10)
+  - [x] Best sellers and chart: the top 10 table, shadcn Chart with day, week and month buckets, the table toggle (AC-8, AC-9, AC-11, AC-12)
+  - [x] Orders link and safety net: `dates=paid` on the orders list, the seeded year speed and exactness test, e2e with axe and keyboard (AC-13, AC-15, AC-16)
+- [x] Verify it: `/check verify admin sales dashboard`
+- [x] Test it: `/test admin sales dashboard`
+
+## Slice 9 follow ups (from spec 0016)
+
+### 23. Native controls in GET forms · done
+Every filter, period picker and search box uses native controls (`NativeSelect`, native checkbox and radio) and a submit button, so it works before the app's JavaScript loads. The admin orders, discounts and products filters move off the Base UI Select and Checkbox, and the hand rolled selects move to `NativeSelect`. from spec 0016
+**Done when:** no GET form uses a Base UI control, ESLint bans `@/components/ui/select` outside the style guide, and every GET form has a passing e2e test with the app's scripts blocked.
+spec [0016](../specs/0016-native-controls-get-forms.md) · code in [src/components/ui/native-select.tsx](../../src/components/ui/native-select.tsx)
+- [x] Design it (spec): `/architect native controls in GET forms`
+- [x] Build it: `/develop native controls in GET forms`
+  - [x] `NativeSelect` from the shadcn registry, with its states on `/style-guide`
+  - [x] Move the orders, discounts, products, dashboard, sort and checkout country controls to native ones, with the e2e steps that open them updated
+  - [x] `blockAppScripts` helper and one no JavaScript e2e test per GET form, then the ESLint ban
+- [x] Verify it: `/check verify native controls in GET forms`
+- [x] Test it: `/test native controls in GET forms`
 
 ## Launch readiness
 

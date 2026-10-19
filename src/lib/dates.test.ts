@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addDays,
   formatDate,
   formatDateTime,
   parseCalendarDay,
+  storeToday,
   utcToZonedInput,
   zonedDateTimeToUtc,
   zonedDayStart,
@@ -102,5 +104,31 @@ describe("zonedDateTimeToUtc and utcToZonedInput", () => {
     expect(utcToZonedInput(zonedDateTimeToUtc(text, "America/New_York")!, "America/New_York")).toBe(
       text,
     );
+  });
+});
+
+describe("storeToday", () => {
+  it("is the store's day, not UTC's", () => {
+    // 22:30 UTC on 31 March is 00:30 on 1 April in Warsaw (summer time, UTC+2).
+    const moment = new Date("2026-03-31T22:30:00Z");
+    expect(storeToday(moment, "Europe/Warsaw")).toEqual({ y: 2026, m: 4, d: 1 });
+    expect(storeToday(moment, "UTC")).toEqual({ y: 2026, m: 3, d: 31 });
+  });
+
+  it("is still yesterday west of UTC", () => {
+    expect(storeToday(new Date("2026-01-01T03:00:00Z"), "America/New_York")).toEqual({
+      y: 2025,
+      m: 12,
+      d: 31,
+    });
+  });
+});
+
+describe("addDays", () => {
+  it("rolls over a month, a year and a leap day", () => {
+    expect(addDays({ y: 2026, m: 1, d: 31 }, 1)).toEqual({ y: 2026, m: 2, d: 1 });
+    expect(addDays({ y: 2026, m: 12, d: 31 }, 1)).toEqual({ y: 2027, m: 1, d: 1 });
+    expect(addDays({ y: 2028, m: 2, d: 28 }, 1)).toEqual({ y: 2028, m: 2, d: 29 });
+    expect(addDays({ y: 2026, m: 3, d: 1 }, -1)).toEqual({ y: 2026, m: 2, d: 28 });
   });
 });

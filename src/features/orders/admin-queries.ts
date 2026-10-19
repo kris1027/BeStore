@@ -10,7 +10,7 @@ import type {
   RefundStatus,
 } from "@/generated/prisma/client";
 import type { Prisma } from "@/generated/prisma/client";
-import { parseCalendarDay, zonedDayStart } from "@/lib/dates";
+import { addDays, parseCalendarDay, zonedDayStart } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { escapeLike } from "@/lib/like";
 import { env } from "@/lib/env";
@@ -204,21 +204,13 @@ function filterWhere(params: AdminOrdersParams): Prisma.OrderWhereInput[] {
     terms.push({ refundedCents: { gt: 0, lt: db.order.fields.totalCents } });
   }
   // Whole days in the store's time zone: from the start of `from` to the start of the day
-  // after `to`.
+  // after `to`, on the date `dates` names (spec 0015, AC-13).
+  const field = params.dates === "paid" ? "paidAt" : "createdAt";
+  if (params.dates === "paid") terms.push({ paidAt: { not: null } });
   const from = params.from === null ? null : parseCalendarDay(params.from);
   const to = params.to === null ? null : parseCalendarDay(params.to);
-  if (from) terms.push({ createdAt: { gte: zonedDayStart(from, env.STORE_TIMEZONE) } });
-  if (to) {
-    const next = new Date(Date.UTC(to.y, to.m - 1, to.d + 1));
-    terms.push({
-      createdAt: {
-        lt: zonedDayStart(
-          { y: next.getUTCFullYear(), m: next.getUTCMonth() + 1, d: next.getUTCDate() },
-          env.STORE_TIMEZONE,
-        ),
-      },
-    });
-  }
+  if (from) terms.push({ [field]: { gte: zonedDayStart(from, env.STORE_TIMEZONE) } });
+  if (to) terms.push({ [field]: { lt: zonedDayStart(addDays(to, 1), env.STORE_TIMEZONE) } });
   return terms;
 }
 

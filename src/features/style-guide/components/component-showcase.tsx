@@ -61,6 +61,7 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
@@ -240,6 +241,55 @@ export function ComponentShowcase() {
               <Button type="button" variant="outline">
                 Cancel
               </Button>
+            </Field>
+          </FieldGroup>
+        </form>
+      </ShowcaseSection>
+
+      <ShowcaseSection
+        id="native-select"
+        title="NativeSelect"
+        description="Every GET form (filters, period pickers, search) uses NativeSelect, because it works before the app's JavaScript loads (spec 0016). The Base UI Select above only opens with JavaScript. Tab to it to see the focus ring."
+      >
+        <form className="max-w-md" noValidate onSubmit={(event) => event.preventDefault()}>
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="sg-native-size">Pack size</FieldLabel>
+              <NativeSelect id="sg-native-size" name="size" defaultValue="m" className="w-48">
+                {sizes.map((size) => (
+                  <NativeSelectOption key={size.value} value={size.value}>
+                    {size.label}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </Field>
+            <Field data-disabled>
+              <FieldLabel htmlFor="sg-native-disabled">Pack size (disabled)</FieldLabel>
+              <NativeSelect id="sg-native-disabled" disabled defaultValue="m" className="w-48">
+                {sizes.map((size) => (
+                  <NativeSelectOption key={size.value} value={size.value}>
+                    {size.label}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </Field>
+            <Field data-invalid>
+              <FieldLabel htmlFor="sg-native-invalid">Pack size (invalid)</FieldLabel>
+              <NativeSelect
+                id="sg-native-invalid"
+                defaultValue=""
+                aria-invalid
+                aria-describedby="sg-native-error"
+                className="w-48"
+              >
+                <NativeSelectOption value="">Choose a size</NativeSelectOption>
+                {sizes.map((size) => (
+                  <NativeSelectOption key={size.value} value={size.value}>
+                    {size.label}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+              <FieldError id="sg-native-error">Choose a pack size.</FieldError>
             </Field>
           </FieldGroup>
         </form>

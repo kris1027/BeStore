@@ -24,6 +24,11 @@ export const orderStatusFilters = [
 // "settled" is the default view: the orders that took money.
 export type StatusFilter = OrderStatus | "all" | "settled";
 
+// Which date `from` and `to` filter: when the order was placed, or when it was paid (spec 0015,
+// AC-13, the dashboard's "View these orders").
+export const orderDateFilters = ["created", "paid"] as const;
+export type DateFilter = (typeof orderDateFilters)[number];
+
 export type AdminOrdersParams = {
   readonly q: string;
   readonly status: StatusFilter;
@@ -32,6 +37,8 @@ export type AdminOrdersParams = {
   // Both YYYY-MM-DD in the store's time zone, inclusive; both null when from is after to.
   readonly from: string | null;
   readonly to: string | null;
+  // "paid" also leaves out every order without a paid_at, with or without from and to.
+  readonly dates: DateFilter;
   readonly before: number | null;
   // spec 0014, AC-14: only orders that used this promo code (its id). The page drops an id that
   // is not a code.
@@ -45,6 +52,7 @@ const schema = z.object({
   refund: z.enum(["none", "partial", "full"]).optional().catch(undefined),
   from: z.string().optional().catch(undefined),
   to: z.string().optional().catch(undefined),
+  dates: z.enum(orderDateFilters).optional().catch(undefined),
   before: z.coerce.number().int().min(1).max(maxOrderNumber).optional().catch(undefined),
   discount: z.uuid().optional().catch(undefined),
 });
@@ -63,6 +71,7 @@ export function parseAdminOrdersParams(
     refund: firstValue(params.refund),
     from: firstValue(params.from),
     to: firstValue(params.to),
+    dates: firstValue(params.dates),
     before: firstValue(params.before),
     discount: firstValue(params.discount),
   });
@@ -78,6 +87,7 @@ export function parseAdminOrdersParams(
     refund: parsed.refund ?? null,
     from: backwards ? null : from,
     to: backwards ? null : to,
+    dates: parsed.dates ?? "created",
     before: parsed.before ?? null,
     discount: parsed.discount ?? null,
   };
@@ -91,6 +101,7 @@ export function hasFilters(params: AdminOrdersParams): boolean {
     params.refund !== null ||
     params.from !== null ||
     params.to !== null ||
+    params.dates !== "created" ||
     params.discount !== null
   );
 }
@@ -104,6 +115,7 @@ export function adminOrdersHref(params: AdminOrdersParams, before: number | null
   if (params.refund !== null) query.set("refund", params.refund);
   if (params.from !== null) query.set("from", params.from);
   if (params.to !== null) query.set("to", params.to);
+  if (params.dates !== "created") query.set("dates", params.dates);
   if (params.discount !== null) query.set("discount", params.discount);
   if (before !== null) query.set("before", String(before));
   const search = query.toString();

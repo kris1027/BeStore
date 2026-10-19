@@ -4,6 +4,7 @@ import Stripe from "stripe";
 import { expectNoA11yViolations, tabTo } from "../a11y";
 import { seedProduct, type SeededProduct } from "../catalog/support";
 import { hasRealStripeKey, type SeededOrder, seedPendingOrder } from "../checkout/support";
+import { blockAppScripts } from "../no-js";
 import { createTestUser, signInFully, withDb } from "./support";
 
 // spec 0010: run an order after payment from the admin pages, by keyboard, with no axe
@@ -205,6 +206,30 @@ test("the orders list filters by number, keeps filters in the URL and has an emp
   await page.getByRole("link", { name: "Clear filters" }).click();
   await expect(page).toHaveURL(/\/admin\/orders$/);
   await expectNoA11yViolations(page);
+});
+
+// spec 0016: the filters are a GET form, so they work before the app's JavaScript loads.
+test("without the app's JavaScript the orders filters still filter", async ({ page }) => {
+  const admin = await createTestUser({ enrolled: true });
+  await signInFully(page, admin);
+  await blockAppScripts(page);
+  await page.goto("/admin/orders");
+
+  const filters = page.getByRole("form", { name: "Find orders" });
+  await filters.getByLabel("Status").selectOption("all");
+  await filters.getByLabel("Refunds").selectOption("none");
+  await filters.getByLabel("Date").selectOption("paid");
+  await filters.getByRole("checkbox", { name: "Needs attention only" }).check();
+  await filters.getByRole("button", { name: "Find orders" }).click();
+
+  await expect(page).toHaveURL(/status=all/);
+  await expect(page).toHaveURL(/refund=none/);
+  await expect(page).toHaveURL(/dates=paid/);
+  await expect(page).toHaveURL(/attention=1/);
+  await expect(filters.getByLabel("Status")).toHaveValue("all");
+  await expect(filters.getByLabel("Refunds")).toHaveValue("none");
+  await expect(filters.getByLabel("Date")).toHaveValue("paid");
+  await expect(filters.getByRole("checkbox", { name: "Needs attention only" })).toBeChecked();
 });
 
 // ─── With Stripe (STRIPE_E2E=1) ──────────────────────────────────────────────

@@ -11,6 +11,7 @@ const defaults = {
   refund: null,
   from: null,
   to: null,
+  dates: "created",
   before: null,
   discount: null,
 };
@@ -29,6 +30,7 @@ describe("parseAdminOrdersParams", () => {
         refund: "partial",
         from: "2026-09-01",
         to: "2026-09-30",
+        dates: "paid",
         before: "1050",
         discount: "0192f1c2-0000-7000-8000-000000000001",
       }),
@@ -39,6 +41,7 @@ describe("parseAdminOrdersParams", () => {
       refund: "partial",
       from: "2026-09-01",
       to: "2026-09-30",
+      dates: "paid",
       before: 1050,
       discount: "0192f1c2-0000-7000-8000-000000000001",
     });
@@ -106,5 +109,25 @@ describe("searchNumber", () => {
     expect(searchNumber("2147483648")).toBeNull();
     expect(searchNumber("0")).toBeNull();
     expect(searchNumber("#1042")).toBeNull();
+  });
+
+  // spec 0015, AC-13: the dashboard's "View these orders" link.
+  it("keeps the paid date filter through paging, and counts it as a filter", () => {
+    const params = parseAdminOrdersParams({
+      status: "all",
+      dates: "paid",
+      from: "2026-10-01",
+      to: "2026-10-18",
+    });
+    expect(params.dates).toBe("paid");
+    expect(hasFilters(parseAdminOrdersParams({ dates: "paid" }))).toBe(true);
+    expect(adminOrdersHref(params, 1040)).toBe(
+      "/admin/orders?status=all&from=2026-10-01&to=2026-10-18&dates=paid&before=1040",
+    );
+  });
+
+  it("ignores an unknown date filter", () => {
+    expect(parseAdminOrdersParams({ dates: "shipped" }).dates).toBe("created");
+    expect(parseAdminOrdersParams({ dates: ["paid", "created"] }).dates).toBe("paid");
   });
 });
