@@ -10,7 +10,7 @@ import type {
   RefundStatus,
 } from "@/generated/prisma/client";
 import type { Prisma } from "@/generated/prisma/client";
-import { parseCalendarDay, zonedDayStart } from "@/lib/dates";
+import { addDays, parseCalendarDay, zonedDayStart } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { escapeLike } from "@/lib/like";
 import { env } from "@/lib/env";
@@ -210,17 +210,7 @@ function filterWhere(params: AdminOrdersParams): Prisma.OrderWhereInput[] {
   const from = params.from === null ? null : parseCalendarDay(params.from);
   const to = params.to === null ? null : parseCalendarDay(params.to);
   if (from) terms.push({ [field]: { gte: zonedDayStart(from, env.STORE_TIMEZONE) } });
-  if (to) {
-    const next = new Date(Date.UTC(to.y, to.m - 1, to.d + 1));
-    terms.push({
-      [field]: {
-        lt: zonedDayStart(
-          { y: next.getUTCFullYear(), m: next.getUTCMonth() + 1, d: next.getUTCDate() },
-          env.STORE_TIMEZONE,
-        ),
-      },
-    });
-  }
+  if (to) terms.push({ [field]: { lt: zonedDayStart(addDays(to, 1), env.STORE_TIMEZONE) } });
   return terms;
 }
 

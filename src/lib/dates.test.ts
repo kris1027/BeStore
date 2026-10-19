@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addDays,
   formatDate,
   formatDateTime,
   parseCalendarDay,
@@ -120,5 +121,14 @@ describe("storeToday", () => {
       m: 12,
       d: 31,
     });
+  });
+});
+
+describe("addDays", () => {
+  it("rolls over a month, a year and a leap day", () => {
+    expect(addDays({ y: 2026, m: 1, d: 31 }, 1)).toEqual({ y: 2026, m: 2, d: 1 });
+    expect(addDays({ y: 2026, m: 12, d: 31 }, 1)).toEqual({ y: 2027, m: 1, d: 1 });
+    expect(addDays({ y: 2028, m: 2, d: 28 }, 1)).toEqual({ y: 2028, m: 2, d: 29 });
+    expect(addDays({ y: 2026, m: 3, d: 1 }, -1)).toEqual({ y: 2026, m: 2, d: 28 });
   });
 });

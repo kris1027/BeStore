@@ -76,6 +76,12 @@ function wallToUtc(wall: number, timeZone: string): Date {
   return new Date(wall - zoneOffsetMs(guess, timeZone));
 }
 
+// The calendar day n days later (or earlier); Date.UTC rolls months and years over.
+export function addDays(day: CalendarDay, n: number): CalendarDay {
+  const date = new Date(Date.UTC(day.y, day.m - 1, day.d + n));
+  return { y: date.getUTCFullYear(), m: date.getUTCMonth() + 1, d: date.getUTCDate() };
+}
+
 // The UTC instant a calendar day starts in a time zone.
 export function zonedDayStart(day: CalendarDay, timeZone: string): Date {
   return wallToUtc(Date.UTC(day.y, day.m - 1, day.d), timeZone);
