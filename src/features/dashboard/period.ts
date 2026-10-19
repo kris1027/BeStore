@@ -81,14 +81,14 @@ function dayRange(first: number, last: number, timeZone: string): DayRange {
 }
 
 function presetFirstDay(preset: SalesPreset, today: CalendarDay): number {
-  const t = dayNumber(today);
+  const todayNumber = dayNumber(today);
   switch (preset) {
     case "today":
-      return t;
+      return todayNumber;
     case "7d":
-      return t - 6;
+      return todayNumber - 6;
     case "30d":
-      return t - 29;
+      return todayNumber - 29;
     case "month":
       return dayNumber({ y: today.y, m: today.m, d: 1 });
     case "12m":

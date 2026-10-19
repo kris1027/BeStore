@@ -226,13 +226,13 @@ async function readDashboard(window: SalesWindow): Promise<SalesDashboard> {
         ),
         groups AS (
           SELECT
-            coalesce(s.product_id, f.product_id) AS product_id,
-            coalesce(s.units, 0) - coalesce(f.units, 0) AS net_units,
-            coalesce(s.sales, 0) AS sales,
-            CASE WHEN f.last_at IS NULL OR s.last_at >= f.last_at THEN s.last_name
-              ELSE f.last_name END AS line_name
-          FROM sold s
-          FULL OUTER JOIN refunded f ON f.key = s.key
+            coalesce(sold.product_id, refunded.product_id) AS product_id,
+            coalesce(sold.units, 0) - coalesce(refunded.units, 0) AS net_units,
+            coalesce(sold.sales, 0) AS sales,
+            CASE WHEN refunded.last_at IS NULL OR sold.last_at >= refunded.last_at
+              THEN sold.last_name ELSE refunded.last_name END AS line_name
+          FROM sold
+          FULL OUTER JOIN refunded ON refunded.key = sold.key
         ),
         named AS (
           SELECT p.id AS product_id, coalesce(p.name, g.line_name) AS name, g.net_units, g.sales
