@@ -29,6 +29,21 @@ export function parseCalendarDay(text: string): { y: number; m: number; d: numbe
     : null;
 }
 
+export type CalendarDay = { readonly y: number; readonly m: number; readonly d: number };
+
+// The calendar day an instant falls on in a time zone (spec 0015, AC-2), so "today" is the
+// store's day, not the server's.
+export function storeToday(now: Date, timeZone: string): CalendarDay {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const get = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? 0);
+  return { y: get("year"), m: get("month"), d: get("day") };
+}
+
 // How far the zone is ahead of UTC at this instant, in milliseconds.
 function zoneOffsetMs(instant: number, timeZone: string): number {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -62,10 +77,7 @@ function wallToUtc(wall: number, timeZone: string): Date {
 }
 
 // The UTC instant a calendar day starts in a time zone.
-export function zonedDayStart(
-  day: { readonly y: number; readonly m: number; readonly d: number },
-  timeZone: string,
-): Date {
+export function zonedDayStart(day: CalendarDay, timeZone: string): Date {
   return wallToUtc(Date.UTC(day.y, day.m - 1, day.d), timeZone);
 }
 
