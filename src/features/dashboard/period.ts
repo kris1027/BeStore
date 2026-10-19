@@ -117,16 +117,12 @@ function bucketKey(n: number, unit: BucketUnit): number {
 
 // Every bucket of the window, in order, empty ones included (AC-11).
 export function windowBuckets(first: number, last: number, unit: BucketUnit): SalesBucket[] {
-  const buckets: SalesBucket[] = [];
-  let previousKey: number | null = null;
-  for (let n = first; n <= last; n += 1) {
-    const key = bucketKey(n, unit);
-    if (key !== previousKey) {
-      buckets.push({ key: dayText(fromDayNumber(key)), firstDay: dayText(fromDayNumber(n)) });
-      previousKey = key;
-    }
-  }
-  return buckets;
+  return Array.from({ length: last - first + 1 }, (_, index) => first + index)
+    .filter((n) => n === first || bucketKey(n, unit) !== bucketKey(n - 1, unit))
+    .map((n) => ({
+      key: dayText(fromDayNumber(bucketKey(n, unit))),
+      firstDay: dayText(fromDayNumber(n)),
+    }));
 }
 
 function salesWindow(

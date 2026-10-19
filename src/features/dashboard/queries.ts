@@ -105,17 +105,21 @@ function salesTotals(orders: Totals, refunds: Totals): SalesTotals {
 }
 
 // A bucket key SQL returned that the window does not list means the two bucket rules disagree,
-// and the chart would silently drop money.
-function centsByBucket(rows: readonly MoneyRow[], keys: ReadonlySet<string>): Map<string, number> {
-  const byKey = new Map<string, number>();
-  for (const row of rows) {
-    if (!row.is_current) continue;
-    if (row.bucket === null || !keys.has(row.bucket)) {
-      throw new Error(`dashboard bucket ${String(row.bucket)} is not in the window`);
-    }
-    byKey.set(row.bucket, (byKey.get(row.bucket) ?? 0) + toSafeNumber(row.cents));
-  }
-  return byKey;
+// and the chart would silently drop money. The queries group by bucket, so each key comes once.
+function centsByBucket(
+  rows: readonly MoneyRow[],
+  keys: ReadonlySet<string>,
+): ReadonlyMap<string, number> {
+  return new Map(
+    rows
+      .filter((row) => row.is_current)
+      .map((row) => {
+        if (row.bucket === null || !keys.has(row.bucket)) {
+          throw new Error(`dashboard bucket ${String(row.bucket)} is not in the window`);
+        }
+        return [row.bucket, toSafeNumber(row.cents)] as const;
+      }),
+  );
 }
 
 async function readDashboard(window: SalesWindow): Promise<SalesDashboard> {
