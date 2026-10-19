@@ -48,6 +48,9 @@ test.describe("style guide", () => {
 
   test("has no axe violations", async ({ page }) => {
     await page.goto("/style-guide");
+    // The Base UI Checkbox and Radio take their label's name only on hydration, so axe waits.
+    await expect(page.getByRole("checkbox", { name: "Unchecked" })).toBeVisible();
+    await expect(page.getByRole("radio", { name: "Express (unchecked)" })).toBeVisible();
 
     await expectNoA11yViolations(page);
   });
@@ -63,7 +66,7 @@ test.describe("style guide", () => {
   test("has no axe violations with a Select open", async ({ page }) => {
     await page.goto("/style-guide");
     await page.getByRole("combobox", { name: "Size", exact: true }).click();
-    await expect(page.getByRole("option", { name: "Medium" })).toBeVisible();
+    await expect(page.getByRole("listbox").getByRole("option", { name: "Medium" })).toBeVisible();
 
     await expectNoA11yViolations(page);
   });
