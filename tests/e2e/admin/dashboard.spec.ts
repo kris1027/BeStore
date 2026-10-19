@@ -131,6 +131,31 @@ test("without the app's JavaScript the picker still picks a preset", async ({ pa
   await expect(picker.getByLabel("Period")).toHaveValue("7d");
 });
 
+// spec 0016, "Uncontrolled by default": the period stays a controlled NativeSelect because, with
+// JavaScript, a preset must clear the dates (they would otherwise win on the server).
+test("with JavaScript, picking a preset clears a custom range's dates", async ({ page }) => {
+  await signedInAdmin(page);
+  await page.goto("/admin?from=1999-01-01&to=1999-01-31");
+
+  const picker = page.getByRole("form", { name: "Choose a period" });
+  const period = picker.getByLabel("Period");
+  const from = picker.getByRole("textbox", { name: "From" });
+  await expect(period).toHaveValue("");
+  await expect(from).toHaveValue("1999-01-01");
+  // Before hydration a change only moves the native value, so pick until React clears the dates.
+  await expect(async () => {
+    await period.selectOption("30d");
+    await period.selectOption("7d");
+    await expect(from).toHaveValue("", { timeout: 500 });
+  }).toPass();
+  await expect(picker.getByRole("textbox", { name: "To", exact: true })).toHaveValue("");
+  await picker.getByRole("button", { name: "Apply" }).click();
+
+  await expect(page).toHaveURL(/period=7d/);
+  expect(page.url()).not.toContain("1999");
+  await expect(period).toHaveValue("7d");
+});
+
 test("the picker and the table toggle work by keyboard", async ({ page }) => {
   await signedInAdmin(page);
   await page.goto("/admin");

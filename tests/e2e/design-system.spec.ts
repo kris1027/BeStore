@@ -1,6 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoA11yViolations } from "./a11y";
+import { blockAppScripts } from "./no-js";
 
 const isPhone = (page: Page) => (page.viewportSize()?.width ?? 1280) < 768;
 
@@ -22,6 +23,7 @@ test.describe("style guide", () => {
       "Components",
       "Button",
       "Input, Textarea, Select and Field",
+      "NativeSelect",
       "Checkbox and Radio group",
       "Card",
       "Badge",
@@ -69,6 +71,36 @@ test.describe("style guide", () => {
     await expect(page.getByRole("listbox").getByRole("option", { name: "Medium" })).toBeVisible();
 
     await expectNoA11yViolations(page);
+  });
+
+  // spec 0016, Rollout step 1: the NativeSelect section shows its default, disabled and invalid
+  // states, each named by its label.
+  test("shows NativeSelect in its default, disabled and invalid states", async ({ page }) => {
+    await page.goto("/style-guide");
+    const section = page.locator("#native-select");
+
+    const size = section.getByRole("combobox", { name: "Pack size", exact: true });
+    await expect(size).toHaveValue("m");
+    await expect(size).toBeEnabled();
+    await expect(section.getByRole("combobox", { name: "Pack size (disabled)" })).toBeDisabled();
+    const invalid = section.getByRole("combobox", { name: "Pack size (invalid)" });
+    await expect(invalid).toHaveAttribute("aria-invalid", "true");
+    await expect(invalid).toHaveAccessibleDescription("Choose a pack size.");
+    await expect(invalid).toHaveValue("");
+  });
+
+  // spec 0016: the whole point of NativeSelect is that it works before the app's JavaScript loads.
+  test("NativeSelect changes value without the app's JavaScript", async ({ page }) => {
+    await blockAppScripts(page);
+    await page.goto("/style-guide");
+
+    const size = page.locator("#native-select").getByRole("combobox", {
+      name: "Pack size",
+      exact: true,
+    });
+    await size.selectOption("l");
+
+    await expect(size).toHaveValue("l");
   });
 
   test("announces a toast", async ({ page }) => {
