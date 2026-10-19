@@ -32,6 +32,12 @@ const statusItems = [
   { value: "expired", label: "Expired" },
 ];
 
+// spec 0015, AC-13: which date From and To filter. "" is the default, when the order was placed.
+const dateItems = [
+  { value: "", label: "Order placed" },
+  { value: "paid", label: "Paid" },
+];
+
 const refundItems = [
   { value: "", label: "Any" },
   { value: "none", label: "Not refunded" },
@@ -107,8 +113,15 @@ export function OrdersFilters({ params }: { readonly params: AdminOrdersParams }
         items={refundItems}
         value={params.refund ?? ""}
       />
+      <FilterSelect
+        id="orders-dates"
+        name="dates"
+        label="Date"
+        items={dateItems}
+        value={params.dates === "created" ? "" : params.dates}
+      />
       <div className="flex flex-col gap-2">
-        <Label htmlFor="orders-from">Placed from</Label>
+        <Label htmlFor="orders-from">From</Label>
         <Input
           id="orders-from"
           type="date"
@@ -118,7 +131,7 @@ export function OrdersFilters({ params }: { readonly params: AdminOrdersParams }
         />
       </div>
       <div className="flex flex-col gap-2">
-        <Label htmlFor="orders-to">Placed to</Label>
+        <Label htmlFor="orders-to">To</Label>
         <Input
           id="orders-to"
           type="date"

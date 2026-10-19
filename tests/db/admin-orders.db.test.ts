@@ -300,6 +300,28 @@ describe("getAdminOrders filters (spec 0010, AC-1 to AC-3)", () => {
     expect(await numbers({ from: "2026-10-02", to: "2026-10-01" })).toHaveLength(4);
   });
 
+  // spec 0015, AC-13: the dashboard's "View these orders" link.
+  it("filters by the paid day with dates=paid, leaving out unpaid orders", async () => {
+    const at = async (createdAt: string, paidAt: string | null) => {
+      const created = await order({ status: paidAt === null ? "pending_payment" : "paid" });
+      await testDb.order.update({
+        where: { id: created.id },
+        data: { createdAt: new Date(createdAt), paidAt: paidAt === null ? null : new Date(paidAt) },
+      });
+    };
+    // Placed on 30 Sept, paid at 00:00 on 1 Oct in Warsaw.
+    await at("2026-09-30T21:00:00Z", "2026-09-30T22:00:00Z");
+    // Placed and paid on 1 Oct.
+    await at("2026-10-01T08:00:00Z", "2026-10-01T09:00:00Z");
+    // Placed on 1 Oct, never paid.
+    await at("2026-10-01T10:00:00Z", null);
+
+    const day = { status: "all", from: "2026-10-01", to: "2026-10-01" };
+    expect(await numbers({ ...day, dates: "paid" })).toEqual([1002, 1001]);
+    expect(await numbers(day)).toEqual([1003, 1002]);
+    expect(await numbers({ status: "all", dates: "paid" })).toEqual([1002, 1001]);
+  });
+
   it("keeps the filters across pages", async () => {
     for (let i = 0; i < 52; i += 1) await order({ status: i % 2 === 0 ? "paid" : "shipped" });
 
