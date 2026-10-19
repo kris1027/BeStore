@@ -4,7 +4,6 @@ import { TableIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ReferenceLine, XAxis, YAxis } from "recharts";
 
-import { useStoreFormat } from "@/components/store-format-provider";
 import { Button } from "@/components/ui/button";
 import {
   type ChartConfig,
@@ -21,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatMoney } from "@/lib/money";
+import { formatMoney, type MoneyFormat } from "@/lib/money";
 
 import type { BucketUnit } from "../period";
 
@@ -41,14 +40,16 @@ const chartConfig = {
 
 // spec 0015, AC-11 and AC-12: net revenue per bucket. The SVG is hidden from screen readers;
 // the same numbers are one button away as a table.
+// The money format comes from the page, the same one the cards and the table use.
 export function RevenueChart({
   unit,
   rows,
+  format,
 }: {
   readonly unit: BucketUnit;
   readonly rows: readonly ChartRow[];
+  readonly format: MoneyFormat;
 }) {
-  const format = useStoreFormat();
   const [showTable, setShowTable] = useState(false);
   const tableId = useId();
   const heading = `Net revenue per ${unit}`;

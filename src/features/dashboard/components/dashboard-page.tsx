@@ -140,6 +140,7 @@ async function DashboardFigures({
           <CardContent>
             <RevenueChart
               unit={window.unit}
+              format={money}
               rows={dashboard.buckets.map((bucket) => ({
                 key: bucket.key,
                 label: bucketLabel(bucket, window.unit, money.locale),
