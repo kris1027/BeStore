@@ -9,7 +9,26 @@ const eslintConfig = defineConfig([
   {
     rules: {
       "@typescript-eslint/no-explicit-any": "error",
+      // spec 0016: a GET form must work before the app's JavaScript loads, and a dead Select
+      // fails silently (the form submits the value it was rendered with).
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@/components/ui/select",
+              message:
+                "Use NativeSelect from @/components/ui/native-select (spec 0016): the Base UI Select only opens with JavaScript.",
+            },
+          ],
+        },
+      ],
     },
+  },
+  // The style guide keeps showing the Base UI Select (spec 0003).
+  {
+    files: ["src/features/style-guide/**"],
+    rules: { "no-restricted-imports": "off" },
   },
   // Turn off style rules that would fight Prettier.
   prettier,
