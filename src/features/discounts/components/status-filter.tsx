@@ -1,7 +1,6 @@
 "use client";
 
-import { Label } from "@/components/ui/label";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { NativeSelectField, type SelectItem } from "@/components/native-select-field";
 
 // spec 0014, AC-10: part of a plain GET form, so the filter lives in the URL. "Any" sends "",
 // which the parser ignores. Native (spec 0016), so it works before the app's JavaScript loads.
@@ -10,18 +9,16 @@ export function StatusFilter({
   items,
 }: {
   readonly value: string;
-  readonly items: readonly { readonly value: string; readonly label: string }[];
+  readonly items: readonly SelectItem[];
 }) {
   return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor="discounts-status">Status</Label>
-      <NativeSelect id="discounts-status" name="status" defaultValue={value} className="w-44">
-        {items.map((item) => (
-          <NativeSelectOption key={item.value} value={item.value}>
-            {item.label}
-          </NativeSelectOption>
-        ))}
-      </NativeSelect>
-    </div>
+    <NativeSelectField
+      id="discounts-status"
+      name="status"
+      label="Status"
+      items={items}
+      defaultValue={value}
+      className="w-44"
+    />
   );
 }

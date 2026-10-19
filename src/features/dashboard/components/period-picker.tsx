@@ -3,10 +3,10 @@
 import { CalendarRangeIcon } from "lucide-react";
 import { useState } from "react";
 
+import { NativeSelectField } from "@/components/native-select-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 
 import { dashboardPath } from "../paths";
 import { presetLabels, salesPresets, shownCustom, type SalesPreset } from "../period";
@@ -56,22 +56,15 @@ export function PeriodPicker({ preset, from, to, today }: PeriodPickerProps) {
       action={dashboardPath}
       className="flex flex-wrap items-end gap-3"
     >
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="dashboard-period">Period</Label>
-        <NativeSelect
-          id="dashboard-period"
-          name="period"
-          value={period}
-          onChange={(event) => pickPeriod(event.target.value)}
-          className="w-44"
-        >
-          {periodItems.map((item) => (
-            <NativeSelectOption key={item.value} value={item.value}>
-              {item.label}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
-      </div>
+      <NativeSelectField
+        id="dashboard-period"
+        name="period"
+        label="Period"
+        items={periodItems}
+        value={period}
+        onChange={(event) => pickPeriod(event.target.value)}
+        className="w-44"
+      />
       <div className="flex flex-col gap-2">
         <Label htmlFor="dashboard-from">From</Label>
         <Input

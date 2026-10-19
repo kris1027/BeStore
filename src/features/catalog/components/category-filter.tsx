@@ -1,7 +1,6 @@
 "use client";
 
-import { Label } from "@/components/ui/label";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { NativeSelectField } from "@/components/native-select-field";
 
 import type { CategoryOption } from "../admin-queries";
 
@@ -21,20 +20,13 @@ export function CategoryFilter({
     ...categories.map((category) => ({ value: category.id, label: category.name })),
   ];
   return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor="products-category">Category</Label>
-      <NativeSelect
-        id="products-category"
-        name="category"
-        defaultValue={value ?? anyCategory}
-        className="w-48"
-      >
-        {items.map((item) => (
-          <NativeSelectOption key={item.value} value={item.value}>
-            {item.label}
-          </NativeSelectOption>
-        ))}
-      </NativeSelect>
-    </div>
+    <NativeSelectField
+      id="products-category"
+      name="category"
+      label="Category"
+      items={items}
+      defaultValue={value ?? anyCategory}
+      className="w-48"
+    />
   );
 }

@@ -2,10 +2,10 @@
 
 import { SearchIcon } from "lucide-react";
 
+import { NativeSelectField } from "@/components/native-select-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { SEARCH_MAX_LENGTH } from "@/lib/admin-search";
 
 import type { AdminOrdersParams } from "../list-params";
@@ -37,33 +37,6 @@ const refundItems = [
   { value: "full", label: "Fully refunded" },
 ];
 
-function FilterSelect({
-  id,
-  name,
-  label,
-  items,
-  value,
-}: {
-  readonly id: string;
-  readonly name: string;
-  readonly label: string;
-  readonly items: readonly { readonly value: string; readonly label: string }[];
-  readonly value: string;
-}) {
-  return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={id}>{label}</Label>
-      <NativeSelect id={id} name={name} defaultValue={value} className="w-44">
-        {items.map((item) => (
-          <NativeSelectOption key={item.value} value={item.value}>
-            {item.label}
-          </NativeSelectOption>
-        ))}
-      </NativeSelect>
-    </div>
-  );
-}
-
 // spec 0010, AC-1 and AC-2: a plain GET form, so every filter lives in the URL and a filtered
 // view can be shared or reloaded. Submitting starts again at the newest page.
 // spec 0016: a GET form works before the app's JavaScript loads, so its controls are native.
@@ -85,26 +58,29 @@ export function OrdersFilters({ params }: { readonly params: AdminOrdersParams }
           autoComplete="off"
         />
       </div>
-      <FilterSelect
+      <NativeSelectField
         id="orders-status"
         name="status"
         label="Status"
         items={statusItems}
-        value={params.status === "settled" ? "" : params.status}
+        defaultValue={params.status === "settled" ? "" : params.status}
+        className="w-44"
       />
-      <FilterSelect
+      <NativeSelectField
         id="orders-refund"
         name="refund"
         label="Refunds"
         items={refundItems}
-        value={params.refund ?? ""}
+        defaultValue={params.refund ?? ""}
+        className="w-44"
       />
-      <FilterSelect
+      <NativeSelectField
         id="orders-dates"
         name="dates"
         label="Date"
         items={dateItems}
-        value={params.dates === "created" ? "" : params.dates}
+        defaultValue={params.dates === "created" ? "" : params.dates}
+        className="w-44"
       />
       <div className="flex flex-col gap-2">
         <Label htmlFor="orders-from">From</Label>
