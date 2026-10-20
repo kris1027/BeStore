@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   acceptAllChoices,
   categoryUsed,
+  choicesFrom,
   CONSENT_COOKIE,
   CONSENT_MAX_AGE_SECONDS,
   type ConsentChoice,
@@ -13,6 +14,7 @@ import {
   entryMatches,
   expiredCookieString,
   grantedChoices,
+  optionalCategories,
   parseConsent,
   readCookie,
   refusedAll,
@@ -174,5 +176,18 @@ describe("what is granted", () => {
       marketing: false,
     });
     expect(categoryUsed([entry({})], "marketing")).toBe(false);
+  });
+});
+
+describe("choicesFrom", () => {
+  it("answers once for every optional category and nothing else", () => {
+    const asked: string[] = [];
+    const choices = choicesFrom((category) => {
+      asked.push(category);
+      return category === "analytics";
+    });
+
+    expect(asked).toEqual([...optionalCategories]);
+    expect(choices).toEqual({ analytics: true, marketing: false });
   });
 });

@@ -53,7 +53,14 @@ const choiceSchema = z.object({
   marketing: z.boolean(),
 });
 
-export const refusedAll: Choices = { analytics: false, marketing: false };
+// One answer per optional category, so a new category needs no edit in the callers.
+export function choicesFrom(pick: (category: OptionalCategory) => boolean): Choices {
+  return Object.fromEntries(
+    optionalCategories.map((category) => [category, pick(category)]),
+  ) as Record<OptionalCategory, boolean>;
+}
+
+export const refusedAll: Choices = choicesFrom(() => false);
 
 // A missing cookie, a value that is not our JSON, a choice made against another policy version,
 // or one older than 12 months all read as "no choice yet" (AC-15).
@@ -133,9 +140,7 @@ export function categoryUsed(registry: CookieRegistry, category: ConsentCategory
 
 // What a customer's choice amounts to: refused until they say yes, whatever GPC says (AC-21).
 export function grantedChoices(choice: ConsentChoice | null): Choices {
-  return choice === null
-    ? refusedAll
-    : { analytics: choice.analytics, marketing: choice.marketing };
+  return choice === null ? refusedAll : choicesFrom((category) => choice[category]);
 }
 
 // The categories a save turns from on to off: a reload follows, so a running script stops.
@@ -172,8 +177,5 @@ export function shouldShowBanner(input: {
 
 // Accept all turns on only what the registry uses; an unused category stays off (AC-16).
 export function acceptAllChoices(registry: CookieRegistry): Choices {
-  return {
-    analytics: categoryUsed(registry, "analytics"),
-    marketing: categoryUsed(registry, "marketing"),
-  };
+  return choicesFrom((category) => categoryUsed(registry, category));
 }

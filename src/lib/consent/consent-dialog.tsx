@@ -19,10 +19,12 @@ import {
   acceptAllChoices,
   categoryUsed,
   type Choices,
+  choicesFrom,
   type ConsentCategory,
   consentCategoryLabels,
   type CookieRegistry,
   type OptionalCategory,
+  optionalCategories,
   refusedAll,
 } from "./consent";
 
@@ -78,10 +80,9 @@ function ConsentForm({
   readonly granted: Choices;
   readonly onSave: (next: Choices) => void;
 }) {
-  const [choices, setChoices] = useState<Choices>(() => ({
-    analytics: granted.analytics && categoryUsed(registry, "analytics"),
-    marketing: granted.marketing && categoryUsed(registry, "marketing"),
-  }));
+  const [choices, setChoices] = useState<Choices>(() =>
+    choicesFrom((category) => granted[category] && categoryUsed(registry, category)),
+  );
 
   return (
     <>
@@ -113,7 +114,7 @@ function ConsentForm({
             </FieldDescription>
           </FieldContent>
         </Field>
-        {(["analytics", "marketing"] as const).map((category) => (
+        {optionalCategories.map((category) => (
           <CategoryField
             key={category}
             category={category}
