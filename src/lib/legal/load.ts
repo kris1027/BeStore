@@ -1,4 +1,5 @@
 import type { SellerDetails } from "@/lib/brand/brand";
+import type { CalendarDayText } from "@/lib/dates";
 
 import { parseFrontMatter } from "./front-matter";
 import { legalPaths, type LegalSlug, legalSlugs } from "./paths";
@@ -13,7 +14,7 @@ export type LegalDocument = {
   readonly title: string;
   readonly description: string;
   // The front matter date, YYYY-MM-DD: the text's version.
-  readonly updated: string;
+  readonly updated: CalendarDayText;
   // Seller placeholders filled; `/shipping` still holds its live ones (AC-5).
   readonly body: string;
 };

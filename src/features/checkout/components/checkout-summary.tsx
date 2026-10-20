@@ -2,6 +2,7 @@ import { InfoIcon } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import type { CalendarDayText } from "@/lib/dates";
 import { inlineLinkClass } from "@/components/inline-link";
 import { Price } from "@/components/price";
 import { ProductImage } from "@/components/product-image";
@@ -53,7 +54,7 @@ export async function CheckoutSummary({
 }: {
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
   // spec 0017, AC-9: the current terms version, which Pay sends back.
-  readonly termsVersion: string;
+  readonly termsVersion: CalendarDayText;
 }) {
   const [cart, params] = await Promise.all([loadOwnedCart(), searchParams]);
   if (!cart || !cart.canCheckout) redirect(cartPath);

@@ -27,7 +27,7 @@ export function formatCalendarDate(date: Date, locale: string): string {
 }
 
 // A YYYY-MM-DD text as the UTC midnight formatCalendarDate and a Postgres `date` column expect.
-export function calendarDate(ymd: string): Date {
+export function calendarDate(ymd: CalendarDayText): Date {
   return new Date(`${ymd}T00:00:00Z`);
 }
 
@@ -43,10 +43,14 @@ export function parseCalendarDay(text: string): { y: number; m: number; d: numbe
 }
 
 // The same check as a Zod string, for any YYYY-MM-DD text read from outside (a legal text's
-// `updated`, the terms version a checkout sends).
+// `updated`, the terms version a checkout sends). Branded, so only a checked text reaches
+// calendarDate.
 export const calendarDayTextSchema = z
   .string()
-  .refine((value) => parseCalendarDay(value) !== null, { error: "Not a real YYYY-MM-DD date" });
+  .refine((value) => parseCalendarDay(value) !== null, { error: "Not a real YYYY-MM-DD date" })
+  .brand<"CalendarDayText">();
+
+export type CalendarDayText = z.output<typeof calendarDayTextSchema>;
 
 export type CalendarDay = { readonly y: number; readonly m: number; readonly d: number };
 

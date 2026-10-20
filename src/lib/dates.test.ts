@@ -33,14 +33,18 @@ describe("formatDate", () => {
 // spec 0017, AC-1: a version date is the same day in every zone.
 describe("formatCalendarDate", () => {
   it("formats a YYYY-MM-DD as a long date with no day shift", () => {
-    expect(formatCalendarDate(calendarDate("2026-10-20"), "en")).toBe("October 20, 2026");
-    expect(formatCalendarDate(calendarDate("2026-01-01"), "pl-PL")).toBe("1 stycznia 2026");
+    expect(formatCalendarDate(calendarDate(calendarDayTextSchema.parse("2026-10-20")), "en")).toBe(
+      "October 20, 2026",
+    );
+    expect(
+      formatCalendarDate(calendarDate(calendarDayTextSchema.parse("2026-01-01")), "pl-PL"),
+    ).toBe("1 stycznia 2026");
   });
 
   // Value sourcing, admin version and time: accepted at 00:30 Warsaw time the next day, the
   // version still reads as the file's date while the time follows the store zone.
   it("keeps the version day apart from a late night acceptance time", () => {
-    const version = calendarDate("2026-10-20");
+    const version = calendarDate(calendarDayTextSchema.parse("2026-10-20"));
     const acceptedAt = new Date("2026-10-20T22:30:00Z");
 
     expect(formatCalendarDate(version, "pl-PL")).toBe("20 października 2026");

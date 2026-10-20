@@ -37,7 +37,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Spinner } from "@/components/ui/spinner";
-import { calendarDate, formatCalendarDate } from "@/lib/dates";
+import { calendarDate, type CalendarDayText, formatCalendarDate } from "@/lib/dates";
 import { legalPaths } from "@/lib/legal/paths";
 import { formatMoney } from "@/lib/money";
 import type { StoreCountry } from "@/lib/shipping/address";
@@ -115,7 +115,7 @@ export function CheckoutForm({
   // spec 0014, AC-4: the applied promo code Pay sends, or null.
   readonly discountCode: string | null;
   // spec 0017, AC-9: the terms version this page shows, sent with Pay.
-  readonly termsVersion: string;
+  readonly termsVersion: CalendarDayText;
   // Lets the promo code field read the email as typed, for its per customer check.
   readonly emailRef: RefObject<() => string>;
   // Pay refused the code: the field shows why and the summary drops it.
@@ -128,7 +128,7 @@ export function CheckoutForm({
   const [notice, setNotice] = useState<string | null>(null);
   // spec 0017, AC-10: never an editable field. A terms_changed answer moves it to the new version.
   const [termsVersion, setTermsVersion] = useState(shownTermsVersion);
-  const [termsChangedOn, setTermsChangedOn] = useState<string | null>(null);
+  const [termsChangedOn, setTermsChangedOn] = useState<CalendarDayText | null>(null);
   // Until React takes over, the button stays disabled: a native submit would put the email in
   // the URL as a GET query. A disabled default button also blocks submitting with Enter.
   const hydrated = useSyncExternalStore(
