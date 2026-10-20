@@ -32,6 +32,8 @@ jobs:
       - run: pnpm format:check
       - run: pnpm typecheck
       - run: pnpm test
+      # spec 0017, AC-4: a blank or unknown placeholder in a legal text fails `next build`.
+      - run: pnpm test:build
 
   db:
     runs-on: ubuntu-latest

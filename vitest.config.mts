@@ -14,9 +14,10 @@ function rawLegalMarkdown(): Plugin {
   };
 }
 
-// Three projects: `unit` needs no database (`pnpm test`); `db` runs the *.db.test.ts suites
+// Four projects: `unit` needs no database (`pnpm test`); `db` runs the *.db.test.ts suites
 // against TEST_DATABASE_URL (`pnpm test:db`, which migrates that database first); `stack` runs
-// the *.stack.test.ts suites against the local Supabase stack's auth schema (`pnpm test:stack`).
+// the *.stack.test.ts suites against the local Supabase stack's auth schema (`pnpm test:stack`);
+// `build` runs the *.build.test.ts suites, which call `next build` (`pnpm test:build`).
 export default defineConfig({
   plugins: [rawLegalMarkdown()],
   resolve: { tsconfigPaths: true },
@@ -36,6 +37,7 @@ export default defineConfig({
             "tests/e2e/**",
             "**/*.db.test.ts",
             "**/*.stack.test.ts",
+            "**/*.build.test.ts",
           ],
           unstubEnvs: true,
         },
@@ -58,6 +60,15 @@ export default defineConfig({
           include: ["**/*.stack.test.ts"],
           exclude: ["node_modules/**", ".next/**"],
           testTimeout: 20_000,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "build",
+          include: ["**/*.build.test.ts"],
+          exclude: ["node_modules/**", ".next/**"],
+          testTimeout: 300_000,
         },
       },
     ],

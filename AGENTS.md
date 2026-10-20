@@ -38,6 +38,7 @@ pnpm lint && pnpm typecheck
 pnpm format                  # Prettier; format:check in CI
 pnpm test                    # Vitest unit + integration (*.test.ts beside the source)
 pnpm test:db                 # Vitest db project against TEST_DATABASE_URL (needs pnpm db:start)
+pnpm test:build              # Vitest build project: next build on a copy of the app (tests/build/)
 pnpm test:e2e                # Playwright e2e (tests/e2e/*.spec.ts)
 ```
 
@@ -70,7 +71,7 @@ Stored in `docs/specs/`. Format: `docs/specs/NNNN-title/index.md`. Scope lives i
 Installed:
 - ESLint (Next.js config, `@typescript-eslint/no-explicit-any: error`) + Prettier with `prettier-plugin-tailwindcss`; scripts `format`, `format:check`, `test`, `test:e2e`. Prettier skips `*.md` on purpose (skills and `next dev` own those files).
 - Pre commit (simple-git-hooks + lint-staged): lint and format staged files, then `pnpm typecheck`. `SKIP_SIMPLE_GIT_HOOKS=1` bypasses it in an emergency.
-- CI: [.github/workflows/ci.yml](.github/workflows/ci.yml), on pushes to `main` and on every PR, as parallel jobs: `static` (lint, format check, typecheck, unit), `db` (`test:db`), `e2e` (4 Playwright shards, each with its own Supabase stack and build; shard 1 also runs `test:stack`), and a `check` gate that needs them all (the ruleset's required check, so it keeps that name).
+- CI: [.github/workflows/ci.yml](.github/workflows/ci.yml), on pushes to `main` and on every PR, as parallel jobs: `static` (lint, format check, typecheck, unit, build guard), `db` (`test:db`), `e2e` (4 Playwright shards, each with its own Supabase stack and build; shard 1 also runs `test:stack`), and a `check` gate that needs them all (the ruleset's required check, so it keeps that name).
 
 ## Git
 

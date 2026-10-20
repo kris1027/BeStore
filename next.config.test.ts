@@ -17,6 +17,8 @@ describe("legal text bundling", () => {
   it("runs the raw text loader on the legal content folder only", () => {
     expect(rule).toMatchObject({ loaders: ["./scripts/raw-text-loader.cjs"], as: "*.js" });
     expect(path?.test("src/lib/legal/content/terms.md")).toBe(true);
+    expect(path?.test(".next/legal-guard/marker/src/lib/legal/content/terms.md")).toBe(true);
+    expect(path?.test("tests/fixtures/notsrc/lib/legal/content/terms.md")).toBe(false);
     expect(path?.test("docs/specs/0017-legal-pages-cookie-consent/index.md")).toBe(false);
     expect(path?.test("src/lib/legal/content/nested/terms.md")).toBe(false);
   });
