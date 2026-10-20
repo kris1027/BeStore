@@ -2,6 +2,7 @@ import { InfoIcon } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { inlineLinkClass } from "@/components/inline-link";
 import { Price } from "@/components/price";
 import { ProductImage } from "@/components/product-image";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -167,10 +168,7 @@ export async function CheckoutSummary({
               customer === null ? (
                 <p className="text-sm text-muted-foreground">
                   Have an account?{" "}
-                  <Link
-                    href={signInToCheckout}
-                    className="text-foreground underline underline-offset-4 hover:text-foreground/80"
-                  >
+                  <Link href={signInToCheckout} className={inlineLinkClass}>
                     Sign in
                   </Link>
                 </p>

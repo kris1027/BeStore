@@ -1,6 +1,8 @@
 import Link from "next/link";
 import Markdown, { type Components } from "react-markdown";
 
+import { inlineLinkClass } from "@/components/inline-link";
+
 // spec 0017, Renderer: its own renderer, not the product description one (that one drops
 // relative links and demotes headings). The page title is the only h1, so a `#` heading in a
 // draft is an error (content.test.ts), never rendered. Raw HTML is skipped (the draft note is an
@@ -27,8 +29,6 @@ export function legalUrl(url: string): string {
   return /^(https:|mailto:)/i.test(trimmed) ? trimmed : "";
 }
 
-const linkClass = "text-foreground underline underline-offset-4 hover:text-foreground/80";
-
 const components: Components = {
   h2: ({ children }) => (
     <h2 className="mt-6 font-heading text-2xl text-foreground md:text-3xl">{children}</h2>
@@ -49,7 +49,7 @@ const components: Components = {
     if (!href) return <span>{children}</span>;
     if (href.startsWith("/")) {
       return (
-        <Link href={href} className={linkClass}>
+        <Link href={href} className={inlineLinkClass}>
           {children}
         </Link>
       );
@@ -57,7 +57,7 @@ const components: Components = {
     return (
       <a
         href={href}
-        className={linkClass}
+        className={inlineLinkClass}
         {...(href.startsWith("https:") ? { rel: "noopener noreferrer" } : {})}
       >
         {children}
