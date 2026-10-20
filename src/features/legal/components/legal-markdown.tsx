@@ -6,7 +6,7 @@ import Markdown, { type Components } from "react-markdown";
 // draft is an error (content.test.ts), never rendered. Raw HTML is skipped (the draft note is an
 // HTML comment), and anything outside the list below is unwrapped to its text.
 
-export const allowedElements = [
+export const allowedElements: readonly string[] = [
   "h2",
   "h3",
   "p",
