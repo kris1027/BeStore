@@ -14,6 +14,7 @@ import { addDays, parseCalendarDay, zonedDayStart } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { escapeLike } from "@/lib/like";
 import { env } from "@/lib/env";
+import type { TermsAcceptance } from "@/lib/legal/acceptance";
 import { logEmailMissing } from "@/lib/orders/log";
 import {
   type DeliveryAddress,
@@ -246,9 +247,8 @@ export type AdminOrderDetail = {
   readonly shippedAt: Date | null;
   readonly deliveredAt: Date | null;
   readonly cancelledAt: Date | null;
-  // spec 0017, AC-13: the terms version (a UTC midnight date) accepted at Pay, and when; null on
-  // orders from before the feature.
-  readonly terms: { readonly version: Date; readonly acceptedAt: Date } | null;
+  // spec 0017, AC-13: null on orders from before the feature.
+  readonly terms: TermsAcceptance | null;
   readonly carrier: string | null;
   readonly trackingNumber: string | null;
   readonly phone: string | null;

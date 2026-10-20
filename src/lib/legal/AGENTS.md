@@ -10,6 +10,7 @@ The five legal texts (terms, privacy, returns, shipping, cookies) as Markdown in
 - `documents.ts`: `server-only`. `legalDocuments`, `currentTermsVersion` (what checkout accepts and stores on the order) and `cookiePolicyVersion` (what the consent cookie records).
 - `load.ts`: pure `loadLegalDocuments`, the raw files to documents: front matter, seller and store placeholders, the draft comment stripped, the production guard.
 - `front-matter.ts`, `placeholders.ts`: pure. `key: value` front matter checked with Zod (no YAML parser); `{{name}}` filling and `[[TO FILL: ...]]` markers.
+- `acceptance.ts`: the `TermsAcceptance` type an order records (checkout writes it, admin orders read it).
 - `paths.ts`: pure, no server import. `legalSlugs` (the footer order), `legalPaths`, `legalLinkLabels`, for client components and the email builder.
 - `footer-links.ts`: `legalFooterLinks`, which `StoreShell` uses by default, so the 404 page has them too.
 

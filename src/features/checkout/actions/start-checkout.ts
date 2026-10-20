@@ -13,6 +13,7 @@ import { redeem } from "@/lib/discounts/codes";
 import type { DiscountRefused } from "@/lib/discounts/rule";
 import { calendarDate } from "@/lib/dates";
 import { env } from "@/lib/env";
+import type { TermsAcceptance } from "@/lib/legal/acceptance";
 import { currentTermsVersion } from "@/lib/legal/documents";
 import { logOrderExpired } from "@/lib/orders/log";
 import { minimumChargeCents } from "@/lib/orders/minimum-charge";
@@ -288,10 +289,6 @@ async function checkoutCartId(customer: CustomerIdentity | null): Promise<Result
   const cartId = merge === null ? await readOwnedCartId() : merge.cartId;
   return cartId === null ? fail({ code: "cart_changed" }) : { ok: true, data: cartId };
 }
-
-// spec 0017, AC-11: written on the order in the transaction that creates it, never changed. A
-// replaced or restarted checkout makes a new order with its own fresh values.
-type TermsAcceptance = { readonly version: Date; readonly acceptedAt: Date };
 
 type CreatedOrder = {
   readonly id: string;
