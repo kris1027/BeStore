@@ -61,7 +61,24 @@ describe("StoreShell", () => {
 
   describe("footer links", () => {
     it("renders no footer nav when there are no links", () => {
-      expect(render()).not.toContain('aria-label="Footer"');
+      expect(render({ footerLinks: [] })).not.toContain('aria-label="Footer"');
+    });
+
+    // spec 0017, AC-3 and AC-16: the legal pages by default, in order, then Cookie settings,
+    // a plain link to /cookies with no ConsentProvider above (and in the server HTML).
+    it("lists the legal pages by default, then Cookie settings", () => {
+      const links = [...footer(render()).matchAll(/<a[^>]*href="([^"]+)"[^>]*>([^<]+)</g)]
+        .map((match) => [match[1], match[2]])
+        .filter(([href]) => !href?.startsWith("mailto:") && href !== "/");
+
+      expect(links).toEqual([
+        ["/terms", "Terms of sale"],
+        ["/privacy", "Privacy policy"],
+        ["/returns", "Returns"],
+        ["/shipping", "Shipping"],
+        ["/cookies", "Cookie policy"],
+        ["/cookies", "Cookie settings"],
+      ]);
     });
 
     it("renders each link from the footerLinks prop in a labelled nav", () => {
@@ -81,6 +98,23 @@ describe("StoreShell", () => {
   // covers: AC-6 (the menu only shows once there is something to navigate to)
   it("renders no menu button when the nav list is empty", () => {
     expect(render({ navItems: [] })).not.toContain("Open menu");
+  });
+
+  // spec 0017, AC-19: the consent bar comes right after the skip link in the DOM.
+  it("places the banner right after the skip link", () => {
+    const html = render({ banner: createElement("section", { "aria-label": "Cookie consent" }) });
+
+    expect(html).toMatch(
+      /Skip to content<\/a><section aria-label="Cookie consent"><\/section><header/,
+    );
+  });
+
+  // spec 0017, AC-3: printing a legal page prints only its text.
+  it("hides the header and the footer in print", () => {
+    const html = render();
+
+    expect(html).toMatch(/<header class="[^"]*print:hidden/);
+    expect(html).toMatch(/<footer class="[^"]*print:hidden/);
   });
 
   it("renders header actions from the actions prop", () => {

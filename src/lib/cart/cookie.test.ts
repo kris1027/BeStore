@@ -26,8 +26,8 @@ vi.mock("next/headers", () => ({
   }),
 }));
 
-const { CART_COOKIE, CART_TTL_MS, cartExpiry, readCartId, setCartCookie } =
-  await import("./cookie");
+const { CART_TTL_MS, cartExpiry, readCartId, setCartCookie } = await import("./cookie");
+const { CART_COOKIE } = await import("./cookie-name");
 
 beforeEach(() => {
   vi.clearAllMocks();
