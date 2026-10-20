@@ -192,6 +192,33 @@ describe("the confirmation", () => {
       expect(email.html).toContain('href="https://shop.example/terms"');
     });
 
+    // Value sourcing, email links: NEXT_PUBLIC_SITE_URL decides the origin.
+    it("builds the legal links from the site URL it is given", () => {
+      const props = confirmationProps(
+        {
+          number: 1,
+          customerName: null,
+          currency: "EUR",
+          address: null,
+          paidAt: new Date("2026-10-13T10:00:00Z"),
+          subtotalCents: 1000,
+          discountCents: 0,
+          discountCode: null,
+          shippingCents: 0,
+          totalCents: 1000,
+          termsVersion: null,
+          lines: [],
+        },
+        { ...format, siteUrl: "https://staging.other.example" },
+      );
+
+      expect(props.legalLinks).toEqual({
+        terms: "https://staging.other.example/terms",
+        returns: "https://staging.other.example/returns",
+        privacy: "https://staging.other.example/privacy",
+      });
+    });
+
     it("formats the version in the store locale, on the same day", () => {
       const props = confirmationProps(
         {

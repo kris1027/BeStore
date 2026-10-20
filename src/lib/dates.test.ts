@@ -36,6 +36,18 @@ describe("formatCalendarDate", () => {
     expect(formatCalendarDate(calendarDate("2026-01-01"), "pl-PL")).toBe("1 stycznia 2026");
   });
 
+  // Value sourcing, admin version and time: accepted at 00:30 Warsaw time the next day, the
+  // version still reads as the file's date while the time follows the store zone.
+  it("keeps the version day apart from a late night acceptance time", () => {
+    const version = calendarDate("2026-10-20");
+    const acceptedAt = new Date("2026-10-20T22:30:00Z");
+
+    expect(formatCalendarDate(version, "pl-PL")).toBe("20 października 2026");
+    expect(formatDateTime(acceptedAt, { locale: "en", timeZone: "Europe/Warsaw" })).toBe(
+      "Oct 21, 2026, 12:30 AM",
+    );
+  });
+
   it("reads a Postgres date at UTC midnight as that day", () => {
     expect(formatCalendarDate(new Date("2026-03-31T00:00:00.000Z"), "en")).toBe("March 31, 2026");
   });

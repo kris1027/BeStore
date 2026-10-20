@@ -71,6 +71,21 @@ describe("the drafts together", () => {
     ).toThrow("still has blanks to fill before launch");
   });
 
+  // Value sourcing, seller placeholders: one brand.legal field filled clears its marker
+  // everywhere, and only its own.
+  it("fill one seller field on every page that names it", () => {
+    const docs = loadLegalDocuments(raw, {
+      seller: { ...seller, name: "Kowalski Shop sp. z o.o." },
+      store: { country: "Poland", currency: "EUR" },
+      production: false,
+    });
+    const bodies = legalSlugs.map((slug) => docs[slug].body);
+
+    expect(bodies.some((body) => body.includes("Kowalski Shop sp. z o.o."))).toBe(true);
+    for (const body of bodies) expect(body).not.toContain("[[TO FILL: seller.name]]");
+    expect(bodies.some((body) => body.includes("[[TO FILL: seller.address]]"))).toBe(true);
+  });
+
   it("put the shipping placeholders on /shipping only", () => {
     for (const slug of legalSlugs) {
       const names = placeholderNames(raw[slug]);
