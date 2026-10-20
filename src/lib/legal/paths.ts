@@ -1,6 +1,7 @@
 // Pure, no server import: client components and the email builder link to the legal pages
 // without pulling in their texts (spec 0017, Module layout).
 
+// The footer's order (AC-3).
 export const legalSlugs = ["terms", "privacy", "returns", "shipping", "cookies"] as const;
 
 export type LegalSlug = (typeof legalSlugs)[number];
@@ -13,7 +14,7 @@ export const legalPaths: Readonly<Record<LegalSlug, `/${LegalSlug}`>> = {
   cookies: "/cookies",
 };
 
-// The footer's order (AC-3).
+// What the footer and other links call each page.
 export const legalLinkLabels: Readonly<Record<LegalSlug, string>> = {
   terms: "Terms of sale",
   privacy: "Privacy policy",

@@ -1,6 +1,6 @@
 import { defineConfig, type Plugin } from "vitest/config";
 
-// The same as the `raw` Turbopack rule in next.config.ts: a legal text imports as its string.
+// The same as the raw text loader rule in next.config.ts: a legal text imports as its string.
 const legalContent = /\/src\/lib\/legal\/content\/[^/]+\.md$/;
 
 function rawLegalMarkdown(): Plugin {
