@@ -7,13 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { type ConsentCategory, type CookieRegistry } from "@/lib/consent/consent";
-
-const categoryLabels: Readonly<Record<ConsentCategory, string>> = {
-  necessary: "Necessary",
-  analytics: "Analytics",
-  marketing: "Marketing",
-};
+import { consentCategoryLabels, type CookieRegistry } from "@/lib/consent/consent";
 
 // spec 0017, AC-17: the registry as the /cookies table. Cells wrap; on a narrow screen the box
 // scrolls sideways and can take keyboard focus, so a keyboard user can scroll it too.
@@ -47,7 +41,7 @@ export function CookieTable({ registry }: { readonly registry: CookieRegistry })
               {entry.name}
             </TableCell>
             <TableCell className="align-top whitespace-normal">
-              {categoryLabels[entry.category]}
+              {consentCategoryLabels[entry.category]}
             </TableCell>
             <TableCell className="align-top whitespace-normal">{entry.purpose}</TableCell>
             <TableCell className="align-top whitespace-normal">{entry.lifetime}</TableCell>

@@ -9,6 +9,13 @@ export const CONSENT_COOKIE = "bestore_consent";
 export const consentCategories = ["necessary", "analytics", "marketing"] as const;
 export type ConsentCategory = (typeof consentCategories)[number];
 
+// What the dialog and the /cookies table call each category.
+export const consentCategoryLabels: Readonly<Record<ConsentCategory, string>> = {
+  necessary: "Necessary",
+  analytics: "Analytics",
+  marketing: "Marketing",
+};
+
 export const optionalCategories = ["analytics", "marketing"] as const;
 export type OptionalCategory = (typeof optionalCategories)[number];
 

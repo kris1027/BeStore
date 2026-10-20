@@ -19,25 +19,18 @@ import {
   acceptAllChoices,
   categoryUsed,
   type Choices,
+  type ConsentCategory,
+  consentCategoryLabels,
   type CookieRegistry,
   type OptionalCategory,
   refusedAll,
 } from "./consent";
 
-export const categoryCopy = {
-  necessary: {
-    label: "Necessary",
-    purpose: "Keep the store working: your cart, your sign in and this choice.",
-  },
-  analytics: {
-    label: "Analytics",
-    purpose: "Help us see how the store is used, so we can improve it.",
-  },
-  marketing: {
-    label: "Marketing",
-    purpose: "Help show you relevant offers on other sites.",
-  },
-} as const;
+const categoryPurposes: Readonly<Record<ConsentCategory, string>> = {
+  necessary: "Keep the store working: your cart, your sign in and this choice.",
+  analytics: "Help us see how the store is used, so we can improve it.",
+  marketing: "Help show you relevant offers on other sites.",
+};
 
 // spec 0017, AC-16: the three categories and three buttons. Refusing is as easy as accepting:
 // Accept all and Reject all sit side by side in the same style (Key invariants).
@@ -112,11 +105,11 @@ function ConsentForm({
           />
           <FieldContent>
             <FieldLabel htmlFor="consent-necessary">
-              {categoryCopy.necessary.label}
+              {consentCategoryLabels.necessary}
               <span className="font-normal text-muted-foreground">Always on</span>
             </FieldLabel>
             <FieldDescription id="consent-necessary-hint">
-              {categoryCopy.necessary.purpose}
+              {categoryPurposes.necessary}
             </FieldDescription>
           </FieldContent>
         </Field>
@@ -170,12 +163,12 @@ function CategoryField({
       />
       <FieldContent>
         <FieldLabel htmlFor={id}>
-          {categoryCopy[category].label}
+          {consentCategoryLabels[category]}
           {used ? null : (
             <span className="font-normal text-muted-foreground">Not used right now</span>
           )}
         </FieldLabel>
-        <FieldDescription id={`${id}-hint`}>{categoryCopy[category].purpose}</FieldDescription>
+        <FieldDescription id={`${id}-hint`}>{categoryPurposes[category]}</FieldDescription>
       </FieldContent>
     </Field>
   );
