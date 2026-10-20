@@ -4,7 +4,7 @@ import {
   checkoutFieldErrors,
   checkoutSchema,
   sessionIdSchema,
-  termsVersionSchema,
+  startCheckoutInputSchema,
 } from "./schemas";
 
 // spec 0006, AC-1, AC-2 and AC-11; spec 0007, AC-2.
@@ -91,13 +91,13 @@ describe("acceptTerms", () => {
   });
 });
 
-describe("termsVersionSchema", () => {
-  it("accepts a real YYYY-MM-DD date", () => {
-    expect(termsVersionSchema.safeParse("2026-10-20").success).toBe(true);
+describe("startCheckoutInputSchema", () => {
+  it("accepts a real YYYY-MM-DD terms version", () => {
+    expect(startCheckoutInputSchema.safeParse({ termsVersion: "2026-10-20" }).success).toBe(true);
   });
 
-  it.each(["2026-02-31", "20.10.2026", "", 20261020, undefined])("refuses %j", (value) => {
-    expect(termsVersionSchema.safeParse(value).success).toBe(false);
+  it.each(["2026-02-31", "20.10.2026", "", 20261020, undefined])("refuses %j", (termsVersion) => {
+    expect(startCheckoutInputSchema.safeParse({ termsVersion }).success).toBe(false);
   });
 });
 

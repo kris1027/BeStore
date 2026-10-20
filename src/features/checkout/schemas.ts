@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { parseCalendarDay } from "@/lib/dates";
+import { calendarDayTextSchema } from "@/lib/dates";
 import { normalizeEmail } from "@/lib/discounts/schema";
 import { shippingAddressSchema, type StoreCountry } from "@/lib/shipping/address";
 
@@ -37,11 +37,7 @@ export function checkoutSchema(country: StoreCountry) {
 
 // spec 0017, AC-9: the terms version the page showed, held in component state, never a field the
 // customer edits. startCheckout parses it on its own, before any database work.
-export const termsVersionSchema = z
-  .string()
-  .refine((value) => parseCalendarDay(value) !== null, { error: "Not a YYYY-MM-DD date" });
-
-export const startCheckoutInputSchema = z.object({ termsVersion: termsVersionSchema });
+export const startCheckoutInputSchema = z.object({ termsVersion: calendarDayTextSchema });
 
 export type CheckoutValues = z.input<ReturnType<typeof checkoutSchema>>;
 export type CheckoutInput = z.output<ReturnType<typeof checkoutSchema>>;

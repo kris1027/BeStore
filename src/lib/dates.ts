@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export type DateFormat = {
   readonly locale: string;
   readonly timeZone: string;
@@ -39,6 +41,12 @@ export function parseCalendarDay(text: string): { y: number; m: number; d: numbe
     ? { y, m, d }
     : null;
 }
+
+// The same check as a Zod string, for any YYYY-MM-DD text read from outside (a legal text's
+// `updated`, the terms version a checkout sends).
+export const calendarDayTextSchema = z
+  .string()
+  .refine((value) => parseCalendarDay(value) !== null, { error: "Not a real YYYY-MM-DD date" });
 
 export type CalendarDay = { readonly y: number; readonly m: number; readonly d: number };
 

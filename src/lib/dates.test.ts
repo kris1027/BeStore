@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   addDays,
   calendarDate,
+  calendarDayTextSchema,
   formatCalendarDate,
   formatDate,
   formatDateTime,
@@ -156,5 +157,15 @@ describe("addDays", () => {
     expect(addDays({ y: 2026, m: 12, d: 31 }, 1)).toEqual({ y: 2027, m: 1, d: 1 });
     expect(addDays({ y: 2028, m: 2, d: 28 }, 1)).toEqual({ y: 2028, m: 2, d: 29 });
     expect(addDays({ y: 2026, m: 3, d: 1 }, -1)).toEqual({ y: 2026, m: 2, d: 28 });
+  });
+});
+
+describe("calendarDayTextSchema", () => {
+  it("accepts a real YYYY-MM-DD date", () => {
+    expect(calendarDayTextSchema.safeParse("2028-02-29").success).toBe(true);
+  });
+
+  it.each(["2026-02-31", "20.10.2026", "", 20261020, undefined])("refuses %j", (value) => {
+    expect(calendarDayTextSchema.safeParse(value).success).toBe(false);
   });
 });

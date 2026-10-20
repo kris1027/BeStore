@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { parseCalendarDay } from "@/lib/dates";
+import { calendarDayTextSchema } from "@/lib/dates";
 
 // Pure. A legal text's `---` block (spec 0017, AC-1): only `key: value` lines, so no YAML parser
 // is needed. `updated` is the text's version, a real calendar day (no 2026-02-31).
@@ -8,9 +8,7 @@ import { parseCalendarDay } from "@/lib/dates";
 const frontMatterSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1),
-  updated: z.string().refine((value) => parseCalendarDay(value) !== null, {
-    error: "updated must be a real YYYY-MM-DD date",
-  }),
+  updated: calendarDayTextSchema,
 });
 
 export type FrontMatter = z.output<typeof frontMatterSchema>;
