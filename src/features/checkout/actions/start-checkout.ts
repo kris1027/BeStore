@@ -41,7 +41,6 @@ import {
 import {
   type CheckoutFieldErrors,
   checkoutFieldErrors,
-  checkoutMessages,
   checkoutSchema,
   startCheckoutInputSchema,
 } from "../schemas";
@@ -97,11 +96,8 @@ async function run(input: unknown): Promise<Result<{ readonly url: string }>> {
   } = parsed.data;
   // spec 0017, AC-9: the version the page showed must be the current one, checked before any
   // database work, so a refusal creates no order and takes no lock. A missing or malformed one
-  // reads as changed: the customer never saw the current text.
-  // acceptTerms is `true` by the schema; checked here too, as the server is what enforces it.
-  if (acceptTerms !== true) {
-    return fail({ code: "validation", fields: { acceptTerms: checkoutMessages.acceptTerms } });
-  }
+  // reads as changed: the customer never saw the current text. acceptTerms is already `true`:
+  // checkoutSchema refused anything else above.
   const terms = startCheckoutInputSchema.safeParse(input);
   if (!terms.success || terms.data.termsVersion !== currentTermsVersion) {
     return fail({ code: "terms_changed", currentVersion: currentTermsVersion });
