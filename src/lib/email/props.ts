@@ -4,7 +4,7 @@ import type { OrderRefundedProps } from "../../../emails/order-refunded";
 import type { OrderShippedProps } from "../../../emails/order-shipped";
 import { formatCalendarDate, formatDate } from "@/lib/dates";
 import { discountRowLabel } from "@/lib/discounts/rule";
-import { legalPaths } from "@/lib/legal/paths";
+import { legalPaths, type LegalSlug } from "@/lib/legal/paths";
 import { formatMoney } from "@/lib/money";
 import type { DeliveryAddress } from "@/lib/shipping/address";
 
@@ -106,11 +106,16 @@ export function confirmationProps(
     termsVersionLabel:
       order.termsVersion === null ? null : formatCalendarDate(order.termsVersion, format.locale),
     legalLinks: {
-      terms: new URL(legalPaths.terms, format.siteUrl).toString(),
-      returns: new URL(legalPaths.returns, format.siteUrl).toString(),
-      privacy: new URL(legalPaths.privacy, format.siteUrl).toString(),
+      terms: legalUrl("terms", format.siteUrl),
+      returns: legalUrl("returns", format.siteUrl),
+      privacy: legalUrl("privacy", format.siteUrl),
     },
   };
+}
+
+// An email is read away from the site, so its links are absolute.
+function legalUrl(slug: LegalSlug, siteUrl: string): string {
+  return new URL(legalPaths[slug], siteUrl).toString();
 }
 
 export type ShippedSource = OrderBasics & {
