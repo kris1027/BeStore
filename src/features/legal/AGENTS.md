@@ -10,7 +10,6 @@ The storefront pages `/terms`, `/privacy`, `/returns`, `/shipping` and `/cookies
 - `components/legal-page.tsx`: `server-only`. `legalMetadata` (title, description, canonical from `NEXT_PUBLIC_SITE_URL`) and `LegalPage` (the `h1`, the "Last updated" date, the body).
 - `components/legal-markdown.tsx`: its own `react-markdown` renderer, not the product description one. Only `h2`, `h3`, `p`, lists, `strong`, `em`, `a`, `blockquote`, `hr`; raw HTML skipped; links only to `/...`, `#...`, `https:` and `mailto:`.
 - `components/cookie-table.tsx`: the registry as the table on `/cookies`.
-- `components/footer-links.ts`: `legalFooterLinks`, which `StoreShell` uses by default, so the 404 page has them too.
 - `shipping-values.ts`: pure. The live delivery fee and free delivery rule `/shipping` fills in.
 
 ## Conventions

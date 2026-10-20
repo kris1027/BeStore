@@ -2,9 +2,9 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { Wordmark } from "@/components/wordmark";
-import { legalFooterLinks } from "@/features/legal/components/footer-links";
 import { brand } from "@/lib/brand/brand";
 import { CookieSettingsControl } from "@/lib/consent/cookie-settings-control";
+import { legalFooterLinks } from "@/lib/legal/footer-links";
 import { cn } from "@/lib/utils";
 
 import { storeContainer } from "./container";
