@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, FieldContent, FieldDescription, FieldLabel, FieldSet } from "@/components/ui/field";
+import { legalPaths } from "@/lib/legal/paths";
 
 import {
   acceptAllChoices,
@@ -95,8 +96,8 @@ function ConsentForm({
         <DialogTitle className="text-lg">Cookie settings</DialogTitle>
         <DialogDescription>
           Choose which optional cookies we may use. Necessary cookies are always on. You can change
-          this at any time from the footer. See the <a href="/cookies">cookie policy</a> for every
-          cookie we use.
+          this at any time from the footer. See the <a href={legalPaths.cookies}>cookie policy</a>{" "}
+          for every cookie we use.
         </DialogDescription>
       </DialogHeader>
       <FieldSet className="gap-4">
