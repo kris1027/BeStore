@@ -68,6 +68,7 @@ vi.mock("@/lib/customer/session", () => ({
 }));
 
 const { startCheckout } = await import("@/features/checkout/actions/start-checkout");
+const { currentTermsVersion } = await import("@/lib/legal/documents");
 
 resetDatabaseBeforeEach();
 
@@ -92,6 +93,9 @@ const address = {
   postalCode: "00950",
   city: "Warsaw",
   phone: "",
+  // spec 0017, AC-9: the ticked box and the version the page showed.
+  acceptTerms: true,
+  termsVersion: currentTermsVersion,
 };
 
 // What the checkout form sends: the email plus a valid delivery address.
@@ -395,6 +399,108 @@ describe("delivery (spec 0007)", () => {
       shippingCents: 1500,
       shipCountryCode: "PL",
     });
+  });
+});
+
+// spec 0017, AC-9 and AC-11.
+describe("terms of sale", () => {
+  it("records the accepted version and the time of Pay on the new order", async () => {
+    const { variant } = await createSimpleProduct("a", 5);
+    await cartWith([{ variantId: variant.id, quantity: 1 }]);
+    const before = Date.now();
+
+    expect((await startCheckout(checkout())).ok).toBe(true);
+
+    const order = await testDb.order.findFirstOrThrow();
+    expect(order.termsVersion?.toISOString()).toBe(`${currentTermsVersion}T00:00:00.000Z`);
+    expect(order.termsAcceptedAt?.getTime()).toBeGreaterThanOrEqual(before - 1000);
+    expect(order.termsAcceptedAt?.getTime()).toBeLessThanOrEqual(Date.now() + 1000);
+  });
+
+  it("gives a replaced checkout's new order its own acceptance time", async () => {
+    const { variant } = await createSimpleProduct("a", 5);
+    await cartWith([{ variantId: variant.id, quantity: 1 }]);
+    await startCheckout(checkout());
+    const first = await testDb.order.findFirstOrThrow();
+    mocks.retrieve.mockResolvedValueOnce({
+      id: first.stripeCheckoutSessionId,
+      status: "open",
+      payment_status: "unpaid",
+    });
+
+    expect((await startCheckout(checkout())).ok).toBe(true);
+
+    const second = await testDb.order.findFirstOrThrow({ where: { id: { not: first.id } } });
+    expect(second.termsVersion).toEqual(first.termsVersion);
+    expect(second.termsAcceptedAt!.getTime()).toBeGreaterThanOrEqual(
+      first.termsAcceptedAt!.getTime(),
+    );
+  });
+
+  it.each([
+    ["unticked", { acceptTerms: false }],
+    ["missing", { acceptTerms: undefined }],
+  ])("refuses the box %s with the field message, before any database work", async (_, terms) => {
+    const { variant } = await createSimpleProduct("a", 5);
+    await cartWith([{ variantId: variant.id, quantity: 1 }]);
+
+    expect(await startCheckout(checkout("a@example.com", terms))).toEqual({
+      ok: false,
+      error: {
+        code: "validation",
+        fields: { acceptTerms: "Tick the box to accept the terms of sale." },
+      },
+    });
+    expect(await testDb.order.count()).toBe(0);
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["an older version", "2020-01-01"],
+    ["no version", undefined],
+    ["a version that is not a date", "latest"],
+  ])("answers terms_changed for %s and creates no order", async (_, termsVersion) => {
+    const { variant } = await createSimpleProduct("a", 5);
+    const cart = await cartWith([{ variantId: variant.id, quantity: 1 }]);
+
+    expect(await startCheckout(checkout("a@example.com", { termsVersion }))).toEqual({
+      ok: false,
+      error: { code: "terms_changed", currentVersion: currentTermsVersion },
+    });
+    expect(await testDb.order.count()).toBe(0);
+    expect(mocks.create).not.toHaveBeenCalled();
+    // No lock was taken: the cart is free for the next Pay.
+    expect((await startCheckout(checkout())).ok).toBe(true);
+    expect(await testDb.order.count({ where: { cartId: cart.id } })).toBe(1);
+  });
+
+  it("logs a terms_changed refusal by its code only", async () => {
+    const { variant } = await createSimpleProduct("a", 5);
+    await cartWith([{ variantId: variant.id, quantity: 1 }]);
+
+    await startCheckout(checkout("a@example.com", { termsVersion: "2020-01-01" }));
+
+    expect(mocks.info).toHaveBeenCalledWith(
+      { event: "checkout.refused", reason: "terms_changed" },
+      "checkout.refused",
+    );
+  });
+
+  it("keeps the two columns together with a CHECK", async () => {
+    const { variant } = await createSimpleProduct("a", 5);
+    await cartWith([{ variantId: variant.id, quantity: 1 }]);
+    await startCheckout(checkout());
+    const order = await testDb.order.findFirstOrThrow();
+
+    await expect(
+      testDb.$executeRaw`UPDATE orders SET terms_accepted_at = NULL WHERE id = ${order.id}::uuid`,
+    ).rejects.toThrow(/orders_terms_acceptance_check/);
+    await expect(
+      testDb.$executeRaw`UPDATE orders SET terms_version = NULL WHERE id = ${order.id}::uuid`,
+    ).rejects.toThrow(/orders_terms_acceptance_check/);
+    // Both null, as on an order from before the feature, is allowed.
+    await testDb.$executeRaw`
+      UPDATE orders SET terms_version = NULL, terms_accepted_at = NULL WHERE id = ${order.id}::uuid`;
   });
 });
 

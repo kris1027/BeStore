@@ -406,6 +406,10 @@ model Order {
   expiredAt               DateTime?     @map("expired_at") @db.Timestamptz(3)
   // Set once by the expired order PII purge (spec 0008), never cleared. Only on expired orders.
   piiPurgedAt             DateTime?     @map("pii_purged_at") @db.Timestamptz(3)
+  // spec 0017, AC-11: the terms of sale version (its `updated` date) accepted at Pay, and when.
+  // Both or neither (a CHECK in the migration); null on orders from before the feature.
+  termsVersion            DateTime?     @map("terms_version") @db.Date
+  termsAcceptedAt         DateTime?     @map("terms_accepted_at") @db.Timestamptz(3)
   createdAt               DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt               DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 

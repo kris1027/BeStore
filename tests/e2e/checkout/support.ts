@@ -51,6 +51,12 @@ export async function fillCheckout(page: Page, email = "e2e.customer@example.com
   await page.getByLabel("Address line 1").fill(testAddress.line1);
   await page.getByLabel("Postal code").fill(testAddress.postalCode);
   await page.getByLabel("City").fill(testAddress.city);
+  await termsBox(page).check();
+}
+
+// spec 0017, AC-8: the box every Pay needs ticked.
+export function termsBox(page: Page) {
+  return page.getByRole("checkbox", { name: /^I accept the terms of sale/ });
 }
 
 // The Pay button whatever the delivery fee: the store_settings row is shared by every spec file

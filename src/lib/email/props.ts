@@ -2,8 +2,9 @@ import type { EmailFrame } from "../../../emails/components/layout";
 import type { OrderConfirmationProps } from "../../../emails/order-confirmation";
 import type { OrderRefundedProps } from "../../../emails/order-refunded";
 import type { OrderShippedProps } from "../../../emails/order-shipped";
-import { formatDate } from "@/lib/dates";
+import { formatCalendarDate, formatDate } from "@/lib/dates";
 import { discountRowLabel } from "@/lib/discounts/rule";
+import { legalPaths } from "@/lib/legal/paths";
 import { formatMoney } from "@/lib/money";
 import type { DeliveryAddress } from "@/lib/shipping/address";
 
@@ -14,7 +15,10 @@ export type EmailFormat = {
   readonly locale: string;
   readonly timeZone: string;
   readonly storeName: string;
+  // The address part of EMAIL_FROM.
   readonly contactAddress: string;
+  // NEXT_PUBLIC_SITE_URL, for the legal links (spec 0017, AC-14).
+  readonly siteUrl: string;
 };
 
 export type EmailContent =
@@ -65,6 +69,8 @@ export type ConfirmationSource = OrderBasics & {
   readonly discountCode: string | null;
   readonly shippingCents: number;
   readonly totalCents: number;
+  // spec 0017, AC-14: the accepted terms version, a UTC midnight date; null before the feature.
+  readonly termsVersion: Date | null;
   readonly lines: readonly (SourceItem & {
     readonly unitPriceCents: number;
     readonly lineTotalCents: number;
@@ -97,6 +103,13 @@ export function confirmationProps(
     delivery: order.shippingCents === 0 ? "Free" : money(order.shippingCents),
     total: money(order.totalCents),
     address: order.address,
+    termsVersionLabel:
+      order.termsVersion === null ? null : formatCalendarDate(order.termsVersion, format.locale),
+    legalLinks: {
+      terms: new URL(legalPaths.terms, format.siteUrl).toString(),
+      returns: new URL(legalPaths.returns, format.siteUrl).toString(),
+      privacy: new URL(legalPaths.privacy, format.siteUrl).toString(),
+    },
   };
 }
 

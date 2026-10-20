@@ -246,6 +246,9 @@ export type AdminOrderDetail = {
   readonly shippedAt: Date | null;
   readonly deliveredAt: Date | null;
   readonly cancelledAt: Date | null;
+  // spec 0017, AC-13: the terms version (a UTC midnight date) accepted at Pay, and when; null on
+  // orders from before the feature.
+  readonly terms: { readonly version: Date; readonly acceptedAt: Date } | null;
   readonly carrier: string | null;
   readonly trackingNumber: string | null;
   readonly phone: string | null;
@@ -317,6 +320,8 @@ export async function getAdminOrder(
       shippedAt: true,
       deliveredAt: true,
       cancelledAt: true,
+      termsVersion: true,
+      termsAcceptedAt: true,
       carrier: true,
       trackingNumber: true,
       phone: true,
@@ -463,6 +468,11 @@ export async function getAdminOrder(
     shippedAt: order.shippedAt,
     deliveredAt: order.deliveredAt,
     cancelledAt: order.cancelledAt,
+    // The CHECK keeps the two together.
+    terms:
+      order.termsVersion === null || order.termsAcceptedAt === null
+        ? null
+        : { version: order.termsVersion, acceptedAt: order.termsAcceptedAt },
     carrier: order.carrier,
     trackingNumber: order.trackingNumber,
     phone: order.phone,

@@ -1,14 +1,16 @@
-import { Heading, Section, Text } from "react-email";
+import { Heading, Link, Section, Text } from "react-email";
 
 import {
   AddressSection,
   bodyCellStyle,
+  colors,
   DataTable,
   type EmailAddressLines,
   type EmailFrame,
   EmailLayout,
   headerCellStyle,
   itemLabel,
+  mutedStyle,
   subheadingStyle,
   textStyle,
 } from "./components/layout";
@@ -37,6 +39,14 @@ export type OrderConfirmationProps = {
   readonly delivery: string;
   readonly total: string;
   readonly address: EmailAddressLines | null;
+  // spec 0017, AC-14: the terms version as a long date, or null for an order paid before it was
+  // recorded. The links are absolute; the template never reads env.
+  readonly termsVersionLabel: string | null;
+  readonly legalLinks: {
+    readonly terms: string;
+    readonly returns: string;
+    readonly privacy: string;
+  };
 };
 
 export function orderConfirmationSubject(orderNumber: number): string {
@@ -103,9 +113,29 @@ export function OrderConfirmationEmail(props: OrderConfirmationProps) {
       <Text style={{ ...textStyle, marginTop: "24px" }}>
         We&apos;ll email you when your order ships.
       </Text>
+      {props.termsVersionLabel === null ? null : (
+        <Text style={mutedStyle}>
+          Terms of sale version {props.termsVersionLabel} applied to this order.
+        </Text>
+      )}
+      <Text style={mutedStyle}>
+        <Link href={props.legalLinks.terms} style={legalLinkStyle}>
+          Terms of sale
+        </Link>
+        {" · "}
+        <Link href={props.legalLinks.returns} style={legalLinkStyle}>
+          Returns
+        </Link>
+        {" · "}
+        <Link href={props.legalLinks.privacy} style={legalLinkStyle}>
+          Privacy policy
+        </Link>
+      </Text>
     </EmailLayout>
   );
 }
+
+const legalLinkStyle = { color: colors.text, textDecoration: "underline" } as const;
 
 function SummaryRow({
   label,
@@ -154,6 +184,12 @@ OrderConfirmationEmail.PreviewProps = {
     postalCode: "00-238",
     city: "Warszawa",
     countryName: "Poland",
+  },
+  termsVersionLabel: "October 20, 2026",
+  legalLinks: {
+    terms: "https://example.com/terms",
+    returns: "https://example.com/returns",
+    privacy: "https://example.com/privacy",
   },
 } satisfies OrderConfirmationProps;
 

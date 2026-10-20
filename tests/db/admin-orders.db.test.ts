@@ -196,6 +196,21 @@ describe("getAdminOrder", () => {
     expect(detail?.events.map((event) => event.type)).toEqual(["created"]);
   });
 
+  // spec 0017, AC-13.
+  it("returns the accepted terms version and time, or null when none was recorded", async () => {
+    const { order } = await seedPendingOrder();
+    expect((await getAdminOrder("1001"))?.terms).toBeNull();
+
+    const version = new Date("2026-10-20T00:00:00.000Z");
+    const acceptedAt = new Date("2026-10-20T21:30:00.000Z");
+    await testDb.order.update({
+      where: { id: order.id },
+      data: { termsVersion: version, termsAcceptedAt: acceptedAt },
+    });
+
+    expect((await getAdminOrder("1001"))?.terms).toEqual({ version, acceptedAt });
+  });
+
   it("shows the name and SKU the customer bought, even after the catalog changes", async () => {
     const { product, variant } = await seedPendingOrder();
     const bought = { productName: product.name, sku: variant.sku };

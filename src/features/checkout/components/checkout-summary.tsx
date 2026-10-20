@@ -48,8 +48,11 @@ const cartPath = "/cart";
 // (AC-9); Pay checks the code again under its lock.
 export async function CheckoutSummary({
   searchParams,
+  termsVersion,
 }: {
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
+  // spec 0017, AC-9: the current terms version, which Pay sends back.
+  readonly termsVersion: string;
 }) {
   const [cart, params] = await Promise.all([loadOwnedCart(), searchParams]);
   if (!cart || !cart.canCheckout) redirect(cartPath);
@@ -177,6 +180,7 @@ export async function CheckoutSummary({
             countryName={countryDisplayName(env.STORE_COUNTRY, env.STORE_LOCALE)}
             prefill={prefill}
             account={account}
+            termsVersion={termsVersion}
           />
         </section>
       </div>

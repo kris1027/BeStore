@@ -80,6 +80,9 @@ async function seedOrder(
       shipCountryCode: "FR",
       stripeCheckoutSessionId: `cs_test_${order.number}`,
       stripePaymentIntentId: `pi_test_${order.number}`,
+      // spec 0017, AC-11: the accepted terms are not personal data, so the purge keeps them.
+      termsVersion: new Date("2026-10-20T00:00:00.000Z"),
+      termsAcceptedAt: new Date("2026-10-20T09:15:00.000Z"),
     },
   });
 }
@@ -127,6 +130,8 @@ const keptFields = [
   "stripePaymentIntentId",
   "needsAttention",
   "expiredAt",
+  "termsVersion",
+  "termsAcceptedAt",
   "lines",
   "events",
 ] as const;

@@ -47,6 +47,8 @@ export function CheckoutPayment({
   readonly countryName: string;
   readonly prefill: CheckoutPrefill;
   readonly account: CheckoutAccount | null;
+  // spec 0017, AC-9: the terms version the page shows.
+  readonly termsVersion: string;
 }) {
   const router = useRouter();
   const format = useStoreFormat();

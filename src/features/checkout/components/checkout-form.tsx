@@ -12,6 +12,7 @@ import {
   useTransition,
 } from "react";
 import {
+  type Control,
   Controller,
   type FieldError as FormFieldError,
   useForm,
@@ -19,11 +20,13 @@ import {
 } from "react-hook-form";
 
 import { FormNotice } from "@/components/form-notice";
+import { NewTabLink } from "@/components/new-tab-link";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useStoreFormat } from "@/components/store-format-provider";
 import { Button } from "@/components/ui/button";
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldError,
   FieldGroup,
@@ -34,11 +37,18 @@ import {
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Spinner } from "@/components/ui/spinner";
+import { calendarDate, formatCalendarDate } from "@/lib/dates";
+import { legalPaths } from "@/lib/legal/paths";
 import { formatMoney } from "@/lib/money";
 import type { StoreCountry } from "@/lib/shipping/address";
 
 import { startCheckout, type StartCheckoutError } from "../actions/start-checkout";
-import { type CheckoutPrefill, checkoutFields, checkoutSchema } from "../schemas";
+import {
+  type CheckoutPrefill,
+  checkoutFields,
+  checkoutSchema,
+  type CheckoutValues,
+} from "../schemas";
 
 // A saved address the signed in customer can swap in (spec 0012, AC-15).
 export type SavedAddressChoice = {
@@ -78,6 +88,7 @@ function formError(error: StartCheckoutError, money: (cents: number) => string):
     case "cart_changed":
     case "already_paid":
     case "discount_refused":
+    case "terms_changed":
       return null;
   }
 }
@@ -91,6 +102,7 @@ export function CheckoutForm({
   prefill,
   account = null,
   discountCode,
+  termsVersion: shownTermsVersion,
   emailRef,
   onDiscountRefused,
 }: {
@@ -102,6 +114,8 @@ export function CheckoutForm({
   readonly account?: CheckoutAccount | null;
   // spec 0014, AC-4: the applied promo code Pay sends, or null.
   readonly discountCode: string | null;
+  // spec 0017, AC-9: the terms version this page shows, sent with Pay.
+  readonly termsVersion: string;
   // Lets the promo code field read the email as typed, for its per customer check.
   readonly emailRef: RefObject<() => string>;
   // Pay refused the code: the field shows why and the summary drops it.
@@ -112,6 +126,9 @@ export function CheckoutForm({
   const [pending, startTransition] = useTransition();
   const [redirecting, setRedirecting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // spec 0017, AC-10: never an editable field. A terms_changed answer moves it to the new version.
+  const [termsVersion, setTermsVersion] = useState(shownTermsVersion);
+  const [termsChangedOn, setTermsChangedOn] = useState<string | null>(null);
   // Until React takes over, the button stays disabled: a native submit would put the email in
   // the URL as a GET query. A disabled default button also blocks submitting with Enter.
   const hydrated = useSyncExternalStore(
@@ -148,9 +165,11 @@ export function CheckoutForm({
 
   const onSubmit = form.handleSubmit((values) => {
     setNotice(null);
+    setTermsChangedOn(null);
     startTransition(async () => {
       const result = await startCheckout({
         ...values,
+        termsVersion,
         ...(discountCode === null ? {} : { discountCode }),
       });
       if (result.ok) {
@@ -176,6 +195,12 @@ export function CheckoutForm({
         router.push("/cart");
       } else if (error.code === "discount_refused") {
         onDiscountRefused(error);
+      } else if (error.code === "terms_changed") {
+        // Every other field keeps its value; the box asks again for the new text.
+        form.resetField("acceptTerms");
+        setTermsVersion(error.currentVersion);
+        setTermsChangedOn(error.currentVersion);
+        form.setFocus("acceptTerms");
       } else if (error.code === "already_paid") {
         setRedirecting(true);
         window.location.assign(error.confirmationUrl);
@@ -295,6 +320,18 @@ export function CheckoutForm({
             </FieldLabel>
           </Field>
         ) : null}
+        <FormNotice
+          message={
+            termsChangedOn === null ? null : (
+              <>
+                Our terms of sale changed on{" "}
+                {formatCalendarDate(calendarDate(termsChangedOn), format.locale)}. Please read{" "}
+                <NewTabLink href={legalPaths.terms}>them</NewTabLink> and tick the box again.
+              </>
+            )
+          }
+        />
+        <TermsField control={form.control} error={errors.acceptTerms} />
         <Button type="submit" size="lg" className="h-11" disabled={busy || !hydrated}>
           {busy ? <Spinner data-icon="inline-start" /> : null}
           {redirecting ? "Redirecting to payment…" : `Pay ${formatMoney(totalCents, format)}`}
@@ -303,8 +340,51 @@ export function CheckoutForm({
           <LockIcon aria-hidden="true" className="size-4 shrink-0" />
           You enter your card details on Stripe&apos;s secure payment page.
         </p>
+        <p className="text-sm text-muted-foreground">
+          Before you buy, see how <NewTabLink href={legalPaths.returns}>returns</NewTabLink> and{" "}
+          <NewTabLink href={legalPaths.shipping}>shipping</NewTabLink> work.
+        </p>
       </FieldGroup>
     </form>
+  );
+}
+
+// spec 0017, AC-8: unticked to start, never disabling Pay. Pay unticked shows the error under
+// the box and focuses it; the server refuses the same (AC-9).
+function TermsField({
+  control,
+  error,
+}: {
+  readonly control: Control<CheckoutValues>;
+  readonly error: FormFieldError | undefined;
+}) {
+  const id = "checkout-accept-terms";
+  const errorId = `${id}-error`;
+  return (
+    <Field orientation="horizontal" data-invalid={error ? true : undefined}>
+      <Controller
+        control={control}
+        name="acceptTerms"
+        render={({ field }) => (
+          <Checkbox
+            id={id}
+            ref={field.ref}
+            checked={field.value === true}
+            onCheckedChange={(checked) => field.onChange(checked === true ? true : undefined)}
+            onBlur={field.onBlur}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? errorId : undefined}
+          />
+        )}
+      />
+      <FieldContent>
+        <FieldLabel htmlFor={id} className="inline leading-normal font-normal">
+          I accept the <NewTabLink href={legalPaths.terms}>terms of sale</NewTabLink> and have read
+          the <NewTabLink href={legalPaths.privacy}>privacy policy</NewTabLink>.
+        </FieldLabel>
+        {error ? <FieldError id={errorId} errors={[error]} /> : null}
+      </FieldContent>
+    </Field>
   );
 }
 
