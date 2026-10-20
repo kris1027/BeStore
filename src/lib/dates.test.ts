@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   addDays,
+  calendarDate,
+  formatCalendarDate,
   formatDate,
   formatDateTime,
   parseCalendarDay,
@@ -24,6 +26,18 @@ describe("formatDate", () => {
 
   it("uses the store's locale", () => {
     expect(formatDate(lateEvening, { locale: "pl-PL", timeZone: "UTC" })).toBe("31 mar 2026");
+  });
+});
+
+// spec 0017, AC-1: a version date is the same day in every zone.
+describe("formatCalendarDate", () => {
+  it("formats a YYYY-MM-DD as a long date with no day shift", () => {
+    expect(formatCalendarDate(calendarDate("2026-10-20"), "en")).toBe("October 20, 2026");
+    expect(formatCalendarDate(calendarDate("2026-01-01"), "pl-PL")).toBe("1 stycznia 2026");
+  });
+
+  it("reads a Postgres date at UTC midnight as that day", () => {
+    expect(formatCalendarDate(new Date("2026-03-31T00:00:00.000Z"), "en")).toBe("March 31, 2026");
   });
 });
 
