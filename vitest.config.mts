@@ -1,15 +1,20 @@
+import { createRequire } from "node:module";
+
 import { defineConfig, type Plugin } from "vitest/config";
 
-// The same as the raw text loader rule in next.config.ts: a legal text imports as its string.
-const legalContent = /\/src\/lib\/legal\/content\/[^/]+\.md$/;
+import { legalContent } from "./src/lib/legal/content-path";
 
+const require = createRequire(import.meta.url);
+const rawTextLoader = require("./scripts/raw-text-loader.cjs") as (source: string) => string;
+
+// The raw text loader rule of next.config.ts, run by Vitest: a legal text imports as its string.
 function rawLegalMarkdown(): Plugin {
   return {
     name: "raw-legal-markdown",
     enforce: "pre",
     transform(code, id) {
       if (!legalContent.test(id)) return null;
-      return { code: `export default ${JSON.stringify(code)};`, map: null };
+      return { code: rawTextLoader(code), map: null };
     },
   };
 }

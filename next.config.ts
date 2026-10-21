@@ -1,11 +1,7 @@
 import type { NextConfig } from "next";
 
 import { productImagesConfig } from "./src/lib/image-config";
-
-// A RegExp matches against the path relative to the Turbopack root, which is the folder holding
-// the lockfile: the app folder here, a parent one for the build guard's copy
-// (tests/build/legal-guard.build.test.ts), so the prefix may be any folder.
-const legalContent = /(?:^|\/)src\/lib\/legal\/content\/[^/]+\.md$/;
+import { legalContent } from "./src/lib/legal/content-path";
 
 const nextConfig: NextConfig = {
   // Static catalog shell, request data behind Suspense (spec 0005, Caching model).

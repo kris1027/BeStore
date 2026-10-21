@@ -16,7 +16,7 @@ The five legal texts (terms, privacy, returns, shipping, cookies) as Markdown in
 
 ## Conventions
 
-- The texts are never read with `fs`. `next.config.ts` runs `scripts/raw-text-loader.cjs` on `src/lib/legal/content/*.md` only, and `vitest.config.mts` has the same transform; a new legal file must live in `content/` to import.
+- The texts are never read with `fs`. `next.config.ts` runs `scripts/raw-text-loader.cjs` on `src/lib/legal/content/*.md` only, and `vitest.config.mts` runs the same loader, both matching the one pattern in `content-path.ts`; a new legal file must live in `content/` to import.
 - Changing a text's meaning means changing its `updated` date. A new terms date makes open checkouts answer `terms_changed`; a new cookies date asks every visitor for consent again.
 - No Markdown `#` heading in a text (the title is the page `h1`) and no unknown `{{placeholder}}`: both fail `content.test.ts` or the build.
 - Seller details come from `brand.legal` in `src/lib/brand/brand.ts`. A `null` field renders `[[TO FILL: seller.<field>]]`, and with `VERCEL_ENV=production` any marker throws at load, failing the build and `startCheckout`. `pnpm test:build` (`tests/build/legal-guard.build.test.ts`) proves it with a real `next build`.
