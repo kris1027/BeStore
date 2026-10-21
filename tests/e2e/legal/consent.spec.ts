@@ -32,6 +32,17 @@ async function savedChoice(context: BrowserContext) {
   return cookie === undefined ? undefined : JSON.parse(decodeURIComponent(cookie.value));
 }
 
+// Hydrated once the footer's Cookie settings link has become a button; without scripts the link
+// stays. A wait on "networkidle" is no ready signal: a page that keeps fetching never settles.
+async function pageReady(page: Page, scripts: "on" | "off") {
+  const footer = page.getByRole("contentinfo");
+  await expect(
+    scripts === "on"
+      ? footer.getByRole("button", { name: "Cookie settings" })
+      : footer.getByRole("link", { name: "Cookie settings" }),
+  ).toBeVisible();
+}
+
 async function openDemo(page: Page) {
   await page.goto("/style-guide");
   // Ready once hydrated: the demo's state line leaves its waiting text.
@@ -117,7 +128,7 @@ test.describe("the store", () => {
 
       for (const path of ["/", `/products/${socks.slug}`, "/cart", "/checkout"]) {
         await page.goto(path);
-        await page.waitForLoadState("networkidle");
+        await pageReady(page, scripts);
         const names = (await page.context().cookies()).map((cookie) => cookie.name);
         expect(names.filter((name) => !necessary.test(name))).toEqual([]);
         if (scripts === "on") {
@@ -133,7 +144,7 @@ test.describe("the store", () => {
     const socks = await seedProduct({ stock: 5, priceCents: 1250 });
     await addToCart(page, socks);
     await page.goto("/checkout");
-    await page.waitForLoadState("networkidle");
+    await pageReady(page, "on");
 
     expect((await page.context().cookies()).map((cookie) => cookie.name)).toEqual(["bestore_cart"]);
     expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
