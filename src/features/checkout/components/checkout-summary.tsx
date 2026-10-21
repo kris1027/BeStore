@@ -2,6 +2,8 @@ import { InfoIcon } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import type { CalendarDayText } from "@/lib/dates";
+import { inlineLinkClass } from "@/components/inline-link";
 import { Price } from "@/components/price";
 import { ProductImage } from "@/components/product-image";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -48,8 +50,11 @@ const cartPath = "/cart";
 // (AC-9); Pay checks the code again under its lock.
 export async function CheckoutSummary({
   searchParams,
+  termsVersion,
 }: {
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
+  // spec 0017, AC-9: the current terms version, which Pay sends back.
+  readonly termsVersion: CalendarDayText;
 }) {
   const [cart, params] = await Promise.all([loadOwnedCart(), searchParams]);
   if (!cart || !cart.canCheckout) redirect(cartPath);
@@ -164,10 +169,7 @@ export async function CheckoutSummary({
               customer === null ? (
                 <p className="text-sm text-muted-foreground">
                   Have an account?{" "}
-                  <Link
-                    href={signInToCheckout}
-                    className="text-foreground underline underline-offset-4 hover:text-foreground/80"
-                  >
+                  <Link href={signInToCheckout} className={inlineLinkClass}>
                     Sign in
                   </Link>
                 </p>
@@ -177,6 +179,7 @@ export async function CheckoutSummary({
             countryName={countryDisplayName(env.STORE_COUNTRY, env.STORE_LOCALE)}
             prefill={prefill}
             account={account}
+            termsVersion={termsVersion}
           />
         </section>
       </div>

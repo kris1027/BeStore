@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export type DateFormat = {
   readonly locale: string;
   readonly timeZone: string;
@@ -18,6 +20,17 @@ export function formatDateTime(date: Date, { locale, timeZone }: DateFormat): st
   }).format(date);
 }
 
+// A calendar date with no time of day (a legal text's version, spec 0017, AC-1): read at UTC
+// midnight and formatted in UTC, so it never shifts by a day whatever the server or store zone.
+export function formatCalendarDate(date: Date, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { dateStyle: "long", timeZone: "UTC" }).format(date);
+}
+
+// A YYYY-MM-DD text as the UTC midnight formatCalendarDate and a Postgres `date` column expect.
+export function calendarDate(ymd: CalendarDayText): Date {
+  return new Date(`${ymd}T00:00:00Z`);
+}
+
 // A calendar day typed as YYYY-MM-DD, only when it is a real day (no 2026-02-30).
 export function parseCalendarDay(text: string): { y: number; m: number; d: number } | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
@@ -28,6 +41,16 @@ export function parseCalendarDay(text: string): { y: number; m: number; d: numbe
     ? { y, m, d }
     : null;
 }
+
+// The same check as a Zod string, for any YYYY-MM-DD text read from outside (a legal text's
+// `updated`, the terms version a checkout sends). Branded, so only a checked text reaches
+// calendarDate.
+export const calendarDayTextSchema = z
+  .string()
+  .refine((value) => parseCalendarDay(value) !== null, { error: "Not a real YYYY-MM-DD date" })
+  .brand<"CalendarDayText">();
+
+export type CalendarDayText = z.output<typeof calendarDayTextSchema>;
 
 export type CalendarDay = { readonly y: number; readonly m: number; readonly d: number };
 

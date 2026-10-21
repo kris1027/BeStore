@@ -11,7 +11,10 @@ import { db, type Tx } from "@/lib/db";
 import { uniqueViolation } from "@/lib/db-errors";
 import { redeem } from "@/lib/discounts/codes";
 import type { DiscountRefused } from "@/lib/discounts/rule";
+import { calendarDate, type CalendarDayText } from "@/lib/dates";
 import { env } from "@/lib/env";
+import type { TermsAcceptance } from "@/lib/legal/acceptance";
+import { currentTermsVersion } from "@/lib/legal/documents";
 import { logOrderExpired } from "@/lib/orders/log";
 import { minimumChargeCents } from "@/lib/orders/minimum-charge";
 import { orderLineImage } from "@/lib/orders/order-image";
@@ -35,7 +38,12 @@ import {
   logStripeFailed,
   stripeErrorCode,
 } from "../log";
-import { type CheckoutFieldErrors, checkoutFieldErrors, checkoutSchema } from "../schemas";
+import {
+  type CheckoutFieldErrors,
+  checkoutFieldErrors,
+  checkoutSchema,
+  startCheckoutInputSchema,
+} from "../schemas";
 import { checkoutSessionParams } from "../stripe-session";
 
 export type StartCheckoutError =
@@ -49,7 +57,9 @@ export type StartCheckoutError =
   | { readonly code: "checkout_in_progress" }
   | { readonly code: "payment_unavailable" }
   // spec 0014, AC-4: the code stopped applying since Apply (or never did); no order was made.
-  | ({ readonly code: "discount_refused" } & DiscountRefused);
+  | ({ readonly code: "discount_refused" } & DiscountRefused)
+  // spec 0017, AC-9: the terms changed since the page loaded; the form asks again with this one.
+  | { readonly code: "terms_changed"; readonly currentVersion: CalendarDayText };
 
 type Result<T> = ActionResult<T, StartCheckoutError>;
 
@@ -81,8 +91,22 @@ async function run(input: unknown): Promise<Result<{ readonly url: string }>> {
     email: typedEmail,
     saveAddress: saveRequested,
     discountCode: codeInput,
+    acceptTerms,
     ...address
   } = parsed.data;
+  // spec 0017, AC-9: the version the page showed must be the current one, checked before any
+  // database work, so a refusal creates no order and takes no lock. A missing or malformed one
+  // reads as changed: the customer never saw the current text. acceptTerms is already `true`:
+  // checkoutSchema refused anything else above.
+  const terms = startCheckoutInputSchema.safeParse(input);
+  if (!terms.success || terms.data.termsVersion !== currentTermsVersion) {
+    return fail({ code: "terms_changed", currentVersion: currentTermsVersion });
+  }
+  // AC-11: the moment of acceptance is the server's time at Pay.
+  const acceptance: TermsAcceptance = {
+    version: calendarDate(terms.data.termsVersion),
+    acceptedAt: new Date(),
+  };
   const shipTo: ShipTo = { ...address, countryCode: env.STORE_COUNTRY };
 
   // spec 0012, AC-15: a signed in checkout uses the account email, whatever was typed, and a
@@ -97,7 +121,7 @@ async function run(input: unknown): Promise<Result<{ readonly url: string }>> {
   const cleared = await clearPendingOrder(cartId);
   if (!cleared.ok) return cleared;
 
-  const created = await createPendingOrder(cartId, email, shipTo, account, codeInput);
+  const created = await createPendingOrder(cartId, email, shipTo, account, codeInput, acceptance);
   if (!created.ok) return created;
   const order = created.data;
 
@@ -279,6 +303,7 @@ async function createPendingOrder(
   shipTo: ShipTo,
   account: CheckoutAccount | null,
   codeInput: unknown,
+  terms: TermsAcceptance,
 ): Promise<Result<CreatedOrder>> {
   try {
     const created = await db.$transaction(
@@ -352,6 +377,8 @@ async function createPendingOrder(
             discountCents: snapshot.discountCents,
             shippingCents: snapshot.shippingCents,
             totalCents: snapshot.totalCents,
+            termsVersion: terms.version,
+            termsAcceptedAt: terms.acceptedAt,
             // spec 0014, AC-4: the code's snapshot, written once and never changed.
             ...(applied === null
               ? {}

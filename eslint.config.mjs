@@ -9,6 +9,9 @@ const eslintConfig = defineConfig([
   {
     rules: {
       "@typescript-eslint/no-explicit-any": "error",
+      // Destructuring a key out only to leave it off the rest (`{ a, ...rest }`) is how an
+      // immutable object drops a field.
+      "@typescript-eslint/no-unused-vars": ["warn", { ignoreRestSiblings: true }],
       // spec 0016: a GET form must work before the app's JavaScript loads, and a dead Select
       // fails silently (the form submits the value it was rendered with).
       "no-restricted-imports": [

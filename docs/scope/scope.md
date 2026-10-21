@@ -30,7 +30,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 14 | Discounts & promo codes | Slice 8 | done |
 | 15 | Admin sales dashboard | Slice 9 | done |
 | 23 | Native controls in GET forms | Slice 9 follow up | done |
-| 16 | Legal pages & cookie consent | Launch | planned |
+| 16 | Legal pages & cookie consent | Launch | done |
 | 17 | SEO for storefront pages | Launch | planned |
 | 18 | Analytics & error tracking | Launch | planned |
 | 19 | Production deploy | Launch | planned |
@@ -311,10 +311,18 @@ spec [0016](../specs/0016-native-controls-get-forms.md) · code in [src/componen
 
 ## Launch readiness
 
-### 16. Legal pages & cookie consent · needs a decision
+### 16. Legal pages & cookie consent · done
 Terms, privacy policy, returns and shipping policy, and a cookie banner that blocks non essential cookies until the customer agrees.
 **Done when:** the legal pages are linked from every page footer and from checkout; no analytics or marketing cookies are set before consent; the customer can change their choice later.
-- [ ] Design it (spec): `/architect legal pages & cookie consent`
+spec [0017](../specs/0017-legal-pages-cookie-consent/index.md) · code in [src/lib/legal/](../../src/lib/legal/), [src/lib/consent/](../../src/lib/consent/), [src/features/legal/](../../src/features/legal/)
+- [x] Design it (spec): `/architect legal pages & cookie consent`
+- [x] Build it: `/develop legal pages & cookie consent`
+  - [x] Thin thread: the terms page from Markdown, the footer link, the checkout checkbox recording the version on the order, the admin line and the confirmation email (AC-1, AC-2, AC-4, AC-7 to AC-11, AC-13, AC-14)
+  - [x] The other four pages with live shipping values, the model withdrawal form, print styles and the sign up notice (AC-1 to AC-3, AC-5 to AC-7, AC-12)
+  - [x] Consent core: the cookie, the registry, `ConsentProvider`, `useConsent` and `ConsentGate`, and the cookie table (AC-15, AC-17, AC-22)
+  - [x] Banner, settings dialog, withdrawal, GPC, the style guide demo and the first visit privacy e2e (AC-16, AC-18 to AC-21, AC-23, AC-24)
+- [x] Verify it: `/check verify legal pages & cookie consent`
+- [x] Test it: `/test legal pages & cookie consent`
 
 ### 17. SEO for storefront pages
 Make products findable: titles, descriptions, canonical links, sitemap, product rich results, and social share cards on every public page.

@@ -30,6 +30,7 @@ function emailFormat(): EmailFormat {
     timeZone: env.STORE_TIMEZONE,
     storeName: brand.name,
     contactAddress: env.EMAIL_FROM_ADDRESS,
+    siteUrl: env.NEXT_PUBLIC_SITE_URL,
   };
 }
 
@@ -53,6 +54,7 @@ export async function loadEmailContent(row: ContentRow): Promise<EmailContent> {
           discountCode: true,
           shippingCents: true,
           totalCents: true,
+          termsVersion: true,
           ...deliveryAddressColumns,
           lines: {
             orderBy: lineOrder,

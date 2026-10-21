@@ -13,6 +13,7 @@
     "test": "vitest run --project unit",
     "test:db": "tsx scripts/test-db.ts",
     "test:stack": "vitest run --project stack",
+    "test:build": "vitest run --project build",
     "test:e2e": "playwright test",
     "postinstall": "prisma generate && simple-git-hooks",
     "db:generate": "prisma generate",

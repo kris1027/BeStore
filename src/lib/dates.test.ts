@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   addDays,
+  calendarDate,
+  calendarDayTextSchema,
+  formatCalendarDate,
   formatDate,
   formatDateTime,
   parseCalendarDay,
@@ -24,6 +27,34 @@ describe("formatDate", () => {
 
   it("uses the store's locale", () => {
     expect(formatDate(lateEvening, { locale: "pl-PL", timeZone: "UTC" })).toBe("31 mar 2026");
+  });
+});
+
+// spec 0017, AC-1: a version date is the same day in every zone.
+describe("formatCalendarDate", () => {
+  it("formats a YYYY-MM-DD as a long date with no day shift", () => {
+    expect(formatCalendarDate(calendarDate(calendarDayTextSchema.parse("2026-10-20")), "en")).toBe(
+      "October 20, 2026",
+    );
+    expect(
+      formatCalendarDate(calendarDate(calendarDayTextSchema.parse("2026-01-01")), "pl-PL"),
+    ).toBe("1 stycznia 2026");
+  });
+
+  // Value sourcing, admin version and time: accepted at 00:30 Warsaw time the next day, the
+  // version still reads as the file's date while the time follows the store zone.
+  it("keeps the version day apart from a late night acceptance time", () => {
+    const version = calendarDate(calendarDayTextSchema.parse("2026-10-20"));
+    const acceptedAt = new Date("2026-10-20T22:30:00Z");
+
+    expect(formatCalendarDate(version, "pl-PL")).toBe("20 października 2026");
+    expect(formatDateTime(acceptedAt, { locale: "en", timeZone: "Europe/Warsaw" })).toBe(
+      "Oct 21, 2026, 12:30 AM",
+    );
+  });
+
+  it("reads a Postgres date at UTC midnight as that day", () => {
+    expect(formatCalendarDate(new Date("2026-03-31T00:00:00.000Z"), "en")).toBe("March 31, 2026");
   });
 });
 
@@ -130,5 +161,15 @@ describe("addDays", () => {
     expect(addDays({ y: 2026, m: 12, d: 31 }, 1)).toEqual({ y: 2027, m: 1, d: 1 });
     expect(addDays({ y: 2028, m: 2, d: 28 }, 1)).toEqual({ y: 2028, m: 2, d: 29 });
     expect(addDays({ y: 2026, m: 3, d: 1 }, -1)).toEqual({ y: 2026, m: 2, d: 28 });
+  });
+});
+
+describe("calendarDayTextSchema", () => {
+  it("accepts a real YYYY-MM-DD date", () => {
+    expect(calendarDayTextSchema.safeParse("2028-02-29").success).toBe(true);
+  });
+
+  it.each(["2026-02-31", "20.10.2026", "", 20261020, undefined])("refuses %j", (value) => {
+    expect(calendarDayTextSchema.safeParse(value).success).toBe(false);
   });
 });

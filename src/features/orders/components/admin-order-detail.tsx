@@ -23,7 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { type DateFormat, formatDateTime } from "@/lib/dates";
+import { type DateFormat, formatCalendarDate, formatDateTime } from "@/lib/dates";
 import { discountLabel } from "@/lib/discounts/rule";
 import { deliveryLabel } from "@/lib/shipping/rule";
 import { cn } from "@/lib/utils";
@@ -277,6 +277,12 @@ export function AdminOrderDetail({
                   {formatDateTime(order.cancelledAt, dateFormat)}
                 </DetailRow>
               ) : null}
+              {/* spec 0017, AC-13: which terms text applies in a dispute. */}
+              <DetailRow label="Terms accepted">
+                {order.terms === null
+                  ? "not recorded"
+                  : `version ${formatCalendarDate(order.terms.version, dateFormat.locale)}, on ${formatDateTime(order.terms.acceptedAt, dateFormat)}`}
+              </DetailRow>
               {order.carrier || order.trackingNumber ? (
                 <DetailRow label="Tracking">
                   {[order.carrier, order.trackingNumber].filter(Boolean).join(", ")}

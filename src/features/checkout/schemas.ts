@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { calendarDayTextSchema } from "@/lib/dates";
 import { normalizeEmail } from "@/lib/discounts/schema";
 import { shippingAddressSchema, type StoreCountry } from "@/lib/shipping/address";
 
@@ -7,6 +8,8 @@ import { shippingAddressSchema, type StoreCountry } from "@/lib/shipping/address
 
 export const checkoutMessages = {
   emailInvalid: "Enter a valid email address.",
+  // spec 0017, AC-8 and AC-9.
+  acceptTerms: "Tick the box to accept the terms of sale.",
 } as const;
 
 // Lowercasing and trimming twice gives the same email, so the server can parse the form's output.
@@ -27,13 +30,20 @@ export function checkoutSchema(country: StoreCountry) {
     // spec 0014, AC-4: the applied promo code, checked again by Pay under the code lock. Any
     // value is passed on as typed: one that is not a code is refused as "This code isn't valid."
     discountCode: z.unknown().optional(),
+    // spec 0017, AC-8 and AC-9: unticked (the form's undefined), false or missing all refuse.
+    acceptTerms: z.literal(true, { error: checkoutMessages.acceptTerms }),
   });
 }
+
+// spec 0017, AC-9: the terms version the page showed, held in component state, never a field the
+// customer edits. startCheckout parses it on its own, before any database work.
+export const startCheckoutInputSchema = z.object({ termsVersion: calendarDayTextSchema });
 
 export type CheckoutValues = z.input<ReturnType<typeof checkoutSchema>>;
 export type CheckoutInput = z.output<ReturnType<typeof checkoutSchema>>;
 
-export const checkoutFields = [
+// The typed fields, which a return visit can fill in.
+const checkoutTextFields = [
   "email",
   "fullName",
   "line1",
@@ -43,10 +53,17 @@ export const checkoutFields = [
   "phone",
 ] as const satisfies readonly (keyof CheckoutValues)[];
 
+// Every field a validation refusal can name, in the order the form shows them, so the first
+// invalid one gets focus.
+export const checkoutFields = [
+  ...checkoutTextFields,
+  "acceptTerms",
+] as const satisfies readonly (keyof CheckoutValues)[];
+
 export type CheckoutField = (typeof checkoutFields)[number];
 
 // What a return visit fills in (spec 0007, AC-9); every field empty for a fresh cart.
-export type CheckoutPrefill = Record<CheckoutField, string>;
+export type CheckoutPrefill = Record<(typeof checkoutTextFields)[number], string>;
 
 export const emptyPrefill: CheckoutPrefill = {
   email: "",

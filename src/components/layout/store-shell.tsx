@@ -3,6 +3,8 @@ import { Suspense } from "react";
 
 import { Wordmark } from "@/components/wordmark";
 import { brand } from "@/lib/brand/brand";
+import { CookieSettingsControl } from "@/lib/consent/cookie-settings-control";
+import { legalFooterLinks } from "@/lib/legal/footer-links";
 import { cn } from "@/lib/utils";
 
 import { storeContainer } from "./container";
@@ -11,11 +13,17 @@ import type { NavItem } from "./nav";
 import { StoreDesktopNav, StoreMobileNav } from "./store-nav-menu";
 import { storeNavItems } from "./store-nav";
 
+const footerLinkClass =
+  "inline-flex min-h-6 cursor-pointer items-center text-sm text-muted-foreground hover:text-foreground";
+
 type StoreShellProps = {
   // Header actions (search, account, cart), filled by features 13, 12 and 6.
   readonly actions?: React.ReactNode;
-  // Footer links (legal pages, feature 16).
+  // Footer links; the legal pages by default (spec 0017, AC-3), demo links in the style guide.
   readonly footerLinks?: readonly NavItem[];
+  // The cookie consent bar, right after the skip link (spec 0017, AC-19). Only the store layout
+  // and the style guide demo pass one.
+  readonly banner?: React.ReactNode;
   // Defaults to the real list; the style guide passes demo links.
   readonly navItems?: readonly NavItem[];
   readonly children: React.ReactNode;
@@ -23,7 +31,8 @@ type StoreShellProps = {
 
 export function StoreShell({
   actions,
-  footerLinks = [],
+  footerLinks = legalFooterLinks,
+  banner,
   navItems = storeNavItems,
   children,
 }: StoreShellProps) {
@@ -35,7 +44,9 @@ export function StoreShell({
       >
         Skip to content
       </a>
-      <header className="sticky top-0 z-40 h-(--header-height) border-b bg-background">
+      {banner}
+      {/* Printing a legal page prints only its text (AC-3). */}
+      <header className="sticky top-0 z-40 h-(--header-height) border-b bg-background print:hidden">
         <div className={cn(storeContainer, "flex h-full items-center gap-4")}>
           <div className="flex items-center gap-1">
             {/* The navs read the pathname, which a route with unknown params (a product page)
@@ -56,7 +67,7 @@ export function StoreShell({
       <main id="main" tabIndex={-1} className="flex flex-1 flex-col">
         {children}
       </main>
-      <footer className="border-t">
+      <footer className="border-t print:hidden">
         <div
           className={cn(
             storeContainer,
@@ -82,14 +93,14 @@ export function StoreShell({
               <ul className="flex flex-wrap gap-x-6 gap-y-2">
                 {footerLinks.map((link) => (
                   <li key={link.href}>
-                    <Link
-                      href={link.href}
-                      className="inline-flex min-h-6 items-center text-sm text-muted-foreground hover:text-foreground"
-                    >
+                    <Link href={link.href} className={footerLinkClass}>
                       {link.label}
                     </Link>
                   </li>
                 ))}
+                <li>
+                  <CookieSettingsControl className={footerLinkClass} />
+                </li>
               </ul>
             </nav>
           ) : null}

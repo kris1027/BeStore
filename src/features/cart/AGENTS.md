@@ -8,7 +8,7 @@ The guest cart: add to cart, `/cart` with quantity and remove, the header count,
 
 - `actions.ts`: `addToCart`, `setCartItemQuantity`, `removeCartItem`.
 - `expired-carts.ts`: the logic behind `GET /api/cron/expired-carts` (scheduled in `vercel.json`).
-- `src/lib/cart/signature.ts`, `cookie.ts`: the `bestore_cart` cookie, `<cartId>.<HMAC SHA 256>` signed with `CART_COOKIE_SECRET`.
+- `src/lib/cart/signature.ts`, `cookie.ts`: the `bestore_cart` cookie, `<cartId>.<HMAC SHA 256>` signed with `CART_COOKIE_SECRET`. The name `CART_COOKIE` lives in the pure `cookie-name.ts`, so the client side consent registry can import it.
 - `src/lib/cart/merge.ts`: `mergeCarts` and `lockAccountCart`, the guest cart joining a customer's cart at sign in and checkout (spec 0012, AC-5). The caller holds the customer lock.
 - `src/lib/cart/load-cart.ts`: loads the cart with live variant data; `cart-lines.ts`: pure line flags, totals and `canCheckout`.
 - `src/lib/cart/owned.ts`: `readOwnedCartId` and `loadOwnedCart`, the cookie cart only when this visitor may use it (spec 0012, AC-7).

@@ -5,9 +5,8 @@ import { cookies } from "next/headers";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
+import { CART_COOKIE } from "./cookie-name";
 import { signCartId, verifyCartCookie } from "./signature";
-
-export const CART_COOKIE = "bestore_cart";
 
 // spec 0002: a cart lives 30 days from its last write, and so does its cookie.
 export const CART_TTL_MS = 30 * 24 * 60 * 60 * 1000;

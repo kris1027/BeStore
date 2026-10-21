@@ -59,6 +59,21 @@ async function saveSettings(page: Page, fee: string, threshold: string | null) {
   await expect(page.getByText("Shipping settings saved.")).toBeVisible();
 }
 
+// spec 0017, AC-5: /shipping fills in the live values; the save expires its cached read.
+test("the shipping page shows the saved fee and free delivery rule on its next load", async ({
+  page,
+}) => {
+  await saveSettings(adminPage, "9.99", "50");
+  await page.goto("/shipping");
+  await expect(page.getByText("Standard delivery costs €9.99.")).toBeVisible();
+  await expect(page.getByText("Delivery is free on orders of €50.00 or more.")).toBeVisible();
+
+  await saveSettings(adminPage, "4.50", null);
+  await page.goto("/shipping");
+  await expect(page.getByText("Standard delivery costs €4.50.")).toBeVisible();
+  await expect(page.getByText("The same fee applies to every order.")).toBeVisible();
+});
+
 test("an admin sets the fee and threshold, and the cart and checkout show them", async ({
   page,
 }) => {

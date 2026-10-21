@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { type ReactNode, useRef, useState } from "react";
 
+import type { CalendarDayText } from "@/lib/dates";
 import { DeliveryRow } from "@/components/delivery-row";
 import { Price } from "@/components/price";
 import { useStoreFormat } from "@/components/store-format-provider";
@@ -47,6 +48,8 @@ export function CheckoutPayment({
   readonly countryName: string;
   readonly prefill: CheckoutPrefill;
   readonly account: CheckoutAccount | null;
+  // spec 0017, AC-9: the terms version the page shows.
+  readonly termsVersion: CalendarDayText;
 }) {
   const router = useRouter();
   const format = useStoreFormat();

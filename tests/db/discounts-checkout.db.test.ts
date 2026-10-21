@@ -68,6 +68,7 @@ vi.mock("@/lib/customer/session", () => ({
 }));
 
 const { startCheckout } = await import("@/features/checkout/actions/start-checkout");
+const { currentTermsVersion } = await import("@/lib/legal/documents");
 const { applyDiscountCode } = await import("@/features/checkout/actions/apply-discount");
 const { prefillDiscountCode } = await import("@/features/checkout/queries");
 const { countRedemptions, lockCode, previewDiscount, redeem } =
@@ -99,6 +100,8 @@ const address = {
   postalCode: "00950",
   city: "Warsaw",
   phone: "",
+  acceptTerms: true,
+  termsVersion: currentTermsVersion,
 };
 
 function pay(discountCode?: string, email = "a@example.com") {

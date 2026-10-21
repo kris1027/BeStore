@@ -49,6 +49,7 @@ vi.mock("@/lib/env", () => ({
     EMAIL_TRANSPORT: "log",
     EMAIL_FROM: "BeStore <orders@example.com>",
     EMAIL_FROM_ADDRESS: "orders@example.com",
+    NEXT_PUBLIC_SITE_URL: "https://shop.example",
   },
 }));
 vi.mock("@/lib/stripe", async () => ({
@@ -223,6 +224,29 @@ describe("the confirmation (AC-1, AC-8, AC-16)", () => {
     expect(await post(event)).toBe(200);
     expect(await emailsOf(order.id)).toHaveLength(1);
     expect(scheduledIds()).toEqual([]);
+  });
+
+  // spec 0017, AC-14: the version comes from the order row, formatted at send time.
+  it.each([
+    ["names the accepted terms version", new Date("2026-10-20T00:00:00.000Z"), true],
+    ["leaves the version out for an order without one", null, false],
+  ])("%s, with the legal links", async (_, termsVersion, named) => {
+    const { order } = await seedPendingOrder();
+    await testDb.order.update({
+      where: { id: order.id },
+      data: { termsVersion, termsAcceptedAt: termsVersion === null ? null : new Date() },
+    });
+    await post(
+      sessionEvent("checkout.session.completed", { orderId: order.id, amountTotal: 5000 }),
+    );
+    const { transport, sent } = stubTransport();
+
+    await deliver((await onlyEmail(order.id)).id, transport);
+
+    expect(sent[0]?.text.includes("Terms of sale version October 20, 2026 applied")).toBe(named);
+    expect(sent[0]?.html).toContain('href="https://shop.example/terms"');
+    expect(sent[0]?.html).toContain('href="https://shop.example/returns"');
+    expect(sent[0]?.html).toContain('href="https://shop.example/privacy"');
   });
 
   it("queues nothing and schedules nothing when the paid transaction rolls back", async () => {

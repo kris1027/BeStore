@@ -14,6 +14,7 @@ import { addDays, parseCalendarDay, zonedDayStart } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { escapeLike } from "@/lib/like";
 import { env } from "@/lib/env";
+import type { TermsAcceptance } from "@/lib/legal/acceptance";
 import { logEmailMissing } from "@/lib/orders/log";
 import {
   type DeliveryAddress,
@@ -246,6 +247,8 @@ export type AdminOrderDetail = {
   readonly shippedAt: Date | null;
   readonly deliveredAt: Date | null;
   readonly cancelledAt: Date | null;
+  // spec 0017, AC-13: null on orders from before the feature.
+  readonly terms: TermsAcceptance | null;
   readonly carrier: string | null;
   readonly trackingNumber: string | null;
   readonly phone: string | null;
@@ -317,6 +320,8 @@ export async function getAdminOrder(
       shippedAt: true,
       deliveredAt: true,
       cancelledAt: true,
+      termsVersion: true,
+      termsAcceptedAt: true,
       carrier: true,
       trackingNumber: true,
       phone: true,
@@ -463,6 +468,11 @@ export async function getAdminOrder(
     shippedAt: order.shippedAt,
     deliveredAt: order.deliveredAt,
     cancelledAt: order.cancelledAt,
+    // The CHECK keeps the two together.
+    terms:
+      order.termsVersion === null || order.termsAcceptedAt === null
+        ? null
+        : { version: order.termsVersion, acceptedAt: order.termsAcceptedAt },
     carrier: order.carrier,
     trackingNumber: order.trackingNumber,
     phone: order.phone,

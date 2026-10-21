@@ -4,10 +4,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 
+import { NewTabLink } from "@/components/new-tab-link";
 import { Button } from "@/components/ui/button";
 import { FieldGroup } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import { applyFieldErrors } from "@/lib/form-errors";
+import { legalPaths } from "@/lib/legal/paths";
 
 import { signUp } from "../actions/sign-up";
 import { accountMessages } from "../messages";
@@ -41,6 +43,12 @@ export function SignUpForm() {
           {pending ? <Spinner data-icon="inline-start" /> : null}
           Continue
         </Button>
+        {/* spec 0017, AC-12: nothing new is stored; the terms apply to orders placed later. */}
+        <p className="text-sm text-muted-foreground">
+          By creating an account you accept the{" "}
+          <NewTabLink href={legalPaths.terms}>terms of sale</NewTabLink> and confirm you have read
+          the <NewTabLink href={legalPaths.privacy}>privacy policy</NewTabLink>.
+        </p>
       </FieldGroup>
     </form>
   );

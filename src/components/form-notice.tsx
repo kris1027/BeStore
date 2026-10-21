@@ -1,9 +1,11 @@
 import { CircleAlertIcon, InfoIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type FormNoticeProps = {
-  readonly message: string | null;
+  // Text, or text with a link (spec 0017, AC-10).
+  readonly message: ReactNode;
   // `error` is announced at once (role alert); `info` politely (role status).
   readonly tone?: "error" | "info";
   readonly id?: string;

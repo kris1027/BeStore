@@ -17,6 +17,7 @@ const format: EmailFormat = {
   timeZone: "Europe/Warsaw",
   storeName: "Shop",
   contactAddress: "orders@example.com",
+  siteUrl: "https://shop.example",
 };
 
 const address = {
@@ -59,6 +60,7 @@ function confirmation(overrides: Partial<Parameters<typeof confirmationProps>[0]
       discountCode: null,
       shippingCents: 999,
       totalCents: 10699,
+      termsVersion: new Date("2026-10-20T00:00:00.000Z"),
       lines,
       ...overrides,
     },
@@ -141,6 +143,7 @@ describe("the confirmation", () => {
         discountCode: null,
         shippingCents: 0,
         totalCents: 1000,
+        termsVersion: null,
         lines: [],
       },
       { ...format, locale: "pl-PL" },
@@ -152,15 +155,90 @@ describe("the confirmation", () => {
     expect(props.paidDate).toBe("13 paź 2026");
   });
 
-  it("is accessible and private: one h1, presentation layout, a data table, no links or images", async () => {
+  // spec 0017, AC-14: the only links are the three legal pages, so nothing in the email leads
+  // back to the order or the checkout.
+  it("is accessible and private: one h1, presentation layout, a data table, only legal links, no images", async () => {
     const { html } = await renderEmail({ kind: "order_confirmation", props: confirmation() });
 
     expect(html.match(/<h1/g)).toHaveLength(1);
     expect(html).toContain('role="presentation"');
     expect(html).toContain('<th scope="col"');
-    expect(html).not.toMatch(/<a\s/);
+    expect([...html.matchAll(/<a\s[^>]*href="([^"]+)"/g)].map((match) => match[1])).toEqual([
+      "https://shop.example/terms",
+      "https://shop.example/returns",
+      "https://shop.example/privacy",
+    ]);
     expect(html).not.toMatch(/<img\s/);
     expect(html).not.toContain("checkout");
+  });
+
+  describe("terms of sale (spec 0017, AC-14)", () => {
+    it("names the accepted version as a long date, with the legal links", async () => {
+      const email = await renderEmail({ kind: "order_confirmation", props: confirmation() });
+
+      expect(email.text).toContain("Terms of sale version October 20, 2026 applied to this order.");
+      for (const text of ["Terms of sale", "Returns", "Privacy policy"]) {
+        expect(email.text).toContain(text);
+      }
+    });
+
+    it("leaves the version line out for an order paid before it was recorded, keeping the links", async () => {
+      const email = await renderEmail({
+        kind: "order_confirmation",
+        props: confirmation({ termsVersion: null }),
+      });
+
+      expect(email.text).not.toContain("applied to this order");
+      expect(email.html).toContain('href="https://shop.example/terms"');
+    });
+
+    // Value sourcing, email links: NEXT_PUBLIC_SITE_URL decides the origin.
+    it("builds the legal links from the site URL it is given", () => {
+      const props = confirmationProps(
+        {
+          number: 1,
+          customerName: null,
+          currency: "EUR",
+          address: null,
+          paidAt: new Date("2026-10-13T10:00:00Z"),
+          subtotalCents: 1000,
+          discountCents: 0,
+          discountCode: null,
+          shippingCents: 0,
+          totalCents: 1000,
+          termsVersion: null,
+          lines: [],
+        },
+        { ...format, siteUrl: "https://staging.other.example" },
+      );
+
+      expect(props.legalLinks).toEqual({
+        terms: "https://staging.other.example/terms",
+        returns: "https://staging.other.example/returns",
+        privacy: "https://staging.other.example/privacy",
+      });
+    });
+
+    it("formats the version in the store locale, on the same day", () => {
+      const props = confirmationProps(
+        {
+          number: 1,
+          customerName: null,
+          currency: "PLN",
+          address: null,
+          paidAt: new Date("2026-10-13T10:00:00Z"),
+          subtotalCents: 1000,
+          discountCents: 0,
+          discountCode: null,
+          shippingCents: 0,
+          totalCents: 1000,
+          termsVersion: new Date("2026-01-01T00:00:00.000Z"),
+          lines: [],
+        },
+        { ...format, locale: "pl-PL", timeZone: "America/Los_Angeles" },
+      );
+      expect(props.termsVersionLabel).toBe("1 stycznia 2026");
+    });
   });
 });
 

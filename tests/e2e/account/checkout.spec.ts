@@ -9,6 +9,7 @@ import {
   payButton,
   postPaidEvent,
   seedPendingOrder,
+  termsBox,
 } from "../checkout/support";
 import { signInAsCustomer } from "./support";
 
@@ -83,6 +84,7 @@ test("a signed in Pay goes to Stripe with the account on the order and the addre
   await page.getByLabel("Address line 1").fill("ul. Marszałkowska 1");
   await page.getByLabel("Postal code").fill("00950");
   await page.getByLabel("City").fill("Warsaw");
+  await termsBox(page).check();
   await payButton(page).click();
   await page.waitForURL(/^https:\/\/checkout\.stripe\.com\//, { timeout: 30_000 });
 

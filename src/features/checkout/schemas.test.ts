@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { checkoutFieldErrors, checkoutSchema, sessionIdSchema } from "./schemas";
+import {
+  checkoutFieldErrors,
+  checkoutSchema,
+  sessionIdSchema,
+  startCheckoutInputSchema,
+} from "./schemas";
 
 // spec 0006, AC-1, AC-2 and AC-11; spec 0007, AC-2.
 
@@ -13,6 +18,7 @@ const address = {
   postalCode: "00950",
   city: "Warsaw",
   phone: "",
+  acceptTerms: true,
 };
 
 describe("checkoutSchema", () => {
@@ -26,6 +32,7 @@ describe("checkoutSchema", () => {
       city: "Warsaw",
       phone: null,
       saveAddress: false,
+      acceptTerms: true,
     });
   });
 
@@ -69,6 +76,28 @@ describe("checkoutSchema", () => {
     const parsed = schema.parse({ email: "a@example.com", ...address, shippingCents: 0 });
 
     expect(parsed).not.toHaveProperty("shippingCents");
+  });
+});
+
+// spec 0017, AC-8 and AC-9.
+describe("acceptTerms", () => {
+  it.each([false, undefined, "true", 1])("refuses %j with the tick the box message", (value) => {
+    const result = schema.safeParse({ email: "a@example.com", ...address, acceptTerms: value });
+
+    if (result.success) throw new Error("expected the input to be refused");
+    expect(checkoutFieldErrors(result.error)).toEqual({
+      acceptTerms: "Tick the box to accept the terms of sale.",
+    });
+  });
+});
+
+describe("startCheckoutInputSchema", () => {
+  it("accepts a real YYYY-MM-DD terms version", () => {
+    expect(startCheckoutInputSchema.safeParse({ termsVersion: "2026-10-20" }).success).toBe(true);
+  });
+
+  it.each(["2026-02-31", "20.10.2026", "", 20261020, undefined])("refuses %j", (termsVersion) => {
+    expect(startCheckoutInputSchema.safeParse({ termsVersion }).success).toBe(false);
   });
 });
 
