@@ -57,13 +57,18 @@ test("shows a period's figures, best sellers and chart table, and links to its o
     await page.goto(`/admin?from=${year}-03-01&to=${year}-03-31`);
 
     await expect(page.getByRole("heading", { level: 1, name: "Dashboard" })).toBeVisible();
-    const orders = page.locator('[data-slot="card"]', {
-      has: page.getByRole("heading", { name: "Orders", level: 3 }),
-    });
+    // Scoped through a card's heading: a bare getByText also matches the hidden copy of a
+    // streamed segment that React has not swapped in yet, a strict mode violation.
+    const card = (name: string) =>
+      page.locator('[data-slot="card"]', {
+        has: page.getByRole("heading", { name, level: 3 }),
+      });
+    const orders = card("Orders");
+    const net = card("Net revenue");
     await expect(orders.getByText("2", { exact: true })).toBeVisible();
-    await expect(page.getByText("Gross €60.01")).toBeVisible();
-    await expect(page.getByText("Refunds €0.00")).toBeVisible();
-    await expect(page.getByText("€30.01", { exact: true })).toBeVisible();
+    await expect(net.getByText("Gross €60.01")).toBeVisible();
+    await expect(net.getByText("Refunds €0.00")).toBeVisible();
+    await expect(card("Average order value").getByText("€30.01", { exact: true })).toBeVisible();
     await expect(page.getByText("No earlier figure to compare").first()).toBeVisible();
     await expect(page.getByRole("heading", { name: "Net revenue per day" })).toBeVisible();
     await expect(page.getByRole("row", { name: /Dashboard e2e mug 3 €60\.01/ })).toBeVisible();
