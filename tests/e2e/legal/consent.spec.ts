@@ -128,6 +128,9 @@ test.describe("the store", () => {
 
       for (const path of ["/", `/products/${socks.slug}`, "/cart", "/checkout"]) {
         await page.goto(path);
+        // An empty cart's /checkout sends the browser on to /cart once its stream redirects; the
+        // storage read must wait for that page, or the navigation destroys its context.
+        if (scripts === "on" && path === "/checkout") await expect(page).toHaveURL("/cart");
         await pageReady(page, scripts);
         const names = (await page.context().cookies()).map((cookie) => cookie.name);
         expect(names.filter((name) => !necessary.test(name))).toEqual([]);
