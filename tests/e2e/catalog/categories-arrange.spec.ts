@@ -124,10 +124,10 @@ test("products are arranged by keyboard and the home grid follows", async ({
 
   const customer = await (await browser.newContext()).newPage();
   await customer.goto("/");
-  const cards = await customer
-    .getByRole("region", { name: "Shop all" })
-    .getByRole("link")
-    .allTextContents();
+  const shopAll = customer.getByRole("region", { name: "Shop all" });
+  // allTextContents does not wait, and the grid streams in after the shell.
+  await expect(shopAll.getByRole("link").filter({ hasText: first.name })).toBeVisible();
+  const cards = await shopAll.getByRole("link").allTextContents();
   const card = (name: string) => cards.findIndex((text) => text.includes(name));
   expect(card(first.name)).toBeGreaterThanOrEqual(0);
   expect(card(first.name)).toBeLessThan(card(second.name));
