@@ -251,7 +251,8 @@ test.describe("listings", () => {
 
     await expect(page).toHaveTitle(`Seo shelf ${suffix} · ${brand.name}`);
     expect(await canonical(page)).toBe(`${siteUrl}/categories/${slug}`);
-    expect(await meta(page, "name", "description")).toBe("Light and cool.");
+    // AC-14: the header shows the description as plain text, so the meta keeps its asterisks.
+    expect(await meta(page, "name", "description")).toBe("Light and **cool**.");
     const [crumbs] = (await jsonLd(page)).filter((item) => item["@type"] === "BreadcrumbList");
     expect(crumbs?.itemListElement).toEqual([
       { "@type": "ListItem", position: 1, name: brand.name, item: `${siteUrl}/` },

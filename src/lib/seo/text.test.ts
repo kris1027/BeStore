@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { META_DESCRIPTION_MAX, plainExcerpt, presentText } from "./text";
+import { META_DESCRIPTION_MAX, plainExcerpt, presentText, textExcerpt } from "./text";
 
 // spec 0018, AC-6.
 describe("plainExcerpt", () => {
@@ -46,6 +46,19 @@ describe("plainExcerpt", () => {
 
   it("counts characters, never splitting a surrogate pair", () => {
     expect(plainExcerpt("😀".repeat(20), 10)).toBe(`${"😀".repeat(9)}…`);
+  });
+});
+
+// spec 0018, AC-14: a category description is plain text on the page, so it keeps its symbols.
+describe("textExcerpt", () => {
+  it("keeps what Markdown would read as syntax", () => {
+    expect(textExcerpt("# 1. Shoes *and* [boots](x)", 160)).toBe("# 1. Shoes *and* [boots](x)");
+  });
+
+  it("collapses whitespace and cuts by the AC-6 rule", () => {
+    expect(textExcerpt("a   b\n\nc", 160)).toBe("a b c");
+    expect(textExcerpt("one two three", 10)).toBe("one two…");
+    expect(textExcerpt("  \n ", 160)).toBeNull();
   });
 });
 

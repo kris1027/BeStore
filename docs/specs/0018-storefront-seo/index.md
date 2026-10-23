@@ -35,7 +35,7 @@ Every public storefront page gets complete search and share metadata: a unique t
 *Listings*
 - **AC-12**: Home and category pages declare their canonical by one pure rule on the parsed `ListingState` (from `parseListingParams`), never on raw params. When the state differs from the default state in anything but `page` (any price bound, `inStock`, `onSale`, any option filter, or a sort other than `defaultSort(kind)`), the canonical is the plain path. Otherwise it is the plain path for page 1 and `<path>?page=N` for page N, where N is the page actually shown: the parsed page clamped to the page count, computed by one function exported from `listing.ts` that `buildListing` also uses, so the two cannot drift. So `?page=0`, `?page=abc`, `?page=1`, `?sort=featured`, `?stock=0` and unknown params (`?utm_source=x`) all give the plain path.
 - **AC-13**: For page N above 1 (the unfiltered case of AC-12), the title gains `, page N` (e.g. `Shoes, page 2 · BeStore`); filtered views keep the plain title. No search query or filter text ever appears in a title or any metadata (spec 0013 AC-24 still holds).
-- **AC-14**: A category's title is `meta_title`, else its name (unchanged). Its description is `meta_description`, else its description cut by the AC-6 rule.
+- **AC-14**: A category's title is `meta_title`, else its name (unchanged). Its description is `meta_description`, else its description cut by the AC-6 rule. The category description is plain text (the header shows it as is), so it is never parsed as Markdown: `*`, `#` or `[x](y)` stay in the meta description as on the page.
 - **AC-15**: The home page renders JSON-LD, in its static shell, for an `Organization` (`name`, `url` the site URL, `logo` the absolute `/logo.png` URL) and a `WebSite` (`name`, `url`), with no `SearchAction`.
 - **AC-16**: Each category page renders JSON-LD for a `BreadcrumbList` with two items: the brand name linking the site URL, then the category name (from `getCategoryBySlug`) linking the category canonical (plain path). The script mounts inside `CategoryHeader` after its not found check, so a hidden or unknown category renders none.
 - **AC-17**: `/search` stays `noindex, follow` with no canonical, no JSON-LD and the brand card as its share image.
@@ -88,7 +88,7 @@ Use Next's built in metadata conventions (`generateMetadata`, `sitemap.ts`, `rob
 | `pageMetadata({ title, description, path, image? })` in `src/lib/seo/metadata.ts` | pure helper | page values | `Metadata` (AC-2) | n/a | none |
 | `productJsonLd(view, settings, facts)` in `src/features/catalog/seo.ts` | pure | `ProductView`, `ShippingSettings`, currency, country, site URL | `WithContext<Product>` | n/a | none |
 | `listingCanonical(path, state, kind, pageCount)` in `src/features/catalog/listing/` | pure | parsed `ListingState`, page count | absolute URL + page number for the title | n/a | none |
-| `plainExcerpt(markdown, max)` in `src/lib/seo/text.ts` | pure | Markdown, limit | string or null | n/a | none |
+| `plainExcerpt(markdown, max)` / `textExcerpt(text, max)` in `src/lib/seo/text.ts` | pure | Markdown or plain text, limit | string or null | n/a | none |
 | `jsonLdScript(data)` component in `src/lib/seo/` | server component | object | escaped `<script>` (AC-11) | n/a | none |
 | `getSitemapEntries()` in `src/features/catalog/` and `src/features/categories/` (one each) | `'use cache'` reads | none | slugs, `updated_at`, image paths | server only | none |
 
@@ -110,7 +110,7 @@ Use Next's built in metadata conventions (`generateMetadata`, `sitemap.ts`, `rob
 | product JSON-LD | `itemCondition` | constant `NewCondition` (the engineer confirmed the store sells only new items) |
 | listing canonical | page shown | `parseListingParams` page clamped by `ceil(inScopeCount / PAGE_SIZE)`, the count from `getListingIndex()` scoped like `buildListing` |
 | listing canonical | "filtered or sorted" | `ListingState` fields vs `defaultSort(kind)` (`params.ts`) |
-| category metadata | title / description | `categories.meta_title` / `meta_description`, else `name` / `plainExcerpt(description)` |
+| category metadata | title / description | `categories.meta_title` / `meta_description`, else `name` / `textExcerpt(description)` (plain text, no Markdown parse) |
 | Organization | `logo` | `NEXT_PUBLIC_SITE_URL` plus `/logo.png` |
 | brand card, logo | colours | `brand.colors` (new, sRGB hex, in `brand.ts`) |
 | logo | letter | first character of `brand.name`, uppercased |

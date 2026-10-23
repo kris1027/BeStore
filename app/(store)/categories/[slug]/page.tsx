@@ -14,7 +14,7 @@ import { categoryPath } from "@/features/categories/paths";
 import { getCategoryBySlug, getPrerenderedCategorySlugs } from "@/features/categories/queries";
 import { pageMetadata } from "@/lib/seo/metadata";
 import { site } from "@/lib/seo/site";
-import { META_DESCRIPTION_MAX, plainExcerpt, presentText } from "@/lib/seo/text";
+import { META_DESCRIPTION_MAX, presentText, textExcerpt } from "@/lib/seo/text";
 import { cn } from "@/lib/utils";
 
 // Cannot match the slug pattern, so it renders the 404 page. Cache Components refuses an empty
@@ -45,7 +45,7 @@ export async function generateMetadata({
       title: pagedTitle(presentText(category.metaTitle) ?? category.name, canonical.page),
       description:
         presentText(category.metaDescription) ??
-        plainExcerpt(category.description ?? "", META_DESCRIPTION_MAX),
+        textExcerpt(category.description ?? "", META_DESCRIPTION_MAX),
       path: canonical.path,
     },
     site,
