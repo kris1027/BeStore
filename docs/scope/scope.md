@@ -31,7 +31,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 15 | Admin sales dashboard | Slice 9 | done |
 | 23 | Native controls in GET forms | Slice 9 follow up | done |
 | 16 | Legal pages & cookie consent | Launch | done |
-| 17 | SEO for storefront pages | Launch | planned |
+| 17 | SEO for storefront pages | Launch | in-progress |
 | 18 | Analytics & error tracking | Launch | planned |
 | 19 | Production deploy | Launch | planned |
 
@@ -324,10 +324,18 @@ spec [0017](../specs/0017-legal-pages-cookie-consent/index.md) · code in [src/l
 - [x] Verify it: `/check verify legal pages & cookie consent`
 - [x] Test it: `/test legal pages & cookie consent`
 
-### 17. SEO for storefront pages
+### 17. SEO for storefront pages · in-progress
 Make products findable: titles, descriptions, canonical links, sitemap, product rich results, and social share cards on every public page.
 **Done when:** every product and category page has unique metadata and structured product data, the sitemap lists all visible products, hidden products and admin pages are never indexed.
-- [ ] Build it: `/develop SEO for storefront pages`
+spec [0018](../specs/0018-storefront-seo/index.md) · code in [src/lib/seo/](../../src/lib/seo/), [src/features/catalog/seo.ts](../../src/features/catalog/seo.ts), [app/sitemap.ts](../../app/sitemap.ts), [app/robots.ts](../../app/robots.ts)
+- [x] Design it (spec): `/architect SEO for storefront pages`
+- [x] Build it: `/develop SEO for storefront pages`
+  - [x] Thin thread: `metadataBase`, the shared metadata helper, full product metadata and Product JSON-LD with Offers and shipping, a products only sitemap, robots with the production rule (AC-1, AC-2, AC-5 to AC-11, AC-20)
+  - [x] Brand card, logo and icon; home, legal and search pages on the helper; Organization and WebSite JSON-LD (AC-3, AC-4, AC-15, AC-17)
+  - [x] Listing canonicals and paged titles, category descriptions and BreadcrumbList (AC-12 to AC-14, AC-16)
+  - [x] Full sitemap (home, legal, categories, images) and the hidden and private page checks (AC-18, AC-19, AC-21, AC-22)
+- [ ] Verify it: `/check verify SEO for storefront pages`
+- [ ] Test it: `/test SEO for storefront pages`
 
 ### 18. Analytics & error tracking · needs a decision
 See how customers move through the store and know when something breaks.
@@ -351,6 +359,7 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Several languages & currencies**: selling abroad · needs a decision
 - **Product reviews**: customer ratings on product pages · needs a decision
 - **Wishlist**: save products for later · needs a decision
+- **Return window and delivery time as data**: real values so the product Offer can carry `hasMerchantReturnPolicy` and `deliveryTime` · from spec 0018
 - **Dark mode**: a dark token set with its own contrast pass and a theme switch; the semantic tokens rule keeps it a token change · needs a decision · from spec 0003
 - **Sweep abandoned product image uploads**: delete files in `product-images` that no image row and no order line references, older than a day, if storage cost grows · from spec 0009
 - **Storefront listing in SQL**: move search, filters and counts from the cached in memory index to SQL per request (`pg_trgm`, `unaccent`) once the catalog passes about 2,000 active products or the index nears the cache entry limit · needs a decision · from spec 0013
