@@ -15,6 +15,7 @@ export async function getListingCanonical(
   searchParams: Promise<RawParams>,
 ): Promise<ListingCanonical> {
   const state = parseListingParams(await searchParams, scope.kind, env.STORE_CURRENCY);
+  // No query: a home or category scope ignores it, and only a search returns null.
   const inScope = inScopeProducts(await getListingIndex(), scope, "") ?? [];
   return listingCanonical(path, state, scope.kind, inScope.length);
 }

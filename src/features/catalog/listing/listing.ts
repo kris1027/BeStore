@@ -249,23 +249,48 @@ function toCard(product: ListingProduct): ProductCard {
   };
 }
 
-// The products a listing draws from; null for a search too short to run (AC-9).
+type Scoped = {
+  readonly inScope: readonly ListingProduct[];
+  // Orders the facet values (AC-13).
+  readonly featured: Compare;
+  // Orders the results when no sort is chosen.
+  readonly defaultOrder: Compare;
+};
+
+// The products a listing draws from and its orders; null for a search too short to run (AC-9).
+function scopeOf(index: readonly ListingProduct[], scope: ListingScope, q: string): Scoped | null {
+  switch (scope.kind) {
+    case "search": {
+      if (!searchQueryReady(q)) return null;
+      const queryWords = searchWords(q);
+      return {
+        inScope: index.filter((product) => matchesWords(product.nameWords, queryWords)),
+        featured: homeFeatured,
+        defaultOrder: bestMatch(queryWords),
+      };
+    }
+    case "category": {
+      const featured = categoryFeatured(scope.categoryId);
+      return {
+        inScope: index.filter(
+          (product) => product.categoryPositions[scope.categoryId] !== undefined,
+        ),
+        featured,
+        defaultOrder: featured,
+      };
+    }
+    case "home":
+      return { inScope: index, featured: homeFeatured, defaultOrder: homeFeatured };
+  }
+}
+
+// The products a listing draws from, before filters; `q` only narrows a search scope.
 export function inScopeProducts(
   index: readonly ListingProduct[],
   scope: ListingScope,
   q: string,
 ): readonly ListingProduct[] | null {
-  switch (scope.kind) {
-    case "search": {
-      if (!searchQueryReady(q)) return null;
-      const queryWords = searchWords(q);
-      return index.filter((product) => matchesWords(product.nameWords, queryWords));
-    }
-    case "category":
-      return index.filter((product) => product.categoryPositions[scope.categoryId] !== undefined);
-    case "home":
-      return index;
-  }
+  return scopeOf(index, scope, q)?.inScope ?? null;
 }
 
 // The page a listing actually shows: past the end is the last page. Shared with the canonical
@@ -286,12 +311,10 @@ export function buildListing(
 ): ListingResult {
   const { kind } = scope;
   const collator = new Intl.Collator(locale);
-  const featured = scope.kind === "category" ? categoryFeatured(scope.categoryId) : homeFeatured;
 
-  const inScope = inScopeProducts(index, scope, state.q);
-  if (inScope === null) return { status: "prompt" };
-  const defaultOrder = scope.kind === "search" ? bestMatch(searchWords(state.q)) : featured;
-  // Featured order drives the facet value order (AC-13); the default order the results.
+  const scoped = scopeOf(index, scope, state.q);
+  if (scoped === null) return { status: "prompt" };
+  const { inScope, featured, defaultOrder } = scoped;
   const byFeatured = inScope.toSorted(featured);
 
   const groupDrafts = facetDrafts(byFeatured, collator);
