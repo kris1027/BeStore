@@ -18,6 +18,8 @@ test.use({ userAgent: googlebot });
 
 const siteUrl = new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").origin;
 const brandCard = `${siteUrl}/brand-card.png`;
+// PAGE_SIZE in src/features/catalog/listing/listing.ts (its unit test pins it).
+const PAGE_SIZE = 24;
 
 async function meta(page: Page, attribute: "name" | "property", key: string) {
   const tag = page.locator(`meta[${attribute}="${key}"]`);
@@ -129,6 +131,81 @@ test.describe("a product page", () => {
     expect(await jsonLd(page)).toEqual([]);
     expect(await canonical(page)).toBeNull();
   });
+
+  // covers: AC-21, the other two ways a product leaves the storefront.
+  for (const [label, hide] of [
+    [
+      "an archived product",
+      (id: string) =>
+        withDb((db) => db.query("UPDATE products SET status = 'archived' WHERE id = $1", [id])),
+    ],
+    [
+      "a product with no live variant",
+      (id: string) =>
+        withDb((db) =>
+          db.query("UPDATE product_variants SET archived = true WHERE product_id = $1", [id]),
+        ),
+    ],
+  ] as const) {
+    test(`${label} renders the not found page, noindex, with no product data`, async ({ page }) => {
+      const product = await seedProduct({ stock: 3, label: "Seo gone" });
+      await hide(product.id);
+
+      await page.goto(`/products/${product.slug}`);
+
+      await expect(page.getByRole("heading", { name: "We can't find that page" })).toBeVisible();
+      expect(await meta(page, "name", "robots")).toContain("noindex");
+      expect(await jsonLd(page)).toEqual([]);
+      expect(await canonical(page)).toBeNull();
+      expect(await page.title()).not.toContain(product.name);
+    });
+  }
+
+  // covers: AC-1, AC-5, AC-7. The rows only need URLs, so no file is uploaded.
+  test("shares its first photo with its alt text and lists every photo in gallery order", async ({
+    page,
+  }) => {
+    const product = await seedProduct({ stock: 4, label: "Seo photo" });
+    // Inserted out of order, so the test proves the position decides.
+    await withDb((db) =>
+      db.query(
+        `INSERT INTO product_images (id, product_id, storage_path, alt_text, position, width, height)
+         VALUES (gen_random_uuid(), $1, $2, '', 1, null, null),
+                (gen_random_uuid(), $1, $3, 'Folded on a chair', 0, 1600, 1200)`,
+        [product.id, `${product.id}/second.jpg`, `${product.id}/first.jpg`],
+      ),
+    );
+
+    await page.goto(`/products/${product.slug}`);
+
+    const ogImage = await meta(page, "property", "og:image");
+    expect(ogImage).toMatch(
+      new RegExp(`^https?://[^/]+/storage/v1/object/public/.+/${product.id}/first\\.jpg$`),
+    );
+    expect(await meta(page, "property", "og:image:alt")).toBe("Folded on a chair");
+    expect(await meta(page, "property", "og:image:width")).toBe("1600");
+    expect(await meta(page, "property", "og:image:height")).toBe("1200");
+    expect(await meta(page, "name", "twitter:image")).toBe(ogImage);
+    const [data] = (await jsonLd(page)).filter((item) => item["@type"] === "Product");
+    expect(data?.image).toEqual([ogImage, ogImage!.replace("first.jpg", "second.jpg")]);
+  });
+
+  // covers: AC-5, the meta fields win over the name and description.
+  test("uses its meta title and description when they are set", async ({ page }) => {
+    const product = await seedProduct({ stock: 4, label: "Seo meta" });
+    await withDb((db) =>
+      db.query(
+        "UPDATE products SET meta_title = $2, meta_description = $3, description = $4 WHERE id = $1",
+        [product.id, "Best scarf ever", "Hand knitted in the hills.", "Body copy."],
+      ),
+    );
+
+    await page.goto(`/products/${product.slug}`);
+
+    await expect(page).toHaveTitle(`Best scarf ever · ${brand.name}`);
+    expect(await meta(page, "name", "description")).toBe("Hand knitted in the hills.");
+    expect(await meta(page, "property", "og:description")).toBe("Hand knitted in the hills.");
+  });
 });
 
 test.describe("listings", () => {
@@ -192,6 +269,89 @@ test.describe("listings", () => {
     await expect(page.getByRole("heading", { name: "We can't find that page" })).toBeVisible();
     expect(await meta(page, "name", "robots")).toContain("noindex");
     expect(await jsonLd(page)).toEqual([]);
+  });
+
+  // covers: AC-12, AC-13, AC-14. The page count comes from the cached listing index, so the last
+  // product goes in through the admin, which expires it.
+  test("a two page category names the page shown, clamps past the end and keeps filters plain", async ({
+    page,
+    browser,
+  }) => {
+    const suffix = randomUUID().slice(0, 6);
+    const name = `Seo pages ${suffix}`;
+    const slug = `seo-pages-${suffix}`;
+    const last = await seedProduct({ stock: 2, label: `Seo pages last ${suffix}` });
+    await withDb((db) =>
+      db.query(
+        `WITH c AS (
+           INSERT INTO categories
+             (id, name, slug, description, meta_description, visible, position, updated_at)
+           VALUES (gen_random_uuid(), $1, $2, 'Body copy.', 'Twenty five scarves.', true,
+                   1000002, now())
+           RETURNING id
+         ), p AS (
+           INSERT INTO products (id, name, slug, status, updated_at)
+           SELECT gen_random_uuid(), $1 || ' item ' || i, $2 || '-item-' || i, 'active', now()
+           FROM generate_series(1, $3::int) AS i
+           RETURNING id, slug
+         ), v AS (
+           INSERT INTO product_variants
+             (id, product_id, sku, price_cents, stock_quantity, position, option_key, updated_at)
+           SELECT gen_random_uuid(), p.id, upper(p.slug), 1500, 5, 0, '', now() FROM p
+         )
+         INSERT INTO product_categories (product_id, category_id, position)
+         SELECT p.id, c.id, row_number() OVER () FROM p, c`,
+        [name, slug, PAGE_SIZE],
+      ),
+    );
+    const category = await withDb(async (db) => {
+      const row = await db.query<{ id: string }>("SELECT id FROM categories WHERE slug = $1", [
+        slug,
+      ]);
+      return row.rows[0]!.id;
+    });
+    const admin = await createTestUser({ enrolled: true });
+    await signInFully(page, admin);
+    await page.goto(`/admin/categories/${category}?q=${encodeURIComponent(last.name)}`);
+    await page.getByRole("button", { name: `Add ${last.name}` }).click();
+    await expect(
+      page
+        .getByRole("list", { name: "Products in this category" })
+        .getByRole("link", { name: last.name }),
+    ).toBeVisible();
+    const shopper = await (await browser.newContext({ userAgent: googlebot })).newPage();
+    const plain = `${siteUrl}/categories/${slug}`;
+
+    await shopper.goto(`/categories/${slug}?page=2`);
+    await expect(shopper).toHaveTitle(`${name}, page 2 · ${brand.name}`);
+    expect(await canonical(shopper)).toBe(`${plain}?page=2`);
+    expect(await meta(shopper, "property", "og:url")).toBe(`${plain}?page=2`);
+    expect(await meta(shopper, "name", "description")).toBe("Twenty five scarves.");
+
+    await shopper.goto(`/categories/${slug}?page=99`);
+    expect(await canonical(shopper)).toBe(`${plain}?page=2`);
+    await expect(shopper).toHaveTitle(`${name}, page 2 · ${brand.name}`);
+
+    for (const query of [
+      "page=1",
+      "page=0",
+      "color=red&page=2",
+      "sort=price-asc&page=2",
+      "stock=1&page=2",
+    ]) {
+      await shopper.goto(`/categories/${slug}?${query}`);
+      expect(await canonical(shopper), query).toBe(plain);
+      await expect(shopper, query).toHaveTitle(`${name} · ${brand.name}`);
+    }
+  });
+
+  test("an unknown category renders the not found page with no breadcrumb", async ({ page }) => {
+    await page.goto(`/categories/no-such-shelf-${randomUUID().slice(0, 6)}`);
+
+    await expect(page.getByRole("heading", { name: "We can't find that page" })).toBeVisible();
+    expect(await meta(page, "name", "robots")).toContain("noindex");
+    expect(await jsonLd(page)).toEqual([]);
+    expect(await canonical(page)).toBeNull();
   });
 
   test("search stays noindex, follow with the brand card and no canonical", async ({ page }) => {
@@ -279,7 +439,12 @@ test.describe("site files", () => {
     test(`${path} stays noindex with no canonical or JSON-LD`, async ({ page }) => {
       await page.goto(path);
 
-      expect(await meta(page, "name", "robots")).toContain("noindex");
+      // An empty cart's /checkout redirects to /cart after the shell streams, so the head can
+      // be mid swap on the first read; the retrying assertion waits it out.
+      await expect(page.locator('meta[name="robots"]').first()).toHaveAttribute(
+        "content",
+        /noindex/,
+      );
       expect(await canonical(page)).toBeNull();
       expect(await jsonLd(page)).toEqual([]);
     });
