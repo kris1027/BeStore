@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import type { StoreCountry } from "@/lib/shipping/address";
+
 import { brandCardPath, brandCardSize } from "./brand-assets";
 
 // Pure: the one metadata shape every indexable storefront page declares (spec 0018, AC-2). No
@@ -11,6 +13,13 @@ export type SiteFacts = {
   readonly name: string;
   // STORE_LOCALE, a canonical BCP 47 tag.
   readonly locale: string;
+};
+
+// SiteFacts plus what an Offer needs (spec 0018, AC-8 and AC-10).
+export type StoreFacts = SiteFacts & {
+  // STORE_CURRENCY, an ISO 4217 code.
+  readonly currency: string;
+  readonly country: StoreCountry;
 };
 
 export type ShareImage = {

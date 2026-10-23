@@ -5,8 +5,8 @@ import { calendarDate, formatCalendarDate } from "@/lib/dates";
 import { env } from "@/lib/env";
 import { legalDocuments } from "@/lib/legal/documents";
 import type { LegalSlug } from "@/lib/legal/paths";
-import type { PageSeo } from "@/lib/seo/metadata";
 import { fillPlaceholders } from "@/lib/legal/placeholders";
+import type { PageSeo } from "@/lib/seo/metadata";
 import { cn } from "@/lib/utils";
 
 import { LegalMarkdown } from "./legal-markdown";

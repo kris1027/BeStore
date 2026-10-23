@@ -12,8 +12,7 @@ import {
 } from "@/features/categories/components/category-header";
 import { categoryPath } from "@/features/categories/paths";
 import { getCategoryBySlug, getPrerenderedCategorySlugs } from "@/features/categories/queries";
-import { pageMetadata } from "@/lib/seo/metadata";
-import { site } from "@/lib/seo/site";
+import { storePageMetadata } from "@/lib/seo/site";
 import { META_DESCRIPTION_MAX, presentText, textExcerpt } from "@/lib/seo/text";
 import { cn } from "@/lib/utils";
 
@@ -40,16 +39,13 @@ export async function generateMetadata({
     categoryPath(category.slug),
     searchParams,
   );
-  return pageMetadata(
-    {
-      title: pagedTitle(presentText(category.metaTitle) ?? category.name, canonical.page),
-      description:
-        presentText(category.metaDescription) ??
-        textExcerpt(category.description ?? "", META_DESCRIPTION_MAX),
-      path: canonical.path,
-    },
-    site,
-  );
+  return storePageMetadata({
+    title: pagedTitle(presentText(category.metaTitle) ?? category.name, canonical.page),
+    description:
+      presentText(category.metaDescription) ??
+      textExcerpt(category.description ?? "", META_DESCRIPTION_MAX),
+    path: canonical.path,
+  });
 }
 
 // The page joins the two features: the category from categories, the listing from catalog.

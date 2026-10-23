@@ -25,9 +25,8 @@ vi.mock("next/link", () => ({
 }));
 
 const { LegalPage, legalSeo } = await import("./legal-page");
-const { pageMetadata } = await import("@/lib/seo/metadata");
-const { site } = await import("@/lib/seo/site");
-const legalMetadata = (slug: (typeof legalSlugs)[number]) => pageMetadata(legalSeo(slug), site);
+const { storePageMetadata } = await import("@/lib/seo/site");
+const legalMetadata = (slug: (typeof legalSlugs)[number]) => storePageMetadata(legalSeo(slug));
 const { cookiePolicyVersion, currentTermsVersion } = await import("@/lib/legal/documents");
 
 // spec 0017, Value sourcing: front matter. The checkout's version and the consent cookie's `v`

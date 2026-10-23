@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { availability } from "@/lib/availability";
+import type { StoreFacts } from "@/lib/seo/metadata";
 
 import type { ProductView, ProductVariantView } from "./queries";
-import { productJsonLd, productSeo, type StoreFacts } from "./seo";
+import { productJsonLd, productSeo } from "./seo";
 
 const store: StoreFacts = {
   url: "https://shop.example",

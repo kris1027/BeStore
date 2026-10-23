@@ -2,9 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import { env } from "@/lib/env";
 import { JsonLdScript } from "@/lib/seo/json-ld";
-import { site } from "@/lib/seo/site";
+import { store } from "@/lib/seo/site";
 import { getShippingSettings } from "@/lib/shipping/settings";
 
 import { ProductDescription } from "../markdown";
@@ -24,13 +23,7 @@ export async function ProductDetails({ params }: { readonly params: Promise<{ sl
   return (
     <>
       {/* After the not found check, so a hidden product never gets one (spec 0018, AC-7). */}
-      <JsonLdScript
-        data={productJsonLd(product, settings, {
-          ...site,
-          currency: env.STORE_CURRENCY,
-          country: env.STORE_COUNTRY,
-        })}
-      />
+      <JsonLdScript data={productJsonLd(product, settings, store)} />
       <ProductShowcase
         images={product.images}
         optionTypes={product.optionTypes}

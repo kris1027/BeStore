@@ -10,8 +10,8 @@ import { ListingView } from "@/features/catalog/listing/components/listing-view"
 import { homePath } from "@/features/catalog/paths";
 import { brand } from "@/lib/brand/brand";
 import { JsonLdScript } from "@/lib/seo/json-ld";
-import { defaultDescription, pageMetadata } from "@/lib/seo/metadata";
-import { site } from "@/lib/seo/site";
+import { defaultDescription } from "@/lib/seo/metadata";
+import { site, storePageMetadata } from "@/lib/seo/site";
 import { organizationJsonLd, websiteJsonLd } from "@/lib/seo/structured-data";
 import { cn } from "@/lib/utils";
 
@@ -20,14 +20,11 @@ import { cn } from "@/lib/utils";
 // like the results; crawlers still get it in the head. No filter text ever reaches it.
 export async function generateMetadata({ searchParams }: PageProps<"/">): Promise<Metadata> {
   const canonical = await getListingCanonical({ kind: "home" }, homePath, searchParams);
-  return pageMetadata(
-    {
-      title: canonical.page > 1 ? { absolute: pagedTitle(brand.name, canonical.page) } : null,
-      description: defaultDescription(brand.name),
-      path: canonical.path,
-    },
-    site,
-  );
+  return storePageMetadata({
+    title: canonical.page > 1 ? { absolute: pagedTitle(brand.name, canonical.page) } : null,
+    description: defaultDescription(brand.name),
+    path: canonical.path,
+  });
 }
 
 // spec 0013, AC-4: every listable product, with filters, sorts and paging. The heading is the

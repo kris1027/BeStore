@@ -2,7 +2,7 @@ import type { ItemAvailability, Offer, Product, WithContext } from "schema-dts";
 
 import type { Availability } from "@/lib/availability";
 import { centsToInput } from "@/lib/money";
-import { absoluteUrl, type PageSeo, type SiteFacts } from "@/lib/seo/metadata";
+import { absoluteUrl, type PageSeo, type StoreFacts } from "@/lib/seo/metadata";
 import { META_DESCRIPTION_MAX, plainExcerpt, presentText } from "@/lib/seo/text";
 import { type ShippingSettings, shippingCents } from "@/lib/shipping/rule";
 
@@ -14,11 +14,6 @@ import type { ProductView } from "./queries";
 
 // Google reads at most this much of a Product description.
 const JSON_LD_DESCRIPTION_MAX = 5000;
-
-export type StoreFacts = SiteFacts & {
-  readonly currency: string;
-  readonly country: string;
-};
 
 // AC-5: meta fields first, then the name and the description's plain text; the first gallery
 // image as the share image, or the brand card when there is none.
