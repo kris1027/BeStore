@@ -4,7 +4,8 @@ import { robotsRules } from "./robots";
 
 // spec 0018, AC-20.
 describe("robotsRules", () => {
-  it.each([undefined, "preview", "development", "anything"])(
+  // The env schema already refuses any other value at boot.
+  it.each([undefined, "preview", "development"] as const)(
     "blocks everything with no sitemap when VERCEL_ENV is %s",
     (vercelEnv) => {
       expect(robotsRules(vercelEnv, "https://shop.example")).toEqual({
