@@ -6,8 +6,8 @@ The storefront pages `/terms`, `/privacy`, `/returns`, `/shipping` and `/cookies
 
 ## Files
 
-- `app/(store)/{terms,privacy,returns,shipping,cookies}/page.tsx`: thin routes, `legalMetadata(slug)` then `<LegalPage slug=... />`.
-- `components/legal-page.tsx`: `server-only`. `legalMetadata` (title, description, canonical from `NEXT_PUBLIC_SITE_URL`) and `LegalPage` (the `h1`, the "Last updated" date, the body).
+- `app/(store)/{terms,privacy,returns,shipping,cookies}/page.tsx`: thin routes, `pageMetadata(legalSeo(slug), site)` then `<LegalPage slug=... />`.
+- `components/legal-page.tsx`: `server-only`. `legalSeo` (title, description and path for the shared `pageMetadata`, spec 0018) and `LegalPage` (the `h1`, the "Last updated" date, the body).
 - `components/legal-markdown.tsx`: its own `react-markdown` renderer, not the product description one. Only `h2`, `h3`, `p`, lists, `strong`, `em`, `a`, `blockquote`, `hr`; raw HTML skipped; links only to `/...`, `#...`, `https:` and `mailto:`.
 - `components/cookie-table.tsx`: the registry as the table on `/cookies`.
 - `shipping-values.ts`: pure. The live delivery fee and free delivery rule `/shipping` fills in.

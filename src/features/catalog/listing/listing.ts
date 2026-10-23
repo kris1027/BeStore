@@ -249,33 +249,33 @@ function toCard(product: ListingProduct): ProductCard {
   };
 }
 
-// The products a listing draws from and their default order; null for a search too short to
-// run (AC-9).
-function scopeOf(
+// The products a listing draws from; null for a search too short to run (AC-9).
+export function inScopeProducts(
   index: readonly ListingProduct[],
   scope: ListingScope,
   q: string,
-  featured: Compare,
-): { readonly inScope: readonly ListingProduct[]; readonly defaultOrder: Compare } | null {
+): readonly ListingProduct[] | null {
   switch (scope.kind) {
     case "search": {
       if (!searchQueryReady(q)) return null;
       const queryWords = searchWords(q);
-      return {
-        inScope: index.filter((product) => matchesWords(product.nameWords, queryWords)),
-        defaultOrder: bestMatch(queryWords),
-      };
+      return index.filter((product) => matchesWords(product.nameWords, queryWords));
     }
     case "category":
-      return {
-        inScope: index.filter(
-          (product) => product.categoryPositions[scope.categoryId] !== undefined,
-        ),
-        defaultOrder: featured,
-      };
+      return index.filter((product) => product.categoryPositions[scope.categoryId] !== undefined);
     case "home":
-      return { inScope: index, defaultOrder: featured };
+      return index;
   }
+}
+
+// The page a listing actually shows: past the end is the last page. Shared with the canonical
+// rule (spec 0018, AC-12), so the canonical never names a page the listing does not show.
+export function shownPage(
+  requested: number,
+  total: number,
+): { readonly page: number; readonly pageCount: number } {
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  return { page: Math.min(requested, pageCount), pageCount };
 }
 
 export function buildListing(
@@ -288,9 +288,9 @@ export function buildListing(
   const collator = new Intl.Collator(locale);
   const featured = scope.kind === "category" ? categoryFeatured(scope.categoryId) : homeFeatured;
 
-  const scoped = scopeOf(index, scope, state.q, featured);
-  if (scoped === null) return { status: "prompt" };
-  const { inScope, defaultOrder } = scoped;
+  const inScope = inScopeProducts(index, scope, state.q);
+  if (inScope === null) return { status: "prompt" };
+  const defaultOrder = scope.kind === "search" ? bestMatch(searchWords(state.q)) : featured;
   // Featured order drives the facet value order (AC-13); the default order the results.
   const byFeatured = inScope.toSorted(featured);
 
@@ -366,8 +366,7 @@ export function buildListing(
   const filtered = ordered.filter((product) => resultIds.has(product.id));
   const sorted = sortBy ? filtered.toSorted(sortBy) : filtered;
 
-  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
-  const page = Math.min(state.page, pageCount);
+  const { page, pageCount } = shownPage(state.page, sorted.length);
   const applied: ListingState = {
     ...state,
     // relevance only exists on search; the parser already enforces that.

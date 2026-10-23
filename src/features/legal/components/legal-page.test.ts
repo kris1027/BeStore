@@ -24,7 +24,10 @@ vi.mock("next/link", () => ({
     createElement("a", { href, ...props }, children),
 }));
 
-const { LegalPage, legalMetadata } = await import("./legal-page");
+const { LegalPage, legalSeo } = await import("./legal-page");
+const { pageMetadata } = await import("@/lib/seo/metadata");
+const { site } = await import("@/lib/seo/site");
+const legalMetadata = (slug: (typeof legalSlugs)[number]) => pageMetadata(legalSeo(slug), site);
 const { cookiePolicyVersion, currentTermsVersion } = await import("@/lib/legal/documents");
 
 // spec 0017, Value sourcing: front matter. The checkout's version and the consent cookie's `v`
@@ -40,7 +43,7 @@ describe("the text versions", () => {
 });
 
 // spec 0017, AC-2 and Value sourcing: canonical.
-describe("legalMetadata", () => {
+describe("the legal page metadata", () => {
   it.each(legalSlugs)("points the %s canonical URL at NEXT_PUBLIC_SITE_URL", (slug) => {
     expect(legalMetadata(slug).alternates?.canonical).toBe(`https://staging.other.example/${slug}`);
   });

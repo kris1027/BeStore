@@ -1,7 +1,11 @@
 import { notFound } from "next/navigation";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { JsonLdScript } from "@/lib/seo/json-ld";
+import { site } from "@/lib/seo/site";
+import { breadcrumbJsonLd } from "@/lib/seo/structured-data";
 
+import { categoryPath } from "../paths";
 import { getCategoryBySlug } from "../queries";
 
 // spec 0013, AC-1 to AC-3: the category's name and plain text description. Reads only the
@@ -13,6 +17,10 @@ export async function CategoryHeader({ params }: { readonly params: Promise<{ sl
 
   return (
     <header className="flex flex-col gap-3">
+      {/* After the not found check, so a hidden category never gets one (spec 0018, AC-16). */}
+      <JsonLdScript
+        data={breadcrumbJsonLd(site, [{ name: category.name, path: categoryPath(category.slug) }])}
+      />
       <h1 className="font-heading text-4xl text-balance md:text-5xl">{category.name}</h1>
       {category.description ? (
         <p className="max-w-prose text-lg whitespace-pre-line text-muted-foreground">

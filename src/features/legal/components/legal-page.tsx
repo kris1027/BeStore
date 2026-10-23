@@ -1,25 +1,21 @@
 import "server-only";
 
-import type { Metadata } from "next";
-
 import { storeContainer } from "@/components/layout/container";
 import { calendarDate, formatCalendarDate } from "@/lib/dates";
 import { env } from "@/lib/env";
 import { legalDocuments } from "@/lib/legal/documents";
 import type { LegalSlug } from "@/lib/legal/paths";
+import type { PageSeo } from "@/lib/seo/metadata";
 import { fillPlaceholders } from "@/lib/legal/placeholders";
 import { cn } from "@/lib/utils";
 
 import { LegalMarkdown } from "./legal-markdown";
 
-// spec 0017, AC-2: the front matter title and description, a canonical URL, and indexable.
-export function legalMetadata(slug: LegalSlug): Metadata {
+// spec 0017, AC-2 and spec 0018, AC-2: the front matter title and description on the shared
+// page metadata (canonical, share card), and indexable.
+export function legalSeo(slug: LegalSlug): PageSeo {
   const document = legalDocuments[slug];
-  return {
-    title: document.title,
-    description: document.description,
-    alternates: { canonical: new URL(document.path, env.NEXT_PUBLIC_SITE_URL).toString() },
-  };
+  return { title: document.title, description: document.description, path: document.path };
 }
 
 // spec 0017, AC-1: the title as the only h1, the version date, then the body. It reads no
