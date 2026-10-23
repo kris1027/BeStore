@@ -77,6 +77,9 @@ test.describe("a product page", () => {
     expect(await meta(page, "property", "og:image:alt")).toBe(brand.name);
     expect(await meta(page, "name", "twitter:card")).toBe("summary_large_image");
     expect(await meta(page, "name", "twitter:image")).toBe(brandCard);
+    // Next fills the twitter text from openGraph.
+    expect(await meta(page, "name", "twitter:title")).toBe(product.name);
+    expect(await meta(page, "name", "twitter:description")).toBe("A warm scarf, knitted by hand.");
 
     const [data] = (await jsonLd(page)).filter((item) => item["@type"] === "Product");
     expect(data).toMatchObject({

@@ -1,6 +1,7 @@
 import type { BreadcrumbList, Organization, WebSite, WithContext } from "schema-dts";
 
-import { absoluteUrl, logoPath, type SiteFacts } from "./metadata";
+import { logoPath } from "./brand-assets";
+import { absoluteUrl, type SiteFacts } from "./metadata";
 
 // Pure: the site wide JSON-LD (spec 0018, AC-15 and AC-16). No SearchAction: search results are
 // noindex, so a sitelinks search box would point at pages kept out of the index.
