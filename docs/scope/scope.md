@@ -31,7 +31,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 15 | Admin sales dashboard | Slice 9 | done |
 | 23 | Native controls in GET forms | Slice 9 follow up | done |
 | 16 | Legal pages & cookie consent | Launch | done |
-| 17 | SEO for storefront pages | Launch | in-progress |
+| 17 | SEO for storefront pages | Launch | done |
 | 18 | Analytics & error tracking | Launch | planned |
 | 19 | Production deploy | Launch | planned |
 
@@ -324,7 +324,7 @@ spec [0017](../specs/0017-legal-pages-cookie-consent/index.md) · code in [src/l
 - [x] Verify it: `/check verify legal pages & cookie consent`
 - [x] Test it: `/test legal pages & cookie consent`
 
-### 17. SEO for storefront pages · in-progress
+### 17. SEO for storefront pages · done
 Make products findable: titles, descriptions, canonical links, sitemap, product rich results, and social share cards on every public page.
 **Done when:** every product and category page has unique metadata and structured product data, the sitemap lists all visible products, hidden products and admin pages are never indexed.
 spec [0018](../specs/0018-storefront-seo/index.md) · code in [src/lib/seo/](../../src/lib/seo/), [src/features/catalog/seo.ts](../../src/features/catalog/seo.ts), [app/sitemap.ts](../../app/sitemap.ts), [app/robots.ts](../../app/robots.ts)
@@ -334,8 +334,8 @@ spec [0018](../specs/0018-storefront-seo/index.md) · code in [src/lib/seo/](../
   - [x] Brand card, logo and icon; home, legal and search pages on the helper; Organization and WebSite JSON-LD (AC-3, AC-4, AC-15, AC-17)
   - [x] Listing canonicals and paged titles, category descriptions and BreadcrumbList (AC-12 to AC-14, AC-16)
   - [x] Full sitemap (home, legal, categories, images) and the hidden and private page checks (AC-18, AC-19, AC-21, AC-22)
-- [ ] Verify it: `/check verify SEO for storefront pages`
-- [ ] Test it: `/test SEO for storefront pages`
+- [x] Verify it: `/check verify SEO for storefront pages`
+- [x] Test it: `/test SEO for storefront pages`
 
 ### 18. Analytics & error tracking · needs a decision
 See how customers move through the store and know when something breaks.
