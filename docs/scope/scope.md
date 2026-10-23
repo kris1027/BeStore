@@ -334,7 +334,7 @@ spec [0018](../specs/0018-storefront-seo/index.md) · code in [src/lib/seo/](../
   - [x] Brand card, logo and icon; home, legal and search pages on the helper; Organization and WebSite JSON-LD (AC-3, AC-4, AC-15, AC-17)
   - [x] Listing canonicals and paged titles, category descriptions and BreadcrumbList (AC-12 to AC-14, AC-16)
   - [x] Full sitemap (home, legal, categories, images) and the hidden and private page checks (AC-18, AC-19, AC-21, AC-22)
-- [x] Verify it: `/check verify SEO for storefront pages`
+- [x] Verify it: `/check verify SEO for storefront pages` (the Rich Results Test waits for the first preview deploy, a spec 0018 follow-up)
 - [x] Test it: `/test SEO for storefront pages`
 
 ### 18. Analytics & error tracking · needs a decision

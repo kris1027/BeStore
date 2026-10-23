@@ -8,9 +8,9 @@ Admin only category management: `/admin/categories` (ordered list with product c
 
 - `schemas.ts`: pure. `categoryFieldsSchema` (name, slug, plain text description, visible) is shared by the form (`zodResolver`) and the actions, plus the per action schemas; `categoryFieldErrors` maps issues to fields.
 - `admin-queries.ts`: `getAdminCategories()` and `getCategoryForEdit(id)`, live reads (never cached).
-- `queries.ts`: cached storefront reads of visible categories only: `getNavCategories`, `getCategoryBySlug` (null for unknown, malformed or hidden), `getPrerenderedCategorySlugs`.
+- `queries.ts`: cached storefront reads of visible categories only: `getNavCategories`, `getCategoryBySlug` (null for unknown, malformed or hidden), `getPrerenderedCategorySlugs`, `getSitemapCategories` (for `app/sitemap.ts`, spec 0018).
 - `actions/`: `create-category`, `update-category`, `delete-category`, `reorder-categories`, `set-category-products`, `reorder-category-products`.
-- `components/`: the list page (built on `src/components/arrange-list.tsx`), the editor, form, product list (`category-products.tsx`, with arranging split into `arranged-products.tsx`, `use-draft-order.ts` and `discard-order-dialog.tsx`) and delete button; `category-header.tsx` for the storefront page.
+- `components/`: the list page (built on `src/components/arrange-list.tsx`), the editor, form, product list (`category-products.tsx`, with arranging split into `arranged-products.tsx`, `use-draft-order.ts` and `discard-order-dialog.tsx`) and delete button; `category-header.tsx` for the storefront page, which also renders the BreadcrumbList JSON-LD after its not found check (spec 0018, AC-16).
 - `paths.ts`: admin URLs and `categoryPath`. `log.ts`: `catalog.category.created`, `.updated`, `.deleted`, `.products_reordered`, `catalog.categories.reordered` (ids and counts only, never names or descriptions).
 
 ## Conventions
@@ -20,6 +20,7 @@ Admin only category management: `/admin/categories` (ordered list with product c
 - A product joins a category at the end (`max(position) + 1`, category row locked first). Adding a link that exists or removing one already gone is a no op, not an error.
 - Updates compare `loadedUpdatedAt` under `FOR UPDATE` and return `stale` on a mismatch. Reorder (categories, and products inside a category) takes the full id list, refuses with `stale` unless it is exactly the current set, and rewrites positions `0..n-1` in one raw SQL statement so `updated_at` stays put.
 - Deleting removes the category and its links; the products stay unchanged.
+- The description is plain text everywhere (the header shows it as is), so its meta description fallback is `textExcerpt`, never the Markdown `plainExcerpt` (spec 0018, AC-14).
 - Storefront reads are `'use cache'`, tagged `categories` (`src/lib/cache-tags.ts`); every action here expires it with `updateTag` after the commit, and delete also expires `catalog` (the listing index carries both tags).
 
 ## Tests

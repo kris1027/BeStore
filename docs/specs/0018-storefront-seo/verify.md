@@ -15,17 +15,17 @@ Read every page with a Googlebot user agent (or wait for the streamed tags), sin
 - [x] In `/admin/settings` set the flat fee 9.99 and the free threshold 100 → a 50.00 variant shows `shippingRate` 9.99, a 129.00 variant shows 0; remove the threshold → both 9.99, on the next request → AC-10
 - [x] Rename a product to `</script><script>alert(1)</script>` → no alert, the JSON-LD parses and holds the name → AC-11
 - [x] On a category with more than 24 products: `?page=2` → canonical `?page=2` and title `<name>, page 2 · BeStore`; `?page=99` → the last page; `?page=0`, `?page=abc`, `?page=1`, `?sort=featured`, `?stock=0`, `?utm_source=x`, `?color=red&page=2`, `?sort=price-asc` → the plain path and the plain title → AC-12, AC-13
-- [x] A category with `meta_title` / `meta_description` → those win; without → the name and the description cut to 160 characters → AC-14
+- [x] A category with `meta_title` / `meta_description` → those win; without → the name and the description cut to 160 characters, kept as plain text (`**cool**` stays as typed) → AC-14
 - [x] Home → JSON-LD Organization (name, url, logo `/logo.png`) and WebSite, no SearchAction → AC-15
 - [x] A category → BreadcrumbList of the brand then the category → AC-16
 - [x] `/search?q=scarf` → `noindex, follow`, no canonical, no JSON-LD, the brand card, and "scarf" nowhere in the head → AC-17
 - [x] A draft product, an archived one, a product hidden after it was visited, and a hidden category → the not found page with `noindex`, no JSON-LD, no canonical → AC-21
-- [x] `/cart`, `/checkout`, `/checkout/complete`, the account pages and `/admin/sign-in` → still `noindex`, no canonical, no JSON-LD → AC-22
-- [ ] On a preview build, run one product page through Google's Rich Results Test → Product with Offers detected, only the expected return policy and delivery time warnings → AC-7 to AC-10
+- [x] `/cart`, `/checkout`, `/checkout/complete`, the account pages (signed out and signed in), the admin auth pages and every admin panel page → still `noindex`, no canonical, no JSON-LD → AC-22
+- [ ] On a preview build, run one product page through Google's Rich Results Test → Product with Offers detected, only the expected return policy and delivery time warnings → AC-7 to AC-10 _(open: no preview deploy exists yet; a spec 0018 follow-up)_
 
 ## Commands
 - [x] `curl -s localhost:3000/sitemap.xml` → home, the five legal pages with their `updated` dates, every visible category, every active product with a live variant and its image URLs; no draft, archived, variant less product, hidden category, query URL, account, cart, checkout, search, admin or auth path → AC-18
-- [ ] Publish a draft product in the admin, then fetch `/sitemap.xml` again → it is listed; hide it → it is gone, with no deploy (also on `pnpm build && pnpm start`) → AC-19
+- [x] Publish a draft product in the admin, then fetch `/sitemap.xml` again → it is listed; hide it → it is gone, with no deploy (also on `pnpm build && pnpm start`); the same for a category shown and hidden → AC-19 _(dev server locally; the production build through the CI e2e job, which runs `tests/e2e/seo` on `pnpm build && pnpm start`)_
 - [x] `curl -s localhost:3000/robots.txt` → `User-Agent: *` / `Disallow: /`, no sitemap line → AC-20
 - [x] `pnpm test -- src/lib/seo/robots.test.ts` → the production branch allows `/`, disallows `/admin`, `/api`, `/auth`, names the sitemap → AC-20
 - [x] `pnpm test:db -- tests/db/sitemap.db.test.ts` → passes → AC-18, AC-19
