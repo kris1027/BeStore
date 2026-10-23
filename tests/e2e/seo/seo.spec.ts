@@ -3,7 +3,8 @@ import { randomUUID } from "node:crypto";
 import { expect, type Page, test } from "@playwright/test";
 
 import { brand } from "../../../src/lib/brand/brand";
-import { createTestUser, signInFully, withDb } from "../admin/support";
+import { seedPaidOrder, signInAsCustomer } from "../account/support";
+import { createTestUser, signInFully, testPassword, withDb } from "../admin/support";
 import {
   type SeededProduct,
   seedProduct,
@@ -432,25 +433,109 @@ test.describe("site files", () => {
     expect(await jsonLd(customer)).toEqual([]);
   });
 
-  // AC-22: the private pages keep their noindex and gain nothing.
-  for (const path of [
-    "/cart",
-    "/checkout",
-    "/account/sign-in",
-    "/account/sign-up",
-    "/admin/sign-in",
-  ]) {
+  test("the sitemap follows a category shown and hidden in the admin on the next request", async ({
+    page,
+    request,
+  }) => {
+    const suffix = randomUUID().slice(0, 6);
+    const slug = `seo-map-shelf-${suffix}`;
+    const id = await withDb(async (db) => {
+      const row = await db.query<{ id: string }>(
+        `INSERT INTO categories (id, name, slug, visible, position, updated_at)
+         VALUES (gen_random_uuid(), $1, $2, false, 1000000, now()) RETURNING id`,
+        [`Seo map shelf ${suffix}`, slug],
+      );
+      return row.rows[0]!.id;
+    });
+    const loc = `<loc>${siteUrl}/categories/${slug}</loc>`;
+    const sitemap = async () => (await request.get("/sitemap.xml")).text();
+    expect(await sitemap()).not.toContain(loc);
+
+    const admin = await createTestUser({ enrolled: true });
+    await signInFully(page, admin);
+    const visible = page.getByRole("checkbox", { name: "Visible" });
+    const setVisible = async (checked: boolean) => {
+      await page.goto(`/admin/categories/${id}`);
+      await visible.setChecked(checked);
+      await page.getByRole("button", { name: "Save category" }).click();
+      await expect(page.getByText("Category saved")).toBeVisible();
+    };
+
+    await setVisible(true);
+    await expect.poll(sitemap).toContain(loc);
+    await setVisible(false);
+    await expect.poll(sitemap).not.toContain(loc);
+  });
+});
+
+// The private head (AC-22): noindex, no canonical, no JSON-LD.
+async function expectPrivateHead(page: Page) {
+  await expect(page.locator('meta[name="robots"]').first()).toHaveAttribute("content", /noindex/);
+  expect(await canonical(page)).toBeNull();
+  expect(await jsonLd(page)).toEqual([]);
+}
+
+// AC-22: the private pages keep their noindex and gain nothing. Signed out, /account/set-password,
+// /admin/reset-password and /auth/confirm redirect to a sign in page listed here.
+test.describe("a private page", () => {
+  for (const [path, landsOn = path] of [
+    ["/cart"],
+    // An empty cart's checkout redirects to the cart after the shell streams.
+    ["/checkout", "/cart"],
+    ["/checkout/complete"],
+    ["/account/sign-in"],
+    ["/account/sign-up"],
+    ["/account/forgot-password"],
+    ["/account/confirm"],
+    ["/admin/sign-in"],
+    ["/admin/forgot-password"],
+  ] as const) {
     test(`${path} stays noindex with no canonical or JSON-LD`, async ({ page }) => {
       await page.goto(path);
-
-      // An empty cart's /checkout redirects to /cart after the shell streams, so the head can
-      // be mid swap on the first read; the retrying assertion waits it out.
-      await expect(page.locator('meta[name="robots"]').first()).toHaveAttribute(
-        "content",
-        /noindex/,
-      );
-      expect(await canonical(page)).toBeNull();
-      expect(await jsonLd(page)).toEqual([]);
+      await expect(page).toHaveURL(landsOn);
+      await expectPrivateHead(page);
     });
   }
+
+  test("every signed in account page stays noindex", async ({ page }) => {
+    const customer = await createTestUser({ admin: false });
+    const order = await seedPaidOrder(customer.email);
+    await signInAsCustomer(page, customer.email, testPassword);
+    await expect(page).toHaveURL("/account");
+
+    for (const path of [
+      "/account",
+      "/account/addresses",
+      "/account/settings",
+      `/account/orders/${order.number}`,
+    ]) {
+      await page.goto(path);
+      await expect(page).toHaveURL(path);
+      await expectPrivateHead(page);
+    }
+  });
+
+  test("every admin page stays noindex", async ({ page }) => {
+    // Ten pages in one test; on a cold dev server each compiles on its first visit.
+    test.slow();
+    const admin = await createTestUser({ enrolled: true });
+    await signInFully(page, admin);
+
+    for (const path of [
+      "/admin",
+      "/admin/products",
+      "/admin/products/new",
+      "/admin/products/arrange",
+      "/admin/categories",
+      "/admin/categories/new",
+      "/admin/orders",
+      "/admin/discounts",
+      "/admin/discounts/new",
+      "/admin/settings",
+    ]) {
+      await page.goto(path);
+      await expect(page).toHaveURL(path);
+      await expectPrivateHead(page);
+    }
+  });
 });
