@@ -7,13 +7,17 @@ import { ListingView } from "@/features/catalog/listing/components/listing-view"
 import { SearchForm } from "@/features/catalog/listing/components/search-box";
 import { searchQuery } from "@/features/catalog/listing/params";
 import { searchPath } from "@/features/catalog/paths";
+import { storePageMetadata } from "@/lib/seo/site";
 import { cn } from "@/lib/utils";
 
-// spec 0013, AC-24: the query never reaches the title or any metadata; results are not indexed.
-export const metadata: Metadata = {
+// spec 0013, AC-24 and spec 0018, AC-17: the query never reaches the title or any metadata;
+// results are `noindex, follow`, with no canonical and the brand card as the share image.
+export const metadata: Metadata = storePageMetadata({
   title: "Search",
-  robots: { index: false, follow: true },
-};
+  description: null,
+  path: searchPath,
+  indexable: false,
+});
 
 async function SearchResults({ searchParams }: Pick<PageProps<"/search">, "searchParams">) {
   const query = searchQuery(await searchParams);

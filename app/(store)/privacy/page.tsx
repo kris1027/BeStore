@@ -1,6 +1,7 @@
-import { LegalPage, legalMetadata } from "@/features/legal/components/legal-page";
+import { LegalPage, legalSeo } from "@/features/legal/components/legal-page";
+import { storePageMetadata } from "@/lib/seo/site";
 
-export const metadata = legalMetadata("privacy");
+export const metadata = storePageMetadata(legalSeo("privacy"));
 
 export default function PrivacyPage() {
   return <LegalPage slug="privacy" />;

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { storeContainer } from "@/components/layout/container";
+import { pagedTitle } from "@/features/catalog/listing/canonical";
+import { getListingCanonical } from "@/features/catalog/listing/canonical-query";
 import { ListingSkeleton } from "@/features/catalog/listing/components/listing-skeleton";
 import { ListingView } from "@/features/catalog/listing/components/listing-view";
 import {
@@ -10,7 +12,8 @@ import {
 } from "@/features/categories/components/category-header";
 import { categoryPath } from "@/features/categories/paths";
 import { getCategoryBySlug, getPrerenderedCategorySlugs } from "@/features/categories/queries";
-import { env } from "@/lib/env";
+import { storePageMetadata } from "@/lib/seo/site";
+import { META_DESCRIPTION_MAX, presentText, textExcerpt } from "@/lib/seo/text";
 import { cn } from "@/lib/utils";
 
 // Cannot match the slug pattern, so it renders the 404 page. Cache Components refuses an empty
@@ -22,19 +25,27 @@ export async function generateStaticParams() {
   return slugs.length > 0 ? slugs.map((slug) => ({ slug })) : [{ slug: NO_CATEGORY_SLUG }];
 }
 
-// spec 0013, AC-24: never reads the search params, so filters never reach the metadata.
+// spec 0018, AC-12 to AC-14: the search params decide only the canonical page, through the
+// parsed listing state; no filter text ever reaches the metadata (spec 0013, AC-24).
 export async function generateMetadata({
   params,
+  searchParams,
 }: PageProps<"/categories/[slug]">): Promise<Metadata> {
   const category = await getCategoryBySlug((await params).slug);
+  // AC-21: notFound() in the header adds the noindex.
   if (!category) return { title: "Page not found" };
-  return {
-    title: category.metaTitle ?? category.name,
-    description: category.metaDescription ?? category.description ?? undefined,
-    alternates: {
-      canonical: new URL(categoryPath(category.slug), env.NEXT_PUBLIC_SITE_URL).toString(),
-    },
-  };
+  const canonical = await getListingCanonical(
+    { kind: "category", categoryId: category.id },
+    categoryPath(category.slug),
+    searchParams,
+  );
+  return storePageMetadata({
+    title: pagedTitle(presentText(category.metaTitle) ?? category.name, canonical.page),
+    description:
+      presentText(category.metaDescription) ??
+      textExcerpt(category.description ?? "", META_DESCRIPTION_MAX),
+    path: canonical.path,
+  });
 }
 
 // The page joins the two features: the category from categories, the listing from catalog.

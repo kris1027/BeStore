@@ -3,7 +3,7 @@ import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 
 import { type Availability, availability } from "@/lib/availability";
-import { productTag } from "@/lib/cache-tags";
+import { catalogTag, productTag } from "@/lib/cache-tags";
 import { db } from "@/lib/db";
 import { PLACEHOLDER_IMAGE, productImageUrl } from "@/lib/product-image";
 import { SLUG_PATTERN } from "@/lib/slug";
@@ -63,6 +63,8 @@ export type ProductCard = {
 // count itself, so counts above the low stock threshold never reach the browser (AC-7).
 export type ProductVariantView = {
   readonly id: string;
+  // In the Product JSON-LD (spec 0018, AC-8); not sensitive, order lines show it too.
+  readonly sku: string;
   readonly priceCents: number;
   // Shown struck through as "Was"; never charged (AC-16).
   readonly compareAtPriceCents: number | null;
@@ -90,6 +92,9 @@ export type ProductView = {
   readonly slug: string;
   // Markdown, rendered by ProductDescription (spec 0009, AC-6).
   readonly description: string;
+  // Set only in the database for now; blank or null falls back to the name and description.
+  readonly metaTitle: string | null;
+  readonly metaDescription: string | null;
   readonly images: readonly GalleryImage[];
   readonly optionTypes: readonly ProductOptionTypeView[];
   readonly variants: readonly ProductVariantView[];
@@ -109,6 +114,8 @@ export async function getProductBySlug(slug: string): Promise<ProductView | null
       name: true,
       slug: true,
       description: true,
+      metaTitle: true,
+      metaDescription: true,
       images: {
         orderBy: [{ position: "asc" }, { id: "asc" }],
         select: {
@@ -134,6 +141,7 @@ export async function getProductBySlug(slug: string): Promise<ProductView | null
         orderBy: { position: "asc" },
         select: {
           id: true,
+          sku: true,
           priceCents: true,
           compareAtPriceCents: true,
           stockQuantity: true,
@@ -153,6 +161,8 @@ export async function getProductBySlug(slug: string): Promise<ProductView | null
     name: product.name,
     slug: product.slug,
     description: product.description,
+    metaTitle: product.metaTitle,
+    metaDescription: product.metaDescription,
     images: product.images.map((image) => ({
       ...toImage(image),
       id: image.id,
@@ -162,6 +172,7 @@ export async function getProductBySlug(slug: string): Promise<ProductView | null
     optionTypes: product.optionTypes,
     variants: product.variants.map((variant) => ({
       id: variant.id,
+      sku: variant.sku,
       priceCents: variant.priceCents,
       compareAtPriceCents: variant.compareAtPriceCents,
       availability: availability(variant.stockQuantity),
@@ -181,4 +192,37 @@ export async function getPrerenderedSlugs(): Promise<readonly string[]> {
     select: { slug: true },
   });
   return products.map((product) => product.slug);
+}
+
+export type SitemapProduct = {
+  readonly slug: string;
+  // ISO 8601: a cached value must survive serialization as it is.
+  readonly updatedAt: string;
+  readonly imageUrls: readonly string[];
+};
+
+// spec 0018, AC-18 and AC-19: every product the storefront lists (active, with a live variant),
+// tagged catalog so a product write shows in the sitemap on the next request.
+export async function getSitemapProducts(): Promise<readonly SitemapProduct[]> {
+  "use cache";
+  cacheLife("max");
+  cacheTag(catalogTag);
+
+  const products = await db.product.findMany({
+    where: { status: "active", variants: { some: { archived: false } } },
+    orderBy: [{ position: "asc" }, { createdAt: "desc" }, { id: "desc" }],
+    select: {
+      slug: true,
+      updatedAt: true,
+      images: {
+        orderBy: [{ position: "asc" }, { id: "asc" }],
+        select: { storagePath: true },
+      },
+    },
+  });
+  return products.map((product) => ({
+    slug: product.slug,
+    updatedAt: product.updatedAt.toISOString(),
+    imageUrls: product.images.map((image) => productImageUrl(image.storagePath)),
+  }));
 }

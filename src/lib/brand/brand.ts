@@ -16,12 +16,17 @@ export type SellerDetails = {
 
 export const brand: {
   readonly name: string;
+  // sRGB hex copies of the --background and --foreground tokens in app/globals.css, for the
+  // generated share card and logo (spec 0018, AC-3): next/og cannot read oklch CSS tokens. A
+  // rebrand updates them with the tokens; brand.test.ts fails until it does.
+  readonly colors: { readonly background: string; readonly foreground: string };
   readonly contactEmail: string | null;
   // The seller named in the legal pages (spec 0017, AC-4). A null field renders a
   // `[[TO FILL]]` marker, which a production build refuses.
   readonly legal: SellerDetails;
 } = {
   name: "BeStore",
+  colors: { background: "#ffffff", foreground: "#0a0a0a" },
   contactEmail: null,
   legal: {
     name: null,

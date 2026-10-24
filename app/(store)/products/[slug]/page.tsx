@@ -7,6 +7,8 @@ import {
   ProductDetailsSkeleton,
 } from "@/features/catalog/components/product-details";
 import { getPrerenderedSlugs, getProductBySlug } from "@/features/catalog/queries";
+import { productSeo } from "@/features/catalog/seo";
+import { storePageMetadata } from "@/lib/seo/site";
 import { cn } from "@/lib/utils";
 
 // Cannot match the slug pattern, so it renders the 404 page. Cache Components refuses an empty
@@ -22,7 +24,8 @@ export async function generateMetadata({
   params,
 }: PageProps<"/products/[slug]">): Promise<Metadata> {
   const product = await getProductBySlug((await params).slug);
-  return product ? { title: product.name } : { title: "Page not found" };
+  // spec 0018, AC-21: a hidden product gets no product metadata; notFound() adds the noindex.
+  return product ? storePageMetadata(productSeo(product)) : { title: "Page not found" };
 }
 
 // Other slugs render on their first visit and are cached (spec 0005, Caching model).

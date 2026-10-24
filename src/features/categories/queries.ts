@@ -62,3 +62,26 @@ export async function getPrerenderedCategorySlugs(): Promise<readonly string[]> 
   });
   return categories.map((category) => category.slug);
 }
+
+export type SitemapCategory = {
+  readonly slug: string;
+  // ISO 8601: a cached value must survive serialization as it is.
+  readonly updatedAt: string;
+};
+
+// spec 0018, AC-18 and AC-19: every visible category, for the sitemap.
+export async function getSitemapCategories(): Promise<readonly SitemapCategory[]> {
+  "use cache";
+  cacheLife("max");
+  cacheTag(categoriesTag);
+
+  const categories = await db.category.findMany({
+    where: { visible: true },
+    orderBy: [{ position: "asc" }, { id: "asc" }],
+    select: { slug: true, updatedAt: true },
+  });
+  return categories.map((category) => ({
+    slug: category.slug,
+    updatedAt: category.updatedAt.toISOString(),
+  }));
+}
