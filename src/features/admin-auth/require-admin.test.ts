@@ -176,6 +176,16 @@ describe("requireAdmin", () => {
 
     expect(mocks.getClaims).toHaveBeenCalled();
   });
+
+  it("sends a session whose token cannot be read to a plain sign in, not the expired one", async () => {
+    signedIn();
+    mocks.getClaims.mockResolvedValue({ data: null, error: new Error("invalid JWT") });
+
+    await expect(outcome(requireAdmin)).resolves.toBe(
+      "redirect:/admin/sign-in?next=%2Fadmin%2Forders%3Fstatus%3Dpaid",
+    );
+    expect(mocks.findAdmin).not.toHaveBeenCalled();
+  });
 });
 
 // covers: AC-6 (no page title hints that the panel exists)

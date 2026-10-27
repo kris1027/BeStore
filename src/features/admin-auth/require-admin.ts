@@ -24,8 +24,10 @@ const loadSessionState = cache(async (): Promise<SessionState> => {
   } = await supabase.auth.getUser();
   if (!user) return { userId: null, amr: null, adminRow: null };
 
-  // The `amr` of the token getUser() just confirmed, read the way the proxy reads it.
+  // The `amr` of the token getUser() just confirmed, read the way the proxy reads it. A token
+  // that cannot be read counts as no session: a plain sign in, not "your session expired".
   const { data } = await supabase.auth.getClaims();
+  if (!data) return { userId: null, amr: null, adminRow: null };
   const adminRow = await db.adminUser.findUnique({
     where: { id: user.id },
     select: { id: true, email: true, name: true, disabledAt: true },
