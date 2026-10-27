@@ -1,5 +1,5 @@
 import { createPrompter, promptAdminPassword, readFlags, run } from "./cli";
-import { connect, findAdminId, resetAdminPassword } from "./lib";
+import { connect, findAdminId, setAdminPassword } from "./lib";
 
 // pnpm admin:reset-password --email <e> [--env-file <path>]
 run(async () => {
@@ -11,9 +11,9 @@ run(async () => {
   const prompt = createPrompter();
   try {
     // Refuse an unknown email before asking for a password.
-    await findAdminId(deps.db, flags.email);
+    const id = await findAdminId(deps.db, flags.email);
     const password = await promptAdminPassword(prompt);
-    await resetAdminPassword(deps, flags.email, password);
+    await setAdminPassword(deps, id, password);
     console.log(`Password changed for ${flags.email}.`);
     // Supabase's admin password change deletes every session of the user (pinned by the stack
     // test), so this also cuts off anyone holding a stolen session.

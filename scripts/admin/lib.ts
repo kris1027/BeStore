@@ -108,12 +108,22 @@ export async function disableAdmin({ db }: Pick<AdminDeps, "db">, email: string)
 // lookup as disableAdmin, so the two scripts never disagree about who is an admin, enabled or
 // not; the admin API applies Supabase's own password policy and writes its auth audit log.
 export async function resetAdminPassword(
-  { db, supabase }: AdminDeps,
+  deps: AdminDeps,
   email: string,
   password: string,
 ): Promise<string> {
-  const id = await findAdminId(db, email);
+  const id = await findAdminId(deps.db, email);
+  await setAdminPassword(deps, id, password);
+  return id;
+}
+
+// For a caller that already holds the id from findAdminId (the CLI looks the admin up before
+// prompting, so an unknown email is refused without asking for a password).
+export async function setAdminPassword(
+  { supabase }: Pick<AdminDeps, "supabase">,
+  id: string,
+  password: string,
+): Promise<void> {
   const { error } = await supabase.auth.admin.updateUserById(id, { password });
   if (error) throw new Error(`Could not set the password: ${error.message}`);
-  return id;
 }
