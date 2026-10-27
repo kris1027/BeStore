@@ -32,6 +32,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 23 | Native controls in GET forms | Slice 9 follow up | done |
 | 16 | Legal pages & cookie consent | Launch | done |
 | 17 | SEO for storefront pages | Launch | done |
+| 24 | Remove admin 2FA | Launch | in-progress |
 | 19 | Production deploy | Launch | planned |
 
 ## Foundations
@@ -335,6 +336,20 @@ spec [0018](../specs/0018-storefront-seo/index.md) · code in [src/lib/seo/](../
   - [x] Full sitemap (home, legal, categories, images) and the hidden and private page checks (AC-18, AC-19, AC-21, AC-22)
 - [x] Verify it: `/check verify SEO for storefront pages` (the Rich Results Test waits for the first preview deploy, a spec 0018 follow-up)
 - [x] Test it: `/test SEO for storefront pages`
+
+### 24. Remove admin 2FA · in-progress · GA
+Admins sign in with email and password only; the TOTP step goes. An admin password changes only from the terminal, so an inbox alone never opens `/admin`.
+**Done when:** an admin reaches `/admin` with just a password; no MFA or admin email reset surface remains; `pnpm admin:reset-password` works; every existing denial still holds.
+spec [0019](../specs/0019-remove-admin-mfa/index.md) · supersedes parts of spec [0004](../specs/0004-admin-sign-in/index.md) and [0012](../specs/0012-customer-accounts/index.md)
+- [x] Design it (spec): `/architect remove admin 2FA`
+- [ ] Build it: `/develop remove admin 2FA`
+  - [ ] Terminal reset replaces the email reset: `admin:reset-password`, 14 character admin passwords, `admin:create` sets the password, hook skips store runners, `/auth/confirm` and admin reset pages gone (AC-4, AC-7 to AC-10, AC-15, AC-16)
+  - [ ] Password only guard: `password` amr rule, proxy redirect, MFA page, actions, lockout, `admin:reset-mfa` and `otpauth` gone (AC-1 to AC-6, AC-11, AC-12, AC-13)
+  - [ ] Config and records: TOTP off, runbook, spec 0004 and 0012 notes, README, Firewall item (AC-11, AC-14)
+- [ ] Verify it: `/check verify remove admin 2FA`
+- [ ] Test it: `/test remove admin 2FA`
+- [ ] Review it (fresh model): `/check review remove admin 2FA`
+- [ ] Document it: `/document remove admin 2FA`
 
 ### 19. Production deploy
 The last step: ship to Vercel and the production Supabase project, and turn on the production only settings every earlier slice left for deploy time.
