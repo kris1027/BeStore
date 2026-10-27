@@ -22,7 +22,7 @@ Run the app on `localhost:3000` against the local Supabase stack, with `EMAIL_TR
 - [x] `pnpm admin:reset-password --email <admin>` with a 13 character password → "The password needs: - At least 14 characters"; with two different passwords → "The passwords do not match." → AC-7, AC-16
 - [x] `pnpm admin:reset-password --email <ADMIN@EXAMPLE.COM>` (upper case, also for a disabled admin) with a valid 14+ character password twice → "Password changed for <email>." then "Every session they had is signed out."; the old password no longer signs in, the new one does, and an open admin tab is sent to sign in on its next request → AC-7
 - [x] `pnpm admin:create --email <existing customer>` → asks for a new password (14+ characters), and the customer's old password no longer signs in; last line "They sign in with the password you set." → AC-15, AC-16
-- [ ] `grep -rn "auth.mfa\|auth.reset.requested\|auth.password.changed" src` → nothing; the logger still redacts `code` → AC-12
+- [x] `grep -rn "auth.mfa\|auth.reset.requested\|auth.password.changed" src` → nothing; the logger still redacts `code` → AC-12
 - [x] `grep -n "enroll_enabled\|verify_enabled" supabase/config.toml` under `[auth.mfa.totp]` → both `false`; `package.json` has no `admin:reset-mfa` and no `otpauth`; `tests/stack/mfa-challenges.stack.test.ts` is gone → AC-11
 - [x] `pnpm test:stack` → `admin-amr.stack.test.ts` passes (password sign in has a `password` amr entry, a recovery session has none) and `admin-scripts.stack.test.ts` passes → AC-2, AC-7, AC-15
 - [x] `docs/runbooks/admin-accounts.md` and scope feature 19 name the Firewall rule on `POST /admin/sign-in` and `POST /account/sign-in`, 10 per minute per IP, deny 10 minutes, required before the first production admin → AC-14

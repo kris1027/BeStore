@@ -1,7 +1,9 @@
 # 0004. Admin sign in with required TOTP
 
 **Date**: 2026-09-25 (amended 2026-10-15 by [spec 0012](../0012-customer-accounts/index.md): public sign up, the recovery template, the proxy matcher)
-**Status**: Accepted
+**Status**: Accepted, partly superseded by [spec 0019](../0019-remove-admin-mfa/index.md) (2026-10-27)
+
+> **Superseded by spec 0019**: admins sign in with email and password only; TOTP and the admin email reset are gone, and an admin password changes only through `pnpm admin:reset-password`. Superseded: AC-2 in part, AC-4, AC-5, AC-9, AC-10 in part (admin passwords need 14 characters), AC-11 in part (`admin:reset-mfa` is gone), AC-13 in part, AC-14 in part (`/admin/sign-in` is the only auth page), AC-15 in part (the Firewall rule now covers both sign in paths), AC-16, AC-17 in part. Everything else still holds.
 
 ## Summary
 
