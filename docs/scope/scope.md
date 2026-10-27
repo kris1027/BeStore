@@ -32,7 +32,6 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 23 | Native controls in GET forms | Slice 9 follow up | done |
 | 16 | Legal pages & cookie consent | Launch | done |
 | 17 | SEO for storefront pages | Launch | done |
-| 18 | Analytics & error tracking | Launch | planned |
 | 19 | Production deploy | Launch | planned |
 
 ## Foundations
@@ -337,11 +336,6 @@ spec [0018](../specs/0018-storefront-seo/index.md) · code in [src/lib/seo/](../
 - [x] Verify it: `/check verify SEO for storefront pages` (the Rich Results Test waits for the first preview deploy, a spec 0018 follow-up)
 - [x] Test it: `/test SEO for storefront pages`
 
-### 18. Analytics & error tracking · needs a decision
-See how customers move through the store and know when something breaks.
-**Done when:** the funnel (view product, add to cart, start checkout, pay) is tracked with consent respected; front end and server errors, including failed payments, raise alerts.
-- [ ] Design it (spec): `/architect analytics & error tracking`
-
 ### 19. Production deploy
 The last step: ship to Vercel and the production Supabase project, and turn on the production only settings every earlier slice left for deploy time.
 **Done when:** the production app runs on Vercel against production Supabase, and each production only item below is applied and checked there.
@@ -370,6 +364,7 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Customer email change**: Supabase secure email change, keeping `customers.email` and order linking in step · needs a decision · from spec 0012
 - **Order data retention and export**: set the accounting retention period, extend the spec 0008 purge to settled orders past it, and offer account holders a data export · needs a decision · GA · from spec 0012
 - **Admin customers page**: search customers and see their orders, if support needs it · needs a decision · from spec 0012
+- **Analytics & error tracking (feature 18)**: the consent respected funnel (view product, add to cart, start checkout, pay) and alerts on front end, server and payment errors · needs a decision
 
 ## Legend
 
