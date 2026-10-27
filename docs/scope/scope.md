@@ -347,9 +347,9 @@ spec [0019](../specs/0019-remove-admin-mfa/index.md) · supersedes parts of spec
   - [x] Terminal reset replaces the email reset: `admin:reset-password`, 14 character admin passwords, `admin:create` sets the password, hook skips store runners, `/auth/confirm` and admin reset pages gone (AC-4, AC-7 to AC-10, AC-15, AC-16)
   - [x] Password only guard: `password` amr rule, proxy redirect, MFA page, actions, lockout, `admin:reset-mfa` and `otpauth` gone (AC-1 to AC-6, AC-11, AC-12, AC-13)
   - [x] Config and records: TOTP off, runbook, spec 0004 and 0012 notes, README, Firewall item (AC-11, AC-14)
-- [ ] Verify it: `/check verify remove admin 2FA`
-- [ ] Test it: `/test remove admin 2FA`
-- [ ] Review it (fresh model): `/check review remove admin 2FA`
+- [x] Verify it: `/check verify remove admin 2FA`
+- [x] Test it: `/test remove admin 2FA`
+- [x] Review it (fresh model): `/check review remove admin 2FA`
 - [ ] Document it: `/document remove admin 2FA`
 
 ### 19. Production deploy
