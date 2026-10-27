@@ -8,7 +8,7 @@ import {
   authIdempotencyKey,
   hookPayloadSchema,
   hookSecretKey,
-  skipsAuthEmail,
+  isStoreRunnerReset,
   usedActionType,
 } from "./auth-hook";
 
@@ -24,12 +24,12 @@ describe("usedActionType", () => {
   });
 });
 
-describe("skipsAuthEmail (spec 0019, AC-8)", () => {
+describe("isStoreRunnerReset (spec 0019, AC-8)", () => {
   it("skips only a reset for someone who runs the store", () => {
-    expect(skipsAuthEmail("recovery", true)).toBe(true);
-    expect(skipsAuthEmail("recovery", false)).toBe(false);
-    expect(skipsAuthEmail("signup", true)).toBe(false);
-    expect(skipsAuthEmail("signup", false)).toBe(false);
+    expect(isStoreRunnerReset("recovery", true)).toBe(true);
+    expect(isStoreRunnerReset("recovery", false)).toBe(false);
+    expect(isStoreRunnerReset("signup", true)).toBe(false);
+    expect(isStoreRunnerReset("signup", false)).toBe(false);
   });
 });
 
@@ -44,16 +44,16 @@ describe("authEmailLink", () => {
   const site = "https://shop.example";
 
   it("points every link at /account/confirm", () => {
-    expect(authEmailLink(site, "confirm_signup", "abc")).toBe(
+    expect(authEmailLink(site, "signup", "abc")).toBe(
       "https://shop.example/account/confirm?token_hash=abc&type=signup",
     );
-    expect(authEmailLink(site, "customer_reset", "abc")).toBe(
+    expect(authEmailLink(site, "recovery", "abc")).toBe(
       "https://shop.example/account/confirm?token_hash=abc&type=recovery",
     );
   });
 
   it("encodes the token hash", () => {
-    expect(authEmailLink(site, "confirm_signup", "a&b=c")).toContain("token_hash=a%26b%3Dc");
+    expect(authEmailLink(site, "signup", "a&b=c")).toContain("token_hash=a%26b%3Dc");
   });
 });
 

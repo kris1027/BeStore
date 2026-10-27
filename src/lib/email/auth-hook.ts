@@ -28,7 +28,7 @@ export type AuthEmailKind = "confirm_signup" | "customer_reset";
 // spec 0019, AC-8: a store runner gets no reset email from any flow, since an admin password
 // changes only from the terminal. Decided from the user id, which the caller cannot steer, unlike
 // redirect_to, which anyone with the anon key can set.
-export function skipsAuthEmail(type: AuthActionType, runsTheStore: boolean): boolean {
+export function isStoreRunnerReset(type: AuthActionType, runsTheStore: boolean): boolean {
   return type === "recovery" && runsTheStore;
 }
 
@@ -36,16 +36,11 @@ export function authEmailKind(type: AuthActionType): AuthEmailKind {
   return type === "signup" ? "confirm_signup" : "customer_reset";
 }
 
-const linkTypes: Record<AuthEmailKind, AuthActionType> = {
-  confirm_signup: "signup",
-  customer_reset: "recovery",
-};
-
 // The token hash link pattern: the page shows Continue first, and only that POST spends it.
-export function authEmailLink(siteUrl: string, kind: AuthEmailKind, tokenHash: string): string {
+export function authEmailLink(siteUrl: string, type: AuthActionType, tokenHash: string): string {
   const url = new URL("/account/confirm", siteUrl);
   url.searchParams.set("token_hash", tokenHash);
-  url.searchParams.set("type", linkTypes[kind]);
+  url.searchParams.set("type", type);
   return url.toString();
 }
 
