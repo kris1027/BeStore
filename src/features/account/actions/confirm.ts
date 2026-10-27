@@ -10,8 +10,13 @@ import { logger } from "@/lib/logger";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { accountPaths } from "../paths";
-import { confirmLinkSchema } from "../schemas";
+import { type ConfirmLinkType, confirmLinkSchema } from "../schemas";
 import { throwawayPassword } from "../throwaway-password";
+
+// The confirm page's failure view; a known type lets it offer a new link of that kind.
+function failedPath(type?: ConfirmLinkType): string {
+  return `${accountPaths.confirm}?failed=1${type ? `&type=${type}` : ""}`;
+}
 
 // spec 0012, AC-2: the POST half of /account/confirm. Only a person pressing Continue spends the
 // one time token, never a mail scanner that opens the link.
@@ -20,12 +25,12 @@ export async function confirmEmail(formData: FormData): Promise<void> {
     tokenHash: formData.get("token_hash"),
     type: formData.get("type"),
   });
-  if (!parsed.success) redirect(`${accountPaths.confirm}?failed=1`);
+  if (!parsed.success) redirect(failedPath());
   const { tokenHash, type } = parsed.data;
 
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
-  if (error || !data.user) redirect(`${accountPaths.confirm}?failed=1&type=${type}`);
+  if (error || !data.user) redirect(failedPath(type));
 
   // A password that guards /admin is never changed from an inbox alone (spec 0019, AC-9), even
   // with an old or hand made link: a store runner's reset is refused, and the session verifyOtp
@@ -39,7 +44,7 @@ export async function confirmEmail(formData: FormData): Promise<void> {
         "account.confirm.sign_out_failed",
       );
     }
-    redirect(`${accountPaths.confirm}?failed=1&type=recovery`);
+    redirect(failedPath("recovery"));
   }
 
   if (type === "signup") {
