@@ -341,9 +341,9 @@ spec [0018](../specs/0018-storefront-seo/index.md) · code in [src/lib/seo/](../
 ### 24. Remove admin 2FA · in-progress · GA
 Admins sign in with email and password only; the TOTP step goes. An admin password changes only from the terminal, so an inbox alone never opens `/admin`.
 **Done when:** an admin reaches `/admin` with just a password; no MFA or admin email reset surface remains; `pnpm admin:reset-password` works; every existing denial still holds.
-spec [0019](../specs/0019-remove-admin-mfa/index.md) · supersedes parts of spec [0004](../specs/0004-admin-sign-in/index.md) and [0012](../specs/0012-customer-accounts/index.md)
+spec [0019](../specs/0019-remove-admin-mfa/index.md) · supersedes parts of spec [0004](../specs/0004-admin-sign-in/index.md) and [0012](../specs/0012-customer-accounts/index.md) · code in [src/features/admin-auth/](../../src/features/admin-auth/), [scripts/admin/](../../scripts/admin/), [docs/runbooks/admin-accounts.md](../runbooks/admin-accounts.md)
 - [x] Design it (spec): `/architect remove admin 2FA`
-- [ ] Build it: `/develop remove admin 2FA`
+- [x] Build it: `/develop remove admin 2FA`
   - [x] Terminal reset replaces the email reset: `admin:reset-password`, 14 character admin passwords, `admin:create` sets the password, hook skips store runners, `/auth/confirm` and admin reset pages gone (AC-4, AC-7 to AC-10, AC-15, AC-16)
   - [x] Password only guard: `password` amr rule, proxy redirect, MFA page, actions, lockout, `admin:reset-mfa` and `otpauth` gone (AC-1 to AC-6, AC-11, AC-12, AC-13)
   - [x] Config and records: TOTP off, runbook, spec 0004 and 0012 notes, README, Firewall item (AC-11, AC-14)
