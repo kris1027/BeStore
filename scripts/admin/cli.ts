@@ -2,6 +2,8 @@ import { createInterface } from "node:readline/promises";
 import { Writable } from "node:stream";
 import { parseArgs } from "node:util";
 
+import { adminPasswordSchema } from "../../src/lib/auth/password";
+
 // Shared by the admin:* scripts: flags, a hidden prompt, and a clean exit on failure.
 
 export function readFlags<const K extends string>(names: readonly K[]) {
@@ -43,6 +45,23 @@ export function createPrompter() {
     },
     close: () => rl.close(),
   };
+}
+
+type Prompter = ReturnType<typeof createPrompter>;
+
+// Asks twice and checks the admin rule (spec 0019, AC-16), naming each missing part.
+export async function promptAdminPassword(prompt: Prompter): Promise<string> {
+  const password = await prompt.hidden("Password: ");
+  const check = adminPasswordSchema.safeParse(password);
+  if (!check.success) {
+    throw new Error(
+      `The password needs:\n${check.error.issues.map((i) => `- ${i.message}`).join("\n")}`,
+    );
+  }
+  if ((await prompt.hidden("Password again: ")) !== password) {
+    throw new Error("The passwords do not match.");
+  }
+  return password;
 }
 
 export function run(main: () => Promise<void>) {

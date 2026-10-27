@@ -89,9 +89,7 @@ test("an admin cannot change their password or delete their account here", async
   await page.getByLabel("Type it again").fill("Fresh-start-88");
   await page.getByRole("button", { name: "Change password" }).click();
   await expect(
-    page.getByText(
-      "This account also runs the store. Use Forgot password on the admin sign in page.",
-    ),
+    page.getByText("This account also runs the store, so its password cannot be changed here."),
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Delete my account" }).click();

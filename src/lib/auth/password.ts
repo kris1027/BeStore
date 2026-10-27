@@ -47,5 +47,18 @@ export const passwordSchema = z.string().superRefine((value, ctx) => {
   if (isPasswordTooLong(value)) ctx.addIssue({ code: "custom", message: passwordTooLongMessage });
 });
 
+// Admin passwords (spec 0019, AC-16): the password is the only factor in front of `/admin`, so
+// length is the cheapest defense against guessing that slips past rate limits. Only the admin
+// scripts set one; the customer forms refuse store runners.
+export const ADMIN_PASSWORD_MIN_LENGTH = 14;
+
+export const adminPasswordLengthMessage = `At least ${ADMIN_PASSWORD_MIN_LENGTH} characters`;
+
+export const adminPasswordSchema = passwordSchema.superRefine((value, ctx) => {
+  if (value.length < ADMIN_PASSWORD_MIN_LENGTH) {
+    ctx.addIssue({ code: "custom", message: adminPasswordLengthMessage });
+  }
+});
+
 // The rule list a form prints under a new password field.
 export const passwordRuleList = Object.values(passwordRuleMessages).join(", ").toLowerCase();

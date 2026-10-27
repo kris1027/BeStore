@@ -3,7 +3,7 @@ import type { EmailFrame } from "./components/layout";
 import { fixtureFrame } from "./fixtures";
 
 // spec 0012, AC-8 and AC-9: a customer's password reset, sent by the Send Email Hook. Users who
-// run the store get admin-reset-password.tsx instead.
+// run the store get no reset email at all (spec 0019, AC-8).
 
 export type ResetPasswordProps = {
   readonly frame: EmailFrame;

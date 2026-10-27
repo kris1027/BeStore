@@ -1,9 +1,10 @@
 import { expect, test } from "@playwright/test";
 
-import { createTestUser, latestEmailHtml, testPassword } from "../admin/support";
+import { createTestUser, recoveryTokenHash, testPassword } from "../admin/support";
 import { accountLinkFor, choosePassword, signInAsCustomer, uniqueEmail } from "./support";
 
-// spec 0012: forgot password through the Send Email Hook (AC-8, AC-9, AC-2, AC-3).
+// spec 0012: forgot password through the Send Email Hook (AC-8, AC-9, AC-2, AC-3), and spec 0019
+// AC-8 and AC-9: nothing for a user who runs the store.
 
 const sent = "If there is an account for that email, a reset link is on its way.";
 
@@ -49,36 +50,37 @@ test("a customer resets their password from the email and every old session ends
   await expect(page).toHaveURL("/account");
 });
 
-test("an unknown email gets the same reply and no email", async ({ page }) => {
-  const email = uniqueEmail("nobody");
-  await requestReset(page, email);
-
-  await page.waitForTimeout(1_500);
+async function expectNoEmail(email: string) {
+  await new Promise((resolve) => setTimeout(resolve, 1_500));
   const search = await fetch(
     `http://127.0.0.1:55324/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`,
   );
   expect(((await search.json()) as { messages_count: number }).messages_count).toBe(0);
+}
+
+test("an unknown email gets the same reply and no email", async ({ page }) => {
+  const email = uniqueEmail("nobody");
+  await requestReset(page, email);
+  await expectNoEmail(email);
 });
 
-test("an admin asking here gets the admin email, and its link never skips the authenticator", async ({
-  page,
-}) => {
-  const admin = await createTestUser({ enrolled: true });
+test("an admin asking here gets the same reply and no email", async ({ page }) => {
+  const admin = await createTestUser();
   await requestReset(page, admin.email);
+  await expectNoEmail(admin.email);
+});
 
-  const html = await latestEmailHtml(admin.email);
-  expect(html).toContain("Reset your admin password");
-  expect(html).not.toContain("/account/confirm");
-  const adminLink = html
-    .match(/href="([^"]*\/auth\/confirm\?[^"]*)"/)?.[1]
-    ?.replaceAll("&amp;", "&");
-  expect(adminLink).toBeDefined();
+test("a recovery link for an admin made outside the app changes no password", async ({ page }) => {
+  const admin = await createTestUser();
+  const tokenHash = await recoveryTokenHash(admin.email);
 
-  // The same token pasted into the customer confirm page still lands on the authenticator step.
-  const pasted = adminLink!.replace("/auth/confirm", "/account/confirm");
-  await page.goto(pasted);
+  await page.goto(`/account/confirm?token_hash=${tokenHash}&type=recovery`);
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page).toHaveURL("/admin/mfa?next=%2Fadmin%2Freset-password");
+  await expect(page).toHaveURL("/account/confirm?failed=1&type=recovery");
+  await expect(page.getByText("This link has expired or was already used.")).toBeVisible();
+  // The session the link opened is ended on this device.
+  await page.goto("/account");
+  await expect(page).toHaveURL(/\/account\/sign-in/);
 });
 
 test("an expired reset link offers a new one", async ({ page }) => {

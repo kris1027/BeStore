@@ -24,6 +24,7 @@
     "email:dev": "email dev --dir emails --port 3001",
     "admin:create": "tsx scripts/admin/create.ts",
     "admin:disable": "tsx scripts/admin/disable.ts",
+    "admin:reset-password": "tsx scripts/admin/reset-password.ts",
     "admin:reset-mfa": "tsx scripts/admin/reset-mfa.ts"
   },
   "dependencies": {

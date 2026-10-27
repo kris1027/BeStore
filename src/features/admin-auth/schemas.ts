@@ -1,8 +1,6 @@
 import { z } from "zod";
 
-import { passwordSchema } from "@/lib/auth/password";
-
-import { authMessages, fieldMessages } from "./messages";
+import { fieldMessages } from "./messages";
 
 export const emailSchema = z
   .string()
@@ -27,16 +25,3 @@ export const totpCodeSchema = z.object({
 });
 
 export type TotpCodeValues = z.input<typeof totpCodeSchema>;
-
-export const forgotPasswordSchema = z.object({ email: emailSchema });
-
-export type ForgotPasswordValues = z.input<typeof forgotPasswordSchema>;
-
-export const resetPasswordSchema = z
-  .object({ password: passwordSchema, confirm: z.string() })
-  .refine((values) => values.password === values.confirm, {
-    path: ["confirm"],
-    message: authMessages.mismatch,
-  });
-
-export type ResetPasswordValues = z.input<typeof resetPasswordSchema>;

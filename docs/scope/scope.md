@@ -343,7 +343,7 @@ Admins sign in with email and password only; the TOTP step goes. An admin passwo
 spec [0019](../specs/0019-remove-admin-mfa/index.md) · supersedes parts of spec [0004](../specs/0004-admin-sign-in/index.md) and [0012](../specs/0012-customer-accounts/index.md)
 - [x] Design it (spec): `/architect remove admin 2FA`
 - [ ] Build it: `/develop remove admin 2FA`
-  - [ ] Terminal reset replaces the email reset: `admin:reset-password`, 14 character admin passwords, `admin:create` sets the password, hook skips store runners, `/auth/confirm` and admin reset pages gone (AC-4, AC-7 to AC-10, AC-15, AC-16)
+  - [x] Terminal reset replaces the email reset: `admin:reset-password`, 14 character admin passwords, `admin:create` sets the password, hook skips store runners, `/auth/confirm` and admin reset pages gone (AC-4, AC-7 to AC-10, AC-15, AC-16)
   - [ ] Password only guard: `password` amr rule, proxy redirect, MFA page, actions, lockout, `admin:reset-mfa` and `otpauth` gone (AC-1 to AC-6, AC-11, AC-12, AC-13)
   - [ ] Config and records: TOTP off, runbook, spec 0004 and 0012 notes, README, Firewall item (AC-11, AC-14)
 - [ ] Verify it: `/check verify remove admin 2FA`

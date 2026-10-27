@@ -475,8 +475,8 @@ async function expectPrivateHead(page: Page) {
   expect(await jsonLd(page)).toEqual([]);
 }
 
-// AC-22: the private pages keep their noindex and gain nothing. Signed out, /account/set-password,
-// /admin/reset-password and /auth/confirm redirect to a sign in page listed here.
+// AC-22: the private pages keep their noindex and gain nothing. Signed out, /account/set-password
+// redirects to a sign in page listed here.
 test.describe("a private page", () => {
   for (const [path, landsOn = path] of [
     ["/cart"],
@@ -488,7 +488,6 @@ test.describe("a private page", () => {
     ["/account/forgot-password"],
     ["/account/confirm"],
     ["/admin/sign-in"],
-    ["/admin/forgot-password"],
   ] as const) {
     test(`${path} stays noindex with no canonical or JSON-LD`, async ({ page }) => {
       await page.goto(path);

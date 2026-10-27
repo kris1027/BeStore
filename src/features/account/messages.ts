@@ -21,8 +21,7 @@ export const accountMessages = {
   // AC-9
   resetSent: "If there is an account for that email, a reset link is on its way.",
   // AC-19
-  runsTheStorePassword:
-    "This account also runs the store. Use Forgot password on the admin sign in page.",
+  runsTheStorePassword: "This account also runs the store, so its password cannot be changed here.",
   wrongCurrentPassword: "Your current password is not right.",
   passwordChanged: "Your password is changed.",
   // AC-20

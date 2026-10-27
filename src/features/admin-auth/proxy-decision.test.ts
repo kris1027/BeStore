@@ -180,12 +180,8 @@ describe("decideAdminGate", () => {
 
 describe("proxy matcher", () => {
   // spec 0012, AC-22: the account pages and checkout join; catalog pages never call Supabase.
-  it("runs only on admin, auth, account and checkout routes", () => {
-    expect(config.matcher).toEqual([
-      "/admin/:path*",
-      "/auth/:path*",
-      "/account/:path*",
-      "/checkout/:path*",
-    ]);
+  // spec 0019, AC-4: /auth has no pages left.
+  it("runs only on admin, account and checkout routes", () => {
+    expect(config.matcher).toEqual(["/admin/:path*", "/account/:path*", "/checkout/:path*"]);
   });
 });

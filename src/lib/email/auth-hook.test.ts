@@ -8,6 +8,7 @@ import {
   authIdempotencyKey,
   hookPayloadSchema,
   hookSecretKey,
+  skipsAuthEmail,
   usedActionType,
 } from "./auth-hook";
 
@@ -23,30 +24,31 @@ describe("usedActionType", () => {
   });
 });
 
-describe("authEmailKind", () => {
-  it("confirms a sign up whoever the user is", () => {
-    expect(authEmailKind("signup", false)).toBe("confirm_signup");
-    expect(authEmailKind("signup", true)).toBe("confirm_signup");
+describe("skipsAuthEmail (spec 0019, AC-8)", () => {
+  it("skips only a reset for someone who runs the store", () => {
+    expect(skipsAuthEmail("recovery", true)).toBe(true);
+    expect(skipsAuthEmail("recovery", false)).toBe(false);
+    expect(skipsAuthEmail("signup", true)).toBe(false);
+    expect(skipsAuthEmail("signup", false)).toBe(false);
   });
+});
 
-  it("sends the admin reset to anyone who runs the store, else the customer reset", () => {
-    expect(authEmailKind("recovery", true)).toBe("admin_reset");
-    expect(authEmailKind("recovery", false)).toBe("customer_reset");
+describe("authEmailKind", () => {
+  it("confirms a sign up and resets a customer", () => {
+    expect(authEmailKind("signup")).toBe("confirm_signup");
+    expect(authEmailKind("recovery")).toBe("customer_reset");
   });
 });
 
 describe("authEmailLink", () => {
   const site = "https://shop.example";
 
-  it("points customers at /account/confirm and admins at /auth/confirm", () => {
+  it("points every link at /account/confirm", () => {
     expect(authEmailLink(site, "confirm_signup", "abc")).toBe(
       "https://shop.example/account/confirm?token_hash=abc&type=signup",
     );
     expect(authEmailLink(site, "customer_reset", "abc")).toBe(
       "https://shop.example/account/confirm?token_hash=abc&type=recovery",
-    );
-    expect(authEmailLink(site, "admin_reset", "abc")).toBe(
-      "https://shop.example/auth/confirm?token_hash=abc&type=recovery",
     );
   });
 

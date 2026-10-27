@@ -1,9 +1,5 @@
 import { render } from "react-email";
 
-import {
-  AdminResetPasswordEmail,
-  adminResetPasswordSubject,
-} from "../../../emails/admin-reset-password";
 import type { EmailFrame } from "../../../emails/components/layout";
 import { ConfirmSignupEmail, confirmSignupSubject } from "../../../emails/confirm-signup";
 import { ResetPasswordEmail, resetPasswordSubject } from "../../../emails/reset-password";
@@ -21,11 +17,6 @@ function element(kind: AuthEmailKind, frame: EmailFrame, link: string) {
       return {
         subject: resetPasswordSubject,
         node: <ResetPasswordEmail frame={frame} resetUrl={link} />,
-      };
-    case "admin_reset":
-      return {
-        subject: adminResetPasswordSubject,
-        node: <AdminResetPasswordEmail frame={frame} resetUrl={link} />,
       };
   }
 }

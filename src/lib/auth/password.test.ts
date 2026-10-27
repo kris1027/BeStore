@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { isPasswordTooLong, missingPasswordRules, passwordSchema } from "./password";
+import {
+  adminPasswordSchema,
+  isPasswordTooLong,
+  missingPasswordRules,
+  passwordSchema,
+} from "./password";
 
 describe("passwordSchema (spec 0004 AC-10, spec 0012 AC-3)", () => {
   it("accepts a password with all four classes and 8 characters", () => {
@@ -28,5 +33,27 @@ describe("passwordSchema (spec 0004 AC-10, spec 0012 AC-3)", () => {
     expect(isPasswordTooLong(`Aa1!${"x".repeat(69)}`)).toBe(true);
     expect(isPasswordTooLong(`Aa1!${"é".repeat(35)}`)).toBe(true);
     expect(passwordSchema.safeParse(`Aa1!${"x".repeat(69)}`).success).toBe(false);
+  });
+});
+
+describe("adminPasswordSchema (spec 0019 AC-16)", () => {
+  it("accepts 14 characters that pass the shared rule", () => {
+    expect(adminPasswordSchema.safeParse("Abcdefghijk1!x").success).toBe(true);
+  });
+
+  it("names the 14 character rule as its own missing part", () => {
+    const result = adminPasswordSchema.safeParse("Abcdefghij1!x");
+    expect(result.error?.issues.map((issue) => issue.message)).toEqual(["At least 14 characters"]);
+  });
+
+  it("names the shared rule parts too", () => {
+    const result = adminPasswordSchema.safeParse("abc");
+    expect(result.error?.issues.map((issue) => issue.message)).toEqual([
+      "At least 8 characters",
+      "An upper case letter",
+      "A digit",
+      "A symbol",
+      "At least 14 characters",
+    ]);
   });
 });

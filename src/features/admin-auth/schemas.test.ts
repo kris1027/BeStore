@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { emailSchema, resetPasswordSchema, signInSchema, totpCodeSchema } from "./schemas";
+import { emailSchema, signInSchema, totpCodeSchema } from "./schemas";
 
 describe("form schemas", () => {
   it("lower cases and trims the email", () => {
@@ -25,12 +25,5 @@ describe("form schemas", () => {
         "Enter the 6 digit code",
       );
     }
-  });
-
-  it("requires the two new passwords to match", () => {
-    const result = resetPasswordSchema.safeParse({ password: "Abcdef1!", confirm: "Abcdef1?" });
-    expect(result.error?.issues).toMatchObject([
-      { path: ["confirm"], message: "The passwords do not match." },
-    ]);
   });
 });

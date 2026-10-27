@@ -9,10 +9,6 @@ export const authMessages = {
   mfa_not_set_up: "Your authenticator is not set up. Contact the store owner.",
   expired: "Your session has expired. Please sign in again.",
   signed_out: "You have signed out.",
-  invalid_link: "That link is invalid or has expired. Request a new one.",
-  reset_sent: "If that email belongs to an admin, a reset link is on its way.",
-  same_password: "Choose a password you have not used here before.",
-  mismatch: "The passwords do not match.",
 } as const;
 
 export type AuthMessageKey = keyof typeof authMessages;
@@ -25,7 +21,7 @@ export const fieldMessages = {
 } as const;
 
 // The reasons the sign in page shows from its `reason` query param.
-const signInReasons = ["expired", "signed_out", "invalid_link", "too_many_codes"] as const;
+const signInReasons = ["expired", "signed_out", "too_many_codes"] as const;
 
 export type SignInReason = (typeof signInReasons)[number];
 

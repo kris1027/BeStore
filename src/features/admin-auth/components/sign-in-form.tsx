@@ -1,7 +1,6 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 
@@ -66,15 +65,7 @@ export function SignInForm({ next, reason }: SignInFormProps) {
           <FieldError id="email-error" errors={[errors.email]} />
         </Field>
         <Field data-invalid={errors.password ? true : undefined}>
-          <div className="flex items-center justify-between gap-2">
-            <FieldLabel htmlFor="password">Password</FieldLabel>
-            <Link
-              href="/admin/forgot-password"
-              className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
-            >
-              Forgot password?
-            </Link>
-          </div>
+          <FieldLabel htmlFor="password">Password</FieldLabel>
           <Input
             id="password"
             type="password"

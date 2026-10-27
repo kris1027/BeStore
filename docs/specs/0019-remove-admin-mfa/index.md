@@ -1,7 +1,7 @@
 # 0019. Remove admin two factor sign in
 
 **Date**: 2026-10-27
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 

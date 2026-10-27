@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { addAuthUser, addVerifiedFactor, resetAuthStub } from "./auth-stub";
+import { addAuthUser, resetAuthStub } from "./auth-stub";
 import { resetDatabaseBeforeEach, testDb } from "./client";
 import { createCustomer, createOrder, createSimpleProduct, inThirtyDays } from "./fixtures";
 
@@ -129,14 +129,16 @@ describe("changePassword (AC-19)", () => {
     expect(mocks.updateUser).not.toHaveBeenCalled();
   });
 
-  it("refuses an admin and anyone with an authenticator", async () => {
+  it("refuses an admin, enabled or disabled (spec 0019, AC-10)", async () => {
     await testDb.adminUser.create({
       data: { id: mocks.customer.id, email: "ada@example.com", name: "Ada" },
     });
     expect(await changePassword(values)).toEqual({ ok: false, error: { form: "runs_the_store" } });
 
-    await testDb.adminUser.deleteMany();
-    await addVerifiedFactor(mocks.customer.id);
+    await testDb.adminUser.update({
+      where: { id: mocks.customer.id },
+      data: { disabledAt: new Date() },
+    });
     expect(await changePassword(values)).toEqual({ ok: false, error: { form: "runs_the_store" } });
     expect(mocks.statelessSignIn).not.toHaveBeenCalled();
   });
@@ -217,17 +219,6 @@ describe("deleteAccount (AC-20)", () => {
       { event: "account.delete_refused_admin", customerId: mocks.customer.id },
       "account.delete_refused_admin",
     );
-  });
-
-  it("refuses anyone with an authenticator, like change password", async () => {
-    await addVerifiedFactor(mocks.customer.id);
-
-    expect(await deleteAccount({ password: "Pass-word-1" })).toEqual({
-      ok: false,
-      error: { form: "runs_the_store" },
-    });
-    expect(mocks.statelessSignIn).not.toHaveBeenCalled();
-    expect(mocks.deleteUser).not.toHaveBeenCalled();
   });
 
   it("needs the right password", async () => {

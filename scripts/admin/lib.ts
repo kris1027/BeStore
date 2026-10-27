@@ -50,8 +50,10 @@ export async function findAuthUserId(db: PrismaClient, email: string): Promise<s
 export type CreateAdminInput = {
   readonly email: string;
   readonly name: string;
-  // Only used when no auth user has this email yet; an existing user keeps their password.
-  readonly password: string | null;
+  // Set for an existing user too (spec 0019, AC-15): public sign up lets anyone create an
+  // unconfirmed user with a password they know, and confirming it here must not hand them
+  // an admin password.
+  readonly password: string;
 };
 
 export async function createAdmin(
@@ -65,11 +67,13 @@ export async function createAdmin(
   let id: string;
   if (existingId) {
     // One auth user may be both a customer and an admin (spec 0004).
-    const { error } = await supabase.auth.admin.updateUserById(existingId, { email_confirm: true });
-    if (error) throw new Error(`Could not confirm the existing user: ${error.message}`);
+    const { error } = await supabase.auth.admin.updateUserById(existingId, {
+      password: input.password,
+      email_confirm: true,
+    });
+    if (error) throw new Error(`Could not update the existing user: ${error.message}`);
     id = existingId;
   } else {
-    if (input.password === null) throw new Error("A password is needed for a new user.");
     const { data, error } = await supabase.auth.admin.createUser({
       email,
       password: input.password,
@@ -87,12 +91,31 @@ export async function createAdmin(
   return { id, existingUser: existingId !== null };
 }
 
-export async function disableAdmin({ db }: Pick<AdminDeps, "db">, email: string): Promise<string> {
+export async function findAdminId(db: PrismaClient, email: string): Promise<string> {
   const admin = await db.adminUser.findUnique({ where: { email: normalizeEmail(email) } });
   if (!admin) throw new Error("No admin has that email.");
-  // Takes effect on their next request: requireAdmin() reads this row every time.
-  await db.adminUser.update({ where: { id: admin.id }, data: { disabledAt: new Date() } });
   return admin.id;
+}
+
+export async function disableAdmin({ db }: Pick<AdminDeps, "db">, email: string): Promise<string> {
+  const id = await findAdminId(db, email);
+  // Takes effect on their next request: requireAdmin() reads this row every time.
+  await db.adminUser.update({ where: { id }, data: { disabledAt: new Date() } });
+  return id;
+}
+
+// The only way to change an admin password without knowing it (spec 0019, AC-7). The same
+// lookup as disableAdmin, so the two scripts never disagree about who is an admin, enabled or
+// not; the admin API applies Supabase's own password policy and writes its auth audit log.
+export async function resetAdminPassword(
+  { db, supabase }: AdminDeps,
+  email: string,
+  password: string,
+): Promise<string> {
+  const id = await findAdminId(db, email);
+  const { error } = await supabase.auth.admin.updateUserById(id, { password });
+  if (error) throw new Error(`Could not set the password: ${error.message}`);
+  return id;
 }
 
 export async function resetAdminMfa(

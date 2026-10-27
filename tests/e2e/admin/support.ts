@@ -165,10 +165,12 @@ export async function latestEmailHtml(to: string): Promise<string> {
   return html;
 }
 
-export function resetLinkFrom(html: string): string {
-  const match = html.match(/href="([^"]*\/auth\/confirm\?[^"]*)"/);
-  if (!match?.[1]) throw new Error("No reset link in the email.");
-  return match[1].replaceAll("&amp;", "&");
+// A recovery token made outside the app, as an old or hand made link would carry: generateLink
+// sends no email, so the Send Email Hook never sees it.
+export async function recoveryTokenHash(email: string): Promise<string> {
+  const { data, error } = await serviceClient.auth.admin.generateLink({ type: "recovery", email });
+  if (error) throw error;
+  return data.properties.hashed_token;
 }
 
 // A browser session for someone who never passes the sign in form: signs in through

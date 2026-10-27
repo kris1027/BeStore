@@ -111,15 +111,12 @@ test.describe("failed sign in looks the same whatever the cause", () => {
 });
 
 test.describe("MFA enforcement", () => {
-  test("a password only session cannot open the panel or the reset page", async ({ page }) => {
+  test("a password only session cannot open the panel", async ({ page }) => {
     const admin = await createTestUser({ enrolled: true });
     await signInWithPassword(page, admin);
 
     await page.goto("/admin");
     await expect(page).toHaveURL("/admin/mfa?next=%2Fadmin");
-
-    await page.goto("/admin/reset-password");
-    await expect(page).toHaveURL("/admin/mfa?next=%2Fadmin%2Freset-password");
   });
 
   test("a wrong code is refused, then the right one works", async ({ page }) => {
@@ -189,7 +186,7 @@ test.describe("signed in visitors skip the auth pages", () => {
     const admin = await createTestUser({ enrolled: true });
     await signInFully(page, admin);
 
-    await page.goto("/admin/forgot-password");
+    await page.goto("/admin/sign-in");
     await expect(page).toHaveURL("/admin");
   });
 });
