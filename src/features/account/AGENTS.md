@@ -15,7 +15,7 @@ Optional customer accounts under `/account`: sign up, confirm, choose a password
 - `send-email-hook.ts`: `handleSendEmailHook`, behind `POST /api/auth/send-email` (AC-8). Checks the Standard Webhooks signature, skips a recovery email for a user who runs the store (answering 200 so the forgot page reveals nothing), picks the template and sends it within 4 seconds; the pure parts live in `src/lib/email/auth-hook.ts`.
 - `sign-up-email.ts`, `throwaway-password.ts`, `settle.ts`: the sign up call made in `after()` with a password nobody knows, and its failure as a reason code.
 - `src/lib/customer/session.ts`: `getCustomer`, `getCustomerId`, `requireCustomer`. `setup.ts`: `accountSetup` (customer row, guest order links, cart merge). `lock.ts`: `lockCustomer`. `addresses.ts`, `address-rules.ts`: the address book. `store-admin.ts`: `runsTheStore`. `log.ts`: `account.*` events.
-- `src/lib/auth/password.ts`: the one password schema for admin pages, account pages and scripts, mirroring `password_requirements` in `supabase/config.toml`. Keep the two in step.
+- `src/lib/auth/password.ts`: `passwordSchema` for the account pages, mirroring `password_requirements` in `supabase/config.toml` (keep the two in step), and `adminPasswordSchema`, the same rule plus at least 14 characters, which only the admin scripts use (spec 0019, AC-16). Supabase does not enforce the 14 characters; the scripts are the only way an admin password is set.
 
 ## Conventions
 

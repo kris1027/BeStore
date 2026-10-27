@@ -356,7 +356,7 @@ spec [0019](../specs/0019-remove-admin-mfa/index.md) · supersedes parts of spec
 The last step: ship to Vercel and the production Supabase project, and turn on the production only settings every earlier slice left for deploy time.
 **Done when:** the production app runs on Vercel against production Supabase, and each production only item below is applied and checked there.
 - [ ] Build it: `/develop production deploy`
-  - [ ] Admin sign in, from the runbook [docs/runbooks/admin-accounts.md](../runbooks/admin-accounts.md): production Supabase auth settings, Resend SMTP, recovery template, redirect URLs, asymmetric JWT keys, the first real admin (spec 0004 AC-10, AC-11)
+  - [ ] Admin sign in, from the runbook [docs/runbooks/admin-accounts.md](../runbooks/admin-accounts.md): production Supabase auth settings, Resend SMTP, redirect URLs, asymmetric JWT keys, the first real admin (spec 0004 AC-10, AC-11)
   - [ ] **Required before the first production admin exists**: Vercel Firewall rate limit on `POST` to `/admin/sign-in` and `/account/sign-in`: 10 per minute per IP, deny 10 minutes (spec 0019 AC-14, replacing spec 0004 AC-15)
   - [ ] Admin TOTP off in production: delete any existing factors, then turn TOTP enroll and verify off; check the Send Email Hook is on (a reset request for an admin email sends nothing) (spec 0019 AC-8, AC-11)
   - [ ] Vercel Firewall rate limit on `POST /checkout` (promo code Apply and Pay), generous enough for real Pay clicks (spec 0014 Follow-up)

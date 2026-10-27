@@ -1,8 +1,8 @@
 import { z } from "zod";
 
-// Pure (no server-only imports): the admin pages, the account pages and the admin scripts all
-// check passwords with this one schema, which mirrors the project wide Supabase policy
-// (spec 0004, AC-10; supabase/config.toml `password_requirements`). Keep the two in step.
+// Pure (no server-only imports): the account pages and the admin scripts check passwords with
+// this schema, which mirrors the project wide Supabase policy (spec 0004, AC-10;
+// supabase/config.toml `password_requirements`). Keep the two in step.
 
 export const passwordRuleMessages = {
   length: "At least 8 characters",
