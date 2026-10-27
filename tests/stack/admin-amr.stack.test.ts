@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { decideAdminAccess } from "../../src/features/admin-auth/access";
-import { decideAdminGate } from "../../src/features/admin-auth/proxy-decision";
+import { decideAdminAccess } from "@/features/admin-auth/access";
+import { decideAdminGate } from "@/features/admin-auth/proxy-decision";
 import { anonClient, serviceClient, stackPassword, uniqueEmail } from "./stack";
 
 // spec 0019, AC-2: the whole password only rule rests on what Supabase writes into `amr`. A

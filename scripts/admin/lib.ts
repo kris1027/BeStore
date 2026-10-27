@@ -3,7 +3,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
 import { z } from "zod";
 
-import { PrismaClient } from "../../src/generated/prisma/client";
+import { PrismaClient } from "@/generated/prisma/client";
 
 // The admin account scripts (spec 0004): no admin UI exists, so these are the whole account
 // lifecycle. They never import server-only app modules; they build their own clients here.

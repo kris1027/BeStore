@@ -2,7 +2,7 @@ import { createInterface } from "node:readline/promises";
 import { Writable } from "node:stream";
 import { parseArgs } from "node:util";
 
-import { adminPasswordSchema } from "../../src/lib/auth/password";
+import { adminPasswordSchema } from "@/lib/auth/password";
 
 // Shared by the admin:* scripts: flags, a hidden prompt, and a clean exit on failure.
 
