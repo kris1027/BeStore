@@ -15,13 +15,3 @@ export const signInSchema = z.object({
 });
 
 export type SignInValues = z.input<typeof signInSchema>;
-
-export const totpCodeSchema = z.object({
-  // Authenticator apps show the code as "123 456"; spaces are dropped before checking.
-  code: z
-    .string()
-    .transform((code) => code.replace(/\s/g, ""))
-    .pipe(z.string().regex(/^\d{6}$/, fieldMessages.codeRequired)),
-});
-
-export type TotpCodeValues = z.input<typeof totpCodeSchema>;

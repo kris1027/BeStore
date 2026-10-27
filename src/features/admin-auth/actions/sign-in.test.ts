@@ -91,13 +91,13 @@ describe("signIn", () => {
     });
   });
 
-  // covers: AC-2
-  it("sends an active admin on to the MFA step, keeping a safe next", async () => {
+  // covers: spec 0019 AC-1
+  it("sends an active admin straight to a safe next", async () => {
     passwordAccepted();
     mocks.findAdmin.mockResolvedValue({ id: USER_ID, disabledAt: null });
 
     await expect(outcome(() => signIn(credentials, "/admin/orders?status=paid"))).resolves.toBe(
-      "redirect:/admin/mfa?next=%2Fadmin%2Forders%3Fstatus%3Dpaid",
+      "redirect:/admin/orders?status=paid",
     );
     expect(mocks.info).toHaveBeenCalledWith(
       { event: "auth.sign_in.succeeded", adminId: USER_ID, ip: "203.0.113.7" },
@@ -111,16 +111,16 @@ describe("signIn", () => {
     mocks.findAdmin.mockResolvedValue({ id: USER_ID, disabledAt: null });
 
     await expect(outcome(() => signIn(credentials, "//evil.example/admin"))).resolves.toBe(
-      "redirect:/admin/mfa?next=%2Fadmin",
+      "redirect:/admin",
     );
   });
 
-  it("goes to the bare MFA step when next is not a string", async () => {
+  it("goes to /admin when next is not a string", async () => {
     passwordAccepted();
     mocks.findAdmin.mockResolvedValue({ id: USER_ID, disabledAt: null });
 
-    await expect(outcome(() => signIn(credentials, { next: "/admin" }))).resolves.toBe(
-      "redirect:/admin/mfa",
+    await expect(outcome(() => signIn(credentials, { next: "/admin/orders" }))).resolves.toBe(
+      "redirect:/admin",
     );
   });
 

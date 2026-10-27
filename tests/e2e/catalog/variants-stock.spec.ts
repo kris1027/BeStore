@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoA11yViolations } from "../a11y";
-import { createTestUser, signInFully } from "../admin/support";
+import { createTestUser, signInAsAdmin } from "../admin/support";
 import {
   seedProduct,
   seedProductWithOptions,
@@ -14,8 +14,8 @@ import {
 // storefront, and a new option value from the editor.
 
 async function openEditor(page: Page, product: SeededProduct) {
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
   await page.goto(`/admin/products/${product.id}`);
   await waitForEditor(page, product.name);
   return admin;

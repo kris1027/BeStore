@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { createTestUser, signInFully, testPassword } from "../admin/support";
+import { createTestUser, signInAsAdmin, testPassword } from "../admin/support";
 import { seedProduct } from "../catalog/support";
 import { addToCart } from "../checkout/support";
 import { signInAsCustomer, uniqueEmail } from "./support";
@@ -61,8 +61,8 @@ test("sign in goes to a safe next and refuses any other", async ({ page }) => {
 test("a signed in admin opening the customer sign in page keeps their admin session", async ({
   page,
 }) => {
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
 
   await page.goto("/account/sign-in");
   await expect(page).toHaveURL("/account");

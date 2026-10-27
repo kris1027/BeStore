@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { expectNoA11yViolations, tabTo } from "../a11y";
-import { createTestUser, signInFully } from "../admin/support";
+import { createTestUser, signInAsAdmin } from "../admin/support";
 import { seedProduct } from "../catalog/support";
 import {
   addToCart,
@@ -144,9 +144,9 @@ test("a paid order shows where it goes, to the customer and to the admin", async
   await expect(page.getByText("€22.40")).toBeVisible();
   await expectNoA11yViolations(page);
 
-  const admin = await createTestUser({ enrolled: true });
+  const admin = await createTestUser();
   const adminPage = await (await browser.newContext()).newPage();
-  await signInFully(adminPage, admin);
+  await signInAsAdmin(adminPage, admin);
   await adminPage.goto("/admin/orders");
   const row = adminPage.getByRole("row", { name: new RegExp(`#${order.number}`) });
   await expect(row).toContainText(`${testAddress.fullName}, ${testAddress.city}`);
@@ -187,9 +187,9 @@ test("an order made before delivery existed says no address was recorded", async
   ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Delivering to" })).toHaveCount(0);
 
-  const admin = await createTestUser({ enrolled: true });
+  const admin = await createTestUser();
   const adminPage = await (await browser.newContext()).newPage();
-  await signInFully(adminPage, admin);
+  await signInAsAdmin(adminPage, admin);
   await adminPage.goto("/admin/orders");
   await expect(adminPage.getByRole("row", { name: new RegExp(`#${order.number}`) })).toContainText(
     "Not recorded",

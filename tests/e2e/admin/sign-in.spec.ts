@@ -1,15 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-import {
-  authCookieNames,
-  createTestUser,
-  enterCode,
-  signInFully,
-  signInWithPassword,
-  totpCode,
-} from "./support";
+import { authCookieNames, createTestUser, injectSession, signInAsAdmin } from "./support";
 
-// Spec 0004. Every test makes its own admin, so the tests run in parallel and on both projects.
+// Spec 0004, with spec 0019: email and password only. Every test makes its own admin, so the
+// tests run in parallel and on both projects.
 
 test("a signed out visitor is sent to sign in, keeping the page asked for", async ({ page }) => {
   await page.goto("/admin/orders?status=paid");
@@ -24,19 +18,12 @@ test("the storefront sets no auth cookie", async ({ page }) => {
   expect(await authCookieNames(page)).toEqual([]);
 });
 
-test("a new admin sets up TOTP, sees their name, and signs out", async ({ page }) => {
+// spec 0019, AC-1
+test("an admin signs in with a password, sees their name, and signs out", async ({ page }) => {
   const admin = await createTestUser();
 
-  await signInWithPassword(page, admin);
-  await expect(page.getByRole("heading", { name: "Set up your authenticator" })).toBeVisible();
-  await page.getByRole("button", { name: "Set up authenticator" }).click();
-
-  await expect(page.getByRole("img", { name: /QR code/ })).toBeVisible();
-  const secret = (await page.locator(".font-mono").first().innerText()).replaceAll(" ", "");
-  await enterCode(page, await totpCode(secret), "Verify and continue");
-
+  await signInAsAdmin(page, admin);
   await expect(page).toHaveURL("/admin");
-  await expect(page.getByText(`Signed in as ${admin.name}`)).toBeVisible();
 
   await page.getByRole("button", { name: admin.name }).click();
   await expect(page.getByRole("menu")).toContainText(admin.email);
@@ -50,25 +37,17 @@ test("a new admin sets up TOTP, sees their name, and signs out", async ({ page }
   await expect(page.getByText(`Signed in as ${admin.name}`)).toHaveCount(0);
 });
 
-test("an enrolled admin verifies a code and returns to the page they asked for", async ({
-  page,
-}) => {
-  const admin = await createTestUser({ enrolled: true });
+test("an admin returns to the page they asked for", async ({ page }) => {
+  const admin = await createTestUser();
 
-  await signInWithPassword(page, admin, "/admin?from=link");
-  await expect(page.getByRole("heading", { name: "Enter your code" })).toBeVisible();
-  await enterCode(page, await totpCode(admin.secret ?? ""));
-
+  await signInAsAdmin(page, admin, "/admin?from=link");
   await expect(page).toHaveURL("/admin?from=link");
-  await expect(page.getByText(`Signed in as ${admin.name}`)).toBeVisible();
 });
 
 test("an unsafe next falls back to /admin", async ({ page }) => {
-  const admin = await createTestUser({ enrolled: true });
+  const admin = await createTestUser();
 
-  await signInWithPassword(page, admin, "//evil.example/admin");
-  await enterCode(page, await totpCode(admin.secret ?? ""));
-
+  await signInAsAdmin(page, admin, "//evil.example/admin");
   await expect(page).toHaveURL("/admin");
 });
 
@@ -76,7 +55,7 @@ test.describe("failed sign in looks the same whatever the cause", () => {
   const message = "Email or password is incorrect.";
 
   test("wrong password, unknown email and a non admin", async ({ page }) => {
-    const admin = await createTestUser({ enrolled: true });
+    const admin = await createTestUser();
     const customer = await createTestUser({ admin: false });
 
     for (const [email, password] of [
@@ -110,83 +89,68 @@ test.describe("failed sign in looks the same whatever the cause", () => {
   });
 });
 
-test.describe("MFA enforcement", () => {
-  test("a password only session cannot open the panel", async ({ page }) => {
-    const admin = await createTestUser({ enrolled: true });
-    await signInWithPassword(page, admin);
+// spec 0019, AC-5
+test("the sign in page offers no reset and ignores old reasons", async ({ page }) => {
+  await page.goto("/admin/sign-in?reason=too_many_codes");
 
-    await page.goto("/admin");
-    await expect(page).toHaveURL("/admin/mfa?next=%2Fadmin");
-  });
+  await expect(page.getByRole("link", { name: /forgot/i })).toHaveCount(0);
+  await expect(page.getByText(/reset/i)).toHaveCount(0);
+  await expect(page.getByText("Too many incorrect codes", { exact: false })).toHaveCount(0);
+  // Next's route announcer is an empty alert; the form notice must be empty too.
+  await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toHaveCount(0);
+});
 
-  test("a wrong code is refused, then the right one works", async ({ page }) => {
-    const admin = await createTestUser({ enrolled: true });
-    await signInWithPassword(page, admin);
+// spec 0019, AC-4
+test.describe("the removed auth pages", () => {
+  const removed = ["/admin/mfa", "/admin/forgot-password", "/admin/reset-password"];
 
-    await enterCode(page, "000000");
-    await expect(
-      page.getByRole("alert").filter({ hasText: "That code is incorrect." }),
-    ).toBeVisible();
-    await expect(page.getByLabel("6 digit code")).toBeFocused();
-
-    await enterCode(page, await totpCode(admin.secret ?? ""));
-    await expect(page).toHaveURL("/admin");
-  });
-
-  test("a wrong code then a reload still enrolls with the QR code already scanned", async ({
-    page,
-  }) => {
-    const admin = await createTestUser();
-    await signInWithPassword(page, admin);
-    await page.getByRole("button", { name: "Set up authenticator" }).click();
-    const secret = (await page.locator(".font-mono").first().innerText()).replaceAll(" ", "");
-
-    await enterCode(page, "000000", "Verify and continue");
-    await expect(
-      page.getByRole("alert").filter({ hasText: "That code is incorrect." }),
-    ).toBeVisible();
-
-    await page.reload();
-    await expect(page.getByRole("heading", { name: "Already scanned the QR code?" })).toBeVisible();
-    await enterCode(page, await totpCode(secret), "Verify and continue");
-
-    await expect(page).toHaveURL("/admin");
-  });
-
-  test("5 wrong codes lock the MFA step, even after signing in again", async ({ page }) => {
-    const admin = await createTestUser({ enrolled: true });
-    await signInWithPassword(page, admin);
-
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      await enterCode(page, "000000");
-      await expect(
-        page.getByRole("alert").filter({ hasText: "That code is incorrect." }),
-      ).toBeVisible();
+  test("send a signed out visitor to sign in", async ({ page }) => {
+    for (const path of removed) {
+      await page.goto(path);
+      await expect(page).toHaveURL(`/admin/sign-in?next=${encodeURIComponent(path)}`);
     }
-    await enterCode(page, "000000");
-    await expect(page).toHaveURL("/admin/sign-in?reason=too_many_codes");
-    await expect(page.getByText("Too many incorrect codes. Please sign in again.")).toBeVisible();
+  });
 
-    await signInWithPassword(page, admin);
-    await enterCode(page, await totpCode(admin.secret ?? ""));
-    await expect(page).toHaveURL("/admin/sign-in?reason=too_many_codes");
+  test("answer an admin with a 404", async ({ page }) => {
+    const admin = await createTestUser();
+    await injectSession(page, admin);
+    for (const path of removed) {
+      const response = await page.goto(path);
+      expect(response?.status(), path).toBe(404);
+    }
+  });
+
+  test("/auth/confirm answers 404", async ({ page }) => {
+    const response = await page.goto("/auth/confirm?token_hash=abc&type=recovery");
+    expect(response?.status()).toBe(404);
   });
 });
 
-test.describe("signed in visitors skip the auth pages", () => {
-  test("at aal1 they go to the MFA step", async ({ page }) => {
-    const admin = await createTestUser({ enrolled: true });
-    await signInWithPassword(page, admin);
+// spec 0019, AC-2: an inbox alone never opens the panel.
+test("an admin session opened by a recovery link is sent to sign in with a real redirect", async ({
+  page,
+}) => {
+  const admin = await createTestUser();
+  await injectSession(page, admin, "recovery");
 
-    await page.goto("/admin/sign-in");
-    await expect(page).toHaveURL("/admin/mfa");
-  });
+  const response = await page.request.get("/admin/orders", { maxRedirects: 0 });
+  expect(response.status()).toBeGreaterThanOrEqual(300);
+  expect(response.status()).toBeLessThan(400);
+  expect(response.headers().location).toBe("/admin/sign-in?next=%2Fadmin%2Forders");
 
-  test("at aal2 they go to the panel", async ({ page }) => {
-    const admin = await createTestUser({ enrolled: true });
-    await signInFully(page, admin);
+  await page.goto("/admin");
+  await expect(page).toHaveURL("/admin/sign-in?next=%2Fadmin");
+  await expect(page.getByText(`Signed in as ${admin.name}`)).toHaveCount(0);
 
-    await page.goto("/admin/sign-in");
-    await expect(page).toHaveURL("/admin");
-  });
+  // spec 0019, AC-6: the sign in page does not send that session on.
+  await page.goto("/admin/sign-in");
+  await expect(page).toHaveURL("/admin/sign-in");
+});
+
+test("a signed in admin skips the sign in page", async ({ page }) => {
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
+
+  await page.goto("/admin/sign-in?next=%2Fadmin%2Forders");
+  await expect(page).toHaveURL("/admin/orders");
 });

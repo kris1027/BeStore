@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 
 import { seedProduct, waitForEditor } from "../catalog/support";
-import { createTestUser, disableAdmin, injectSession, signInFully } from "./support";
+import { createTestUser, disableAdmin, injectSession, signInAsAdmin } from "./support";
 
 // Spec 0004, AC-6: anyone who is not an active admin gets the store's plain 404.
 async function expectNotFound(page: Page) {
@@ -36,8 +36,8 @@ test("a signed in non admin gets a 404 on admin pages", async ({ page }) => {
 
 test("a disabled admin gets a 404 on their next page and their next action", async ({ page }) => {
   const product = await seedProduct({ stock: 1, label: "Disabled action" });
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
   await page.goto(`/admin/products/${product.id}`);
   await waitForEditor(page, product.name);
 

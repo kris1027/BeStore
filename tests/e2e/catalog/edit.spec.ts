@@ -1,15 +1,15 @@
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoA11yViolations } from "../a11y";
-import { createTestUser, signInFully } from "../admin/support";
+import { createTestUser, signInAsAdmin } from "../admin/support";
 import { seedProduct, waitForEditor } from "./support";
 
 // spec 0009, milestone 1: one edit from the admin editor to the storefront, and the status
 // buttons that take a product off the storefront and put it back first in line.
 
-async function signInAsAdmin(page: Page) {
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+async function signInAsNewAdmin(page: Page) {
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
 }
 
 async function openEditor(page: Page, product: { readonly id: string; readonly name: string }) {
@@ -25,7 +25,7 @@ test("an admin renames a live product and the storefront follows on its next req
   browser,
 }) => {
   const product = await seedProduct({ stock: 4, label: "Canvas tote" });
-  await signInAsAdmin(page);
+  await signInAsNewAdmin(page);
   await openEditor(page, product);
 
   const renamed = `${product.name} renamed`;
@@ -49,11 +49,11 @@ test("a second editor's Details save is refused instead of overwriting the first
   browser,
 }) => {
   const product = await seedProduct({ stock: 1, label: "Clay bowl" });
-  await signInAsAdmin(page);
+  await signInAsNewAdmin(page);
   await openEditor(page, product);
 
   const other = await (await browser.newContext()).newPage();
-  await signInAsAdmin(other);
+  await signInAsNewAdmin(other);
   await openEditor(other, product);
   await other.getByLabel("Name", { exact: true }).fill(`${product.name} first`);
   await other.getByRole("button", { name: "Save details" }).click();
@@ -75,7 +75,7 @@ test("hiding takes a product off the storefront and publishing puts it back firs
   const product = await seedProduct({ stock: 2, label: "Oak spoon" });
   // Another live product, so "first" means something.
   await seedProduct({ stock: 2, label: "Birch spoon" });
-  await signInAsAdmin(page);
+  await signInAsNewAdmin(page);
   await openEditor(page, product);
 
   await page.getByRole("button", { name: "Hide" }).click();
@@ -101,7 +101,7 @@ test("hiding takes a product off the storefront and publishing puts it back firs
 
 test("archive and restore never put a product straight back live", async ({ page }) => {
   const product = await seedProduct({ stock: 2, label: "Linen apron" });
-  await signInAsAdmin(page);
+  await signInAsNewAdmin(page);
   await openEditor(page, product);
 
   await page.getByRole("button", { name: "Archive", exact: true }).click();
@@ -123,7 +123,7 @@ test("the edit page has no axe violations and an unknown id shows the not found 
   page,
 }) => {
   const product = await seedProduct({ stock: 2, label: "Wax candle" });
-  await signInAsAdmin(page);
+  await signInAsNewAdmin(page);
   await page.goto(`/admin/products/${product.id}`);
   await waitForEditor(page, product.name);
   await expectNoA11yViolations(page);

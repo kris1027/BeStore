@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { mfaPath, safeAdminPath, signInPath } from "./safe-admin-path";
+import { safeAdminPath, signInPath } from "./safe-admin-path";
 
 describe("safeAdminPath (AC-12)", () => {
   it.each([
@@ -11,8 +11,6 @@ describe("safeAdminPath (AC-12)", () => {
     "/admin-evil",
     "/admin/sign-in",
     "/admin/sign-in?next=/admin",
-    "/admin/mfa",
-    "/admin/forgot-password",
     "/admin/../evil",
     "/admin/%2e%2e/evil",
     "/admin/\tx",
@@ -28,6 +26,8 @@ describe("safeAdminPath (AC-12)", () => {
   it.each([
     ["/admin", "/admin"],
     ["/admin/orders/1?x=y", "/admin/orders/1?x=y"],
+    // spec 0019: the removed auth pages are ordinary admin paths, which 404 after sign in.
+    ["/admin/mfa", "/admin/mfa"],
     ["/admin/reset-password", "/admin/reset-password"],
     ["/admin/orders#top", "/admin/orders"],
   ])("accepts %j", (next, expected) => {
@@ -43,11 +43,5 @@ describe("redirect paths", () => {
     );
     expect(signInPath({ next: "//evil.test" })).toBe("/admin/sign-in?next=%2Fadmin");
     expect(signInPath({ reason: "expired" })).toBe("/admin/sign-in?reason=expired");
-  });
-
-  it("builds the MFA URL", () => {
-    expect(mfaPath()).toBe("/admin/mfa");
-    expect(mfaPath("/admin")).toBe("/admin/mfa?next=%2Fadmin");
-    expect(mfaPath("https://evil.test")).toBe("/admin/mfa?next=%2Fadmin");
   });
 });

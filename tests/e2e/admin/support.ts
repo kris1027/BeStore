@@ -4,7 +4,6 @@ import { expect, type Page } from "@playwright/test";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
-import * as OTPAuth from "otpauth";
 import pg from "pg";
 
 // Real local Supabase, never a mock (spec 0004): every test makes its own admin with a unique
@@ -39,8 +38,6 @@ export type TestUser = {
   readonly email: string;
   readonly name: string;
   readonly password: string;
-  // Base32 TOTP secret, when a factor is enrolled.
-  readonly secret: string | null;
 };
 
 export async function withDb<T>(run: (client: pg.Client) => Promise<T>): Promise<T> {
@@ -56,11 +53,10 @@ export async function withDb<T>(run: (client: pg.Client) => Promise<T>): Promise
 type CreateOptions = {
   // An auth user with no admin_users row, such as a future customer.
   readonly admin?: boolean;
-  readonly enrolled?: boolean;
 };
 
 export async function createTestUser(options: CreateOptions = {}): Promise<TestUser> {
-  const { admin = true, enrolled = false } = options;
+  const { admin = true } = options;
   const email = `e2e-${randomUUID()}@example.com`;
   const name = `Admin ${email.slice(4, 10)}`;
   const { data, error } = await serviceClient.auth.admin.createUser({
@@ -76,64 +72,19 @@ export async function createTestUser(options: CreateOptions = {}): Promise<TestU
       db.query("INSERT INTO admin_users (id, email, name) VALUES ($1, $2, $3)", [id, email, name]),
     );
   }
-  const secret = enrolled ? await enrollFactor(email) : null;
-  return { id, email, name, password: testPassword, secret };
-}
-
-// Enrolls and verifies a TOTP factor through the Auth API, as the user would in the app.
-async function enrollFactor(email: string): Promise<string> {
-  const client = createClient(supabaseUrl, anonKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const signIn = await client.auth.signInWithPassword({ email, password: testPassword });
-  if (signIn.error) throw signIn.error;
-  const enroll = await client.auth.mfa.enroll({ factorType: "totp", friendlyName: "e2e" });
-  if (enroll.error) throw enroll.error;
-  const verify = await client.auth.mfa.challengeAndVerify({
-    factorId: enroll.data.id,
-    code: await totpCode(enroll.data.totp.secret),
-  });
-  if (verify.error) throw verify.error;
-  await client.auth.signOut({ scope: "local" });
-  return enroll.data.totp.secret;
+  return { id, email, name, password: testPassword };
 }
 
 export async function disableAdmin(id: string) {
   await withDb((db) => db.query("UPDATE admin_users SET disabled_at = now() WHERE id = $1", [id]));
 }
 
-// A current code, never one about to expire: with under 5 seconds left in the 30 second step,
-// it waits for the next step so the server does not see a stale code.
-export async function totpCode(secret: string): Promise<string> {
-  const remainingMs = 30_000 - (Date.now() % 30_000);
-  if (remainingMs < 5_000) await new Promise((resolve) => setTimeout(resolve, remainingMs + 250));
-  return new OTPAuth.TOTP({ secret: OTPAuth.Secret.fromBase32(secret) }).generate();
-}
-
-// Any code but the current one.
-export async function wrongCode(secret: string): Promise<string> {
-  const right = await totpCode(secret);
-  return right === "000000" ? "111111" : "000000";
-}
-
-export async function signInWithPassword(page: Page, user: TestUser, next?: string) {
+// Email and password: an admin lands in the panel, on `next` when it is safe (spec 0019, AC-1).
+export async function signInAsAdmin(page: Page, user: TestUser, next?: string) {
   await page.goto(next ? `/admin/sign-in?next=${encodeURIComponent(next)}` : "/admin/sign-in");
   await page.getByLabel("Email").fill(user.email);
   await page.getByLabel("Password").fill(user.password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/admin\/mfa/);
-}
-
-export async function enterCode(page: Page, code: string, submit = "Verify") {
-  await page.getByLabel("6 digit code").fill(code);
-  await page.getByRole("button", { name: submit, exact: true }).click();
-}
-
-// Password plus TOTP: the admin lands in the panel (aal2).
-export async function signInFully(page: Page, user: TestUser) {
-  if (!user.secret) throw new Error("signInFully needs an enrolled admin.");
-  await signInWithPassword(page, user);
-  await enterCode(page, await totpCode(user.secret));
   await expect(page.getByText(`Signed in as ${user.name}`)).toBeVisible();
 }
 
@@ -174,8 +125,13 @@ export async function recoveryTokenHash(email: string): Promise<string> {
 }
 
 // A browser session for someone who never passes the sign in form: signs in through
-// @supabase/ssr itself and hands its cookies to the page's context.
-export async function injectSession(page: Page, user: TestUser) {
+// @supabase/ssr itself and hands its cookies to the page's context. `via: "recovery"` opens it
+// by verifying a recovery link instead, as an inbox alone could (spec 0019, AC-2).
+export async function injectSession(
+  page: Page,
+  user: TestUser,
+  via: "password" | "recovery" = "password",
+) {
   const jar: { name: string; value: string }[] = [];
   const client = createServerClient(supabaseUrl, anonKey, {
     cookies: {
@@ -189,10 +145,13 @@ export async function injectSession(page: Page, user: TestUser) {
       },
     },
   });
-  const { error } = await client.auth.signInWithPassword({
-    email: user.email,
-    password: user.password,
-  });
+  const { error } =
+    via === "password"
+      ? await client.auth.signInWithPassword({ email: user.email, password: user.password })
+      : await client.auth.verifyOtp({
+          type: "recovery",
+          token_hash: await recoveryTokenHash(user.email),
+        });
   if (error) throw error;
   await page
     .context()

@@ -117,27 +117,3 @@ export async function resetAdminPassword(
   if (error) throw new Error(`Could not set the password: ${error.message}`);
   return id;
 }
-
-export async function resetAdminMfa(
-  { db, supabase }: AdminDeps,
-  email: string,
-): Promise<{ readonly id: string; readonly factorsRemoved: number }> {
-  const admin = await db.adminUser.findUnique({ where: { email: normalizeEmail(email) } });
-  if (!admin) throw new Error("No admin has that email.");
-
-  const { data, error } = await supabase.auth.admin.mfa.listFactors({ userId: admin.id });
-  if (error) throw new Error(`Could not list factors: ${error.message}`);
-  for (const factor of data.factors) {
-    const { error: deleteError } = await supabase.auth.admin.mfa.deleteFactor({
-      id: factor.id,
-      userId: admin.id,
-    });
-    if (deleteError) throw new Error(`Could not delete a factor: ${deleteError.message}`);
-  }
-
-  // Deleting the sessions revokes every refresh token (they cascade), and requireAdmin()'s
-  // getUser() finds no session, so every device is out on its next request. The only write to
-  // the auth schema anywhere in the app.
-  await db.$executeRaw`DELETE FROM auth.sessions WHERE user_id = ${admin.id}::uuid`;
-  return { id: admin.id, factorsRemoved: data.factors.length };
-}

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoA11yViolations, tabTo } from "../a11y";
-import { createTestUser, signInFully, withDb } from "../admin/support";
+import { createTestUser, signInAsAdmin, withDb } from "../admin/support";
 import { blockAppScripts } from "../no-js";
 import { seedProduct, type SeededProduct } from "./support";
 
@@ -97,8 +97,8 @@ async function seedCategory(products: readonly SeededProduct[], description = ""
 }
 
 async function signIn(page: Page) {
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
 }
 
 // The admin action that expires the cached reads: add `last` from the category page.

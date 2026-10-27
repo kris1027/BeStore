@@ -17,10 +17,7 @@ export default async function SignInPage({ searchParams }: PageProps<"/admin/sig
   await redirectIfSignedIn(nextPath);
 
   return (
-    <AuthCard
-      title="Sign in"
-      description="Use your admin email and password. You will need your authenticator app next."
-    >
+    <AuthCard title="Sign in" description="Use your admin email and password.">
       <SignInForm next={nextPath} reason={signInReason(reason)} />
     </AuthCard>
   );

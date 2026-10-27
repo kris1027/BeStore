@@ -6,15 +6,15 @@ import { expectNoA11yViolations, tabTo } from "../a11y";
 import { seedProduct } from "../catalog/support";
 import { seedCode, seedPaidOrderWithCode } from "../checkout/support";
 import { blockAppScripts } from "../no-js";
-import { createTestUser, disableAdmin, injectSession, signInFully } from "./support";
+import { createTestUser, disableAdmin, injectSession, signInAsAdmin } from "./support";
 
 // spec 0014, AC-10 to AC-14, AC-17 and AC-20: the promo code admin. Codes are shared by every
 // spec running at the same time, so each test searches for its own unique code.
 
 async function signedInAdmin(browser: Browser): Promise<Page> {
-  const admin = await createTestUser({ enrolled: true });
+  const admin = await createTestUser();
   const page = await (await browser.newContext()).newPage();
-  await signInFully(page, admin);
+  await signInAsAdmin(page, admin);
   return page;
 }
 
@@ -171,9 +171,9 @@ test("a signed in non admin gets a 404 on every discount page, and a signed out 
 });
 
 test("a disabled admin's code save changes nothing", async ({ browser }) => {
-  const admin = await createTestUser({ enrolled: true });
+  const admin = await createTestUser();
   const page = await (await browser.newContext()).newPage();
-  await signInFully(page, admin);
+  await signInAsAdmin(page, admin);
   await openNewCode(page);
 
   await disableAdmin(admin.id);

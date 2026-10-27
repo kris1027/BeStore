@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoA11yViolations } from "../a11y";
-import { createTestUser, signInFully, withDb } from "../admin/support";
+import { createTestUser, signInAsAdmin, withDb } from "../admin/support";
 import { blockAppScripts } from "../no-js";
 import { seedProduct, setProductStatus, waitForEditor } from "./support";
 
@@ -24,8 +24,8 @@ async function seedCategory(): Promise<{ id: string }> {
 }
 
 async function signIn(page: Page) {
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
 }
 
 test("an admin creates a category, adds a product from both sides and deletes it", async ({

@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-// The plain frame for the sign in, MFA, password and reset link pages: no admin shell, since
+// The plain frame for the sign in page: no admin shell, since
 // nothing inside it is granted yet. All admin text is Inter, like AdminShell.
 export function AuthFrame({ children }: { readonly children: React.ReactNode }) {
   return (

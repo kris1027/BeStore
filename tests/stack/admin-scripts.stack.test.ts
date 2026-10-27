@@ -5,13 +5,13 @@ import {
   createAdmin,
   disableAdmin,
   findAuthUserId,
-  resetAdminMfa,
   resetAdminPassword,
 } from "../../scripts/admin/lib";
 import { anonClient, serviceClient, stackEnv, stackPassword, uniqueEmail } from "./stack";
 
-// Spec 0004, AC-11 and spec 0019, AC-7 and AC-15: the admin:create, admin:disable,
-// admin:reset-password and admin:reset-mfa cores against the local stack. The CLIs around them only read flags and prompt for the password.
+// Spec 0004, AC-11 and spec 0019, AC-7 and AC-15: the admin:create, admin:disable and
+// admin:reset-password cores against the local stack. The CLIs around them only read flags and
+// prompt for the password.
 stackEnv();
 const deps = connect(undefined);
 
@@ -149,24 +149,5 @@ describe("resetAdminPassword", () => {
     const sessions = await deps.db.$queryRaw<{ count: number }[]>`
       SELECT count(*)::int AS count FROM auth.sessions WHERE user_id = ${id}::uuid`;
     expect(sessions[0]?.count).toBe(0);
-  });
-});
-
-describe("resetAdminMfa", () => {
-  it("removes every factor and every session", async () => {
-    const email = uniqueEmail();
-    const { id } = await createAdmin(deps, { email, name: "Linus", password: stackPassword });
-    const client = anonClient();
-    await client.auth.signInWithPassword({ email, password: stackPassword });
-    await client.auth.mfa.enroll({ factorType: "totp" });
-
-    const result = await resetAdminMfa(deps, email);
-
-    expect(result).toEqual({ id, factorsRemoved: 1 });
-    const sessions = await deps.db.$queryRaw<{ count: number }[]>`
-      SELECT count(*)::int AS count FROM auth.sessions WHERE user_id = ${id}::uuid`;
-    expect(sessions[0]?.count).toBe(0);
-    const { error } = await client.auth.getUser();
-    expect(error).not.toBeNull();
   });
 });

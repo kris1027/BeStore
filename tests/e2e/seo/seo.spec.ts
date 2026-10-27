@@ -4,7 +4,7 @@ import { expect, type Page, test } from "@playwright/test";
 
 import { brand } from "../../../src/lib/brand/brand";
 import { seedPaidOrder, signInAsCustomer } from "../account/support";
-import { createTestUser, signInFully, testPassword, withDb } from "../admin/support";
+import { createTestUser, signInAsAdmin, testPassword, withDb } from "../admin/support";
 import {
   type SeededProduct,
   seedProduct,
@@ -315,8 +315,8 @@ test.describe("listings", () => {
       ]);
       return row.rows[0]!.id;
     });
-    const admin = await createTestUser({ enrolled: true });
-    await signInFully(page, admin);
+    const admin = await createTestUser();
+    await signInAsAdmin(page, admin);
     await page.goto(`/admin/categories/${category}?q=${encodeURIComponent(last.name)}`);
     await page.getByRole("button", { name: `Add ${last.name}` }).click();
     await expect(
@@ -411,8 +411,8 @@ test.describe("site files", () => {
     expect(before).toContain(`<loc>${siteUrl}/terms</loc>`);
     expect(before).not.toMatch(/\/(search|admin|cart|checkout|account|auth)\b/);
 
-    const admin = await createTestUser({ enrolled: true });
-    await signInFully(page, admin);
+    const admin = await createTestUser();
+    await signInAsAdmin(page, admin);
     await page.goto(`/admin/products/${product.id}`);
     await waitForEditor(page, product.name);
     await page.getByRole("button", { name: "Publish" }).click();
@@ -451,8 +451,8 @@ test.describe("site files", () => {
     const sitemap = async () => (await request.get("/sitemap.xml")).text();
     expect(await sitemap()).not.toContain(loc);
 
-    const admin = await createTestUser({ enrolled: true });
-    await signInFully(page, admin);
+    const admin = await createTestUser();
+    await signInAsAdmin(page, admin);
     const visible = page.getByRole("checkbox", { name: "Visible" });
     const setVisible = async (checked: boolean) => {
       await page.goto(`/admin/categories/${id}`);
@@ -517,8 +517,8 @@ test.describe("a private page", () => {
   test("every admin page stays noindex", async ({ page }) => {
     // Ten pages in one test; on a cold dev server each compiles on its first visit.
     test.slow();
-    const admin = await createTestUser({ enrolled: true });
-    await signInFully(page, admin);
+    const admin = await createTestUser();
+    await signInAsAdmin(page, admin);
 
     for (const path of [
       "/admin",

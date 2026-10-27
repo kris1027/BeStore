@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { createTestUser, signInFully, testPassword } from "../admin/support";
+import { createTestUser, signInAsAdmin, testPassword } from "../admin/support";
 import { seedPaidOrder, signInAsCustomer } from "./support";
 
 // spec 0012: order history and one order (AC-10, AC-11, AC-12, AC-13).
@@ -61,8 +61,8 @@ test("the admin order pages show Account for a linked order and Guest for the re
   await signInAsCustomer(customerPage, customer.email, testPassword);
   await expect(customerPage).toHaveURL("/account");
 
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
   for (const [order, label] of [
     [linked, "Account"],
     [guest, "Guest"],

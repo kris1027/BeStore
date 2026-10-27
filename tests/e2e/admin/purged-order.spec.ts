@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { expectNoA11yViolations, tabTo } from "../a11y";
 import { seedProduct } from "../catalog/support";
 import { seedPendingOrder } from "../checkout/support";
-import { createTestUser, signInFully, withDb } from "./support";
+import { createTestUser, signInAsAdmin, withDb } from "./support";
 
 // spec 0008, AC-4 and AC-8: a real cron call purges an old expired order, and both admin pages
 // say its personal data was removed, by keyboard and with no axe violations.
@@ -50,8 +50,8 @@ test("an expired order past retention shows its personal data as removed", async
   });
   expect(purgedAt).not.toBeNull();
 
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
   await page.goto("/admin/orders?view=all");
   const row = page.getByRole("row", { name: new RegExp(`#${order.number}`) });
   // Email and Ship to both say so.

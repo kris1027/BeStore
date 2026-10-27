@@ -41,9 +41,19 @@ describe("decideProxy", () => {
     });
   });
 
-  it("leaves the public auth pages and /auth open", () => {
-    for (const pathname of ["/admin/sign-in", "/admin/forgot-password", "/auth/confirm"]) {
+  it("leaves the sign in page and paths outside /admin open", () => {
+    for (const pathname of ["/admin/sign-in", "/auth/confirm"]) {
       expect(decideProxy(input({ pathname, claims: null }))).toEqual({ kind: "continue" });
+    }
+  });
+
+  // spec 0019, AC-4: the removed pages are ordinary admin paths now.
+  it("sends a signed out visitor from a removed auth page to sign in", () => {
+    for (const pathname of ["/admin/mfa", "/admin/forgot-password", "/admin/reset-password"]) {
+      expect(decideProxy(input({ pathname, search: "", claims: null }))).toEqual({
+        kind: "redirect",
+        to: `/admin/sign-in?next=${encodeURIComponent(pathname)}`,
+      });
     }
   });
 
@@ -101,7 +111,7 @@ function gate(overrides: Partial<AdminGateInput> = {}): AdminGateInput {
     search: "?page=2",
     method: "GET",
     isServerAction: false,
-    claims: { sub: "admin-1", aal: "aal2", amr: fresh.amr },
+    claims: { sub: "admin-1", amr: fresh.amr },
     nowMs: at(60),
     ...overrides,
   };
@@ -116,8 +126,8 @@ describe("needsAdminGate", () => {
     expect(needsAdminGate(gate({ method: "HEAD" }))).toBe(true);
   });
 
-  it("skips sign in, forgot password and sign out", () => {
-    for (const pathname of ["/admin/sign-in", "/admin/forgot-password", "/admin/sign-out"]) {
+  it("skips sign in and sign out", () => {
+    for (const pathname of ["/admin/sign-in", "/admin/sign-out"]) {
       expect(needsAdminGate(gate({ pathname }))).toBe(false);
     }
   });
@@ -135,7 +145,7 @@ describe("needsAdminGate", () => {
 
 // covers: spec 0005 AC-19
 describe("decideAdminGate", () => {
-  it("lets an active aal2 admin through", () => {
+  it("lets an active admin with a password session through", () => {
     expect(decideAdminGate({ ...gate(), adminRow })).toEqual({ kind: "continue" });
   });
 
@@ -148,32 +158,27 @@ describe("decideAdminGate", () => {
     expect(decideAdminGate({ ...gate(), adminRow: disabled })).toEqual({ kind: "not-found" });
   });
 
-  it("answers a non admin with a 404 on the MFA page too", () => {
+  it("answers a non admin with a 404 on a removed auth page too (spec 0019, AC-4)", () => {
     expect(decideAdminGate({ ...gate({ pathname: "/admin/mfa" }), adminRow: null })).toEqual({
       kind: "not-found",
     });
   });
 
-  it("sends an aal1 admin to the MFA step, keeping the path and query as next", () => {
-    const aal1 = gate({ claims: { sub: "admin-1", aal: "aal1", amr: fresh.amr } });
-    expect(decideAdminGate({ ...aal1, adminRow })).toEqual({
+  // spec 0019, AC-2: a real redirect, not the 200 a page's own redirect() streams.
+  it("sends an admin whose session no password opened to sign in, keeping next", () => {
+    const recovery = gate({
+      claims: { sub: "admin-1", amr: [{ method: "recovery", timestamp: signedInAt }] },
+    });
+    expect(decideAdminGate({ ...recovery, adminRow })).toEqual({
       kind: "redirect",
-      to: "/admin/mfa?next=%2Fadmin%2Forders%3Fpage%3D2",
+      to: "/admin/sign-in?next=%2Fadmin%2Forders%3Fpage%3D2",
     });
   });
 
-  it("lets an aal1 admin open the MFA page itself", () => {
-    const aal1 = gate({ pathname: "/admin/mfa", claims: { sub: "admin-1", aal: "aal1" } });
-    expect(
-      decideAdminGate({ ...aal1, claims: { ...aal1.claims, amr: fresh.amr }, adminRow }),
-    ).toEqual({
-      kind: "continue",
-    });
-  });
-
-  it("never grants: a session without a subject goes on to the page's own guard", () => {
+  it("never grants: a session without a subject is sent to sign in", () => {
     expect(decideAdminGate({ ...gate({ claims: { amr: fresh.amr } }), adminRow: null })).toEqual({
-      kind: "continue",
+      kind: "redirect",
+      to: "/admin/sign-in?next=%2Fadmin%2Forders%3Fpage%3D2",
     });
   });
 });
