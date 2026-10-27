@@ -1,5 +1,5 @@
 import { readFlags, run } from "./cli";
-import { connect, disableAdmin } from "./lib";
+import { connect, disableAdmin, noAdminMessage } from "./lib";
 
 // pnpm admin:disable --email <e> [--env-file <path>]
 run(async () => {
@@ -9,6 +9,7 @@ run(async () => {
   const deps = connect(flags["env-file"]);
   try {
     const id = await disableAdmin(deps, flags.email);
+    if (id === null) throw new Error(noAdminMessage);
     console.log(`Disabled admin ${id}. Their next request gets a 404.`);
   } finally {
     await deps.close();

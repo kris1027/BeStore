@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { promptAdminPassword } from "./cli";
 
 // spec 0019, AC-7 and AC-16: the password prompt shared by admin:create and admin:reset-password.
-// The stack test runs the scripts end to end; this pins the messages and the order of prompts.
+// The stack test runs admin:reset-password end to end; this pins the messages and the order of
+// prompts.
 
 const STRONG = "Garden-gnome-4242";
 

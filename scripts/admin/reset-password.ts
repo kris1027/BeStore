@@ -1,5 +1,5 @@
 import { createPrompter, promptAdminPassword, readFlags, run } from "./cli";
-import { connect, findAdminId, setAdminPassword } from "./lib";
+import { connect, findAdminId, noAdminMessage, setAdminPassword } from "./lib";
 
 // pnpm admin:reset-password --email <e> [--env-file <path>]
 run(async () => {
@@ -12,6 +12,7 @@ run(async () => {
   try {
     // Refuse an unknown email before asking for a password.
     const id = await findAdminId(deps.db, flags.email);
+    if (id === null) throw new Error(noAdminMessage);
     const password = await promptAdminPassword(prompt);
     await setAdminPassword(deps, id, password);
     console.log(`Password changed for ${flags.email}.`);

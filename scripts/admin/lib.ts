@@ -91,34 +91,31 @@ export async function createAdmin(
   return { id, existingUser: existingId !== null };
 }
 
-export async function findAdminId(db: PrismaClient, email: string): Promise<string> {
+// Said by every script that takes an admin's email (spec 0019, AC-7).
+export const noAdminMessage = "No admin has that email.";
+
+// Null when no admin row has the email: an expected answer, which each script reports itself.
+export async function findAdminId(db: PrismaClient, email: string): Promise<string | null> {
   const admin = await db.adminUser.findUnique({ where: { email: normalizeEmail(email) } });
-  if (!admin) throw new Error("No admin has that email.");
-  return admin.id;
+  return admin?.id ?? null;
 }
 
-export async function disableAdmin({ db }: Pick<AdminDeps, "db">, email: string): Promise<string> {
+// Null when no admin has the email. Takes effect on their next request: requireAdmin() reads
+// this row every time.
+export async function disableAdmin(
+  { db }: Pick<AdminDeps, "db">,
+  email: string,
+): Promise<string | null> {
   const id = await findAdminId(db, email);
-  // Takes effect on their next request: requireAdmin() reads this row every time.
+  if (id === null) return null;
   await db.adminUser.update({ where: { id }, data: { disabledAt: new Date() } });
   return id;
 }
 
-// The only way to change an admin password without knowing it (spec 0019, AC-7). The same
-// lookup as disableAdmin, so the two scripts never disagree about who is an admin, enabled or
-// not; the admin API applies Supabase's own password policy and writes its auth audit log.
-export async function resetAdminPassword(
-  deps: AdminDeps,
-  email: string,
-  password: string,
-): Promise<string> {
-  const id = await findAdminId(deps.db, email);
-  await setAdminPassword(deps, id, password);
-  return id;
-}
-
-// For a caller that already holds the id from findAdminId (the CLI looks the admin up before
-// prompting, so an unknown email is refused without asking for a password).
+// The only way to change an admin password without knowing it (spec 0019, AC-7). The id comes
+// from findAdminId, the same lookup as disableAdmin, so the two scripts never disagree about who
+// is an admin, enabled or not; the admin API applies Supabase's own password policy and writes
+// its auth audit log.
 export async function setAdminPassword(
   { supabase }: Pick<AdminDeps, "supabase">,
   id: string,

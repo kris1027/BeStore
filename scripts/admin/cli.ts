@@ -64,6 +64,8 @@ export async function promptAdminPassword(prompt: Prompter): Promise<string> {
   return password;
 }
 
+// The scripts' edge: the lib answers an expected refusal as a value, and the script throws it
+// here to print it and exit 1, like any other failure.
 export function run(main: () => Promise<void>) {
   main().catch((error: unknown) => {
     console.error(error instanceof Error ? error.message : error);
