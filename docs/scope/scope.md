@@ -101,6 +101,7 @@ spec [0004](../specs/0004-admin-sign-in/index.md) · code in [src/features/admin
 - [x] Test it: `/test admin sign in`
 - [x] Review it (fresh model): `/check review admin sign in`
 - [x] Document it: `/document admin sign in`
+_Note: the TOTP step, the admin email reset and `admin:reset-mfa` were removed by feature 24 (spec [0019](../specs/0019-remove-admin-mfa/index.md)); admins sign in with a password only._
 
 ### 6. Core buy loop · done
 The narrow end to end path: an admin creates a product with variants, price, stock, and one image; the storefront shows a product list and a product page; a customer picks a variant, adds it to a cart, and reaches checkout as a guest.
@@ -345,7 +346,7 @@ spec [0019](../specs/0019-remove-admin-mfa/index.md) · supersedes parts of spec
 - [ ] Build it: `/develop remove admin 2FA`
   - [x] Terminal reset replaces the email reset: `admin:reset-password`, 14 character admin passwords, `admin:create` sets the password, hook skips store runners, `/auth/confirm` and admin reset pages gone (AC-4, AC-7 to AC-10, AC-15, AC-16)
   - [x] Password only guard: `password` amr rule, proxy redirect, MFA page, actions, lockout, `admin:reset-mfa` and `otpauth` gone (AC-1 to AC-6, AC-11, AC-12, AC-13)
-  - [ ] Config and records: TOTP off, runbook, spec 0004 and 0012 notes, README, Firewall item (AC-11, AC-14)
+  - [x] Config and records: TOTP off, runbook, spec 0004 and 0012 notes, README, Firewall item (AC-11, AC-14)
 - [ ] Verify it: `/check verify remove admin 2FA`
 - [ ] Test it: `/test remove admin 2FA`
 - [ ] Review it (fresh model): `/check review remove admin 2FA`
@@ -356,7 +357,8 @@ The last step: ship to Vercel and the production Supabase project, and turn on t
 **Done when:** the production app runs on Vercel against production Supabase, and each production only item below is applied and checked there.
 - [ ] Build it: `/develop production deploy`
   - [ ] Admin sign in, from the runbook [docs/runbooks/admin-accounts.md](../runbooks/admin-accounts.md): production Supabase auth settings, Resend SMTP, recovery template, redirect URLs, asymmetric JWT keys, the first real admin (spec 0004 AC-10, AC-11)
-  - [ ] Vercel Firewall rate limit on `POST` to `/admin/sign-in`, `/admin/mfa`, `/admin/forgot-password`: 10 per minute per IP, deny 10 minutes (spec 0004 AC-15)
+  - [ ] **Required before the first production admin exists**: Vercel Firewall rate limit on `POST` to `/admin/sign-in` and `/account/sign-in`: 10 per minute per IP, deny 10 minutes (spec 0019 AC-14, replacing spec 0004 AC-15)
+  - [ ] Admin TOTP off in production: delete any existing factors, then turn TOTP enroll and verify off; check the Send Email Hook is on (a reset request for an admin email sends nothing) (spec 0019 AC-8, AC-11)
   - [ ] Vercel Firewall rate limit on `POST /checkout` (promo code Apply and Pay), generous enough for real Pay clicks (spec 0014 Follow-up)
 - [ ] Verify it: `/check verify production deploy`
 

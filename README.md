@@ -6,7 +6,7 @@ BeStore is a single-brand online store in one Next.js application: a storefront 
 
 ## Current state
 
-The application foundation, database model, shared design system, and admin sign-in with required TOTP are implemented. The storefront currently shows a coming-soon page. Product browsing and the core buy loop, card payment, shipping, catalog and order management, customer accounts, and launch work remain planned. The [scope](docs/scope/scope.md) is the source of truth for feature status and the [specifications](docs/specs/) explain completed decisions.
+The application foundation, database model, shared design system, and admin sign-in (email and password) are implemented. The storefront currently shows a coming-soon page. Product browsing and the core buy loop, card payment, shipping, catalog and order management, customer accounts, and launch work remain planned. The [scope](docs/scope/scope.md) is the source of truth for feature status and the [specifications](docs/specs/) explain completed decisions.
 
 ### Interface previews
 

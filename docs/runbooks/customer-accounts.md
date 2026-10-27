@@ -1,6 +1,6 @@
 # Runbook: customer accounts in production
 
-Spec: [0012](../specs/0012-customer-accounts/index.md). Customers sign up with their email, confirm it from a link, then choose a password. Every auth email (confirm sign up, reset password, the admin reset) leaves through the app's Send Email Hook and Resend, never through Supabase's own mailer.
+Spec: [0012](../specs/0012-customer-accounts/index.md). Customers sign up with their email, confirm it from a link, then choose a password. Every auth email (confirm sign up, reset password) leaves through the app's Send Email Hook and Resend, never through Supabase's own mailer.
 
 These are recommendations for running things safely. Each step says why, so you can judge when to skip one. They are applied at deploy (scope feature 19); nothing here is needed before then.
 
@@ -37,7 +37,7 @@ Supabase sees every sign in, sign up and reset coming from Vercel's servers, so 
 
 ## Where to look when something goes wrong
 
-- **No auth email arrives** (sign up, reset, or an admin reset): the hook failed or never ran. The visitor still saw "Check your email", because Supabase runs after the reply. Look in Vercel logs for `auth_email.failed` (an error, with Resend's error name) and `auth_email.bad_signature` (the secret differs between Supabase and Vercel). Supabase's own Auth logs show `hook_failed` or `hook_timeout`. Resend or the app being down stops every sign up and reset, admins included, until it recovers.
+- **No auth email arrives** (sign up or reset): for an admin email that is expected, the hook skips it on purpose and logs `auth_email.skipped` (spec 0019, AC-8). Otherwise the hook failed or never ran. The visitor still saw "Check your email", because Supabase runs after the reply. Look in Vercel logs for `auth_email.failed` (an error, with Resend's error name) and `auth_email.bad_signature` (the secret differs between Supabase and Vercel). Supabase's own Auth logs show `hook_failed` or `hook_timeout`. Resend or the app being down stops every sign up and reset until it recovers.
 - **`account.email_conflict`** (an error): someone's account setup found another live account holding the same email. It should not happen; compare the two `customers` rows and their `auth.users` rows before changing anything.
 - **`account.delete_incomplete`** (an error): a customer's login was deleted but the database commit failed after it. The leftover `customers` row has no login and is removed when that email signs up again; it can also be deleted by hand.
 - Every account log line carries the customer id, order ids, counts and reason codes, never an email, name, phone, address, password, token, token hash or idempotency key.
