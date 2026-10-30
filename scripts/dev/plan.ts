@@ -16,6 +16,22 @@ export const authContainer = "supabase_auth_BeStore";
 // Exactly the events the webhook acts on, as the staging and production endpoints subscribe.
 export const webhookEvents: readonly string[] = [...handledEventTypes, ...refundEventTypes];
 
+// Under `docker compose up` (compose.yaml sets BESTORE_IN_DOCKER), the Supabase ports .env.local
+// names on 127.0.0.1 belong to the host, not this container. socat answers on the container's
+// own 127.0.0.1 and passes each through, so .env.local works unchanged in both places.
+export const supabaseHostPorts: readonly number[] = [55321, 55322, 55323, 55324];
+
+export function socatArgs(port: number): readonly string[] {
+  return [`TCP-LISTEN:${port},bind=127.0.0.1,fork,reuseaddr`, `TCP:host.docker.internal:${port}`];
+}
+
+// The browser reaches a container's Next.js only through the published port, so it must listen
+// on every interface there; on the host it stays on localhost.
+export function nextDevArgs(port: number, inDocker: boolean): readonly string[] {
+  const base = ["exec", "next", "dev", "--port", String(port)];
+  return inDocker ? [...base, "--hostname", "0.0.0.0"] : base;
+}
+
 export function siteUrl(port: number): string {
   return `http://localhost:${port}`;
 }

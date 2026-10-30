@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   appEnv,
   checkStripeKey,
+  nextDevArgs,
   parseWebhookSecret,
   sendEmailHookUri,
+  socatArgs,
   stackNeedsRestart,
   stripeListenArgs,
   stripeSecretArgs,
@@ -87,5 +89,27 @@ describe("appEnv", () => {
       EMAIL_TRANSPORT: "mailpit",
       MAILPIT_URL: "http://127.0.0.1:55324",
     });
+  });
+});
+
+describe("running inside the dev container", () => {
+  it("listens on every interface only in the container, so the published port reaches it", () => {
+    expect(nextDevArgs(3100, true)).toEqual([
+      "exec",
+      "next",
+      "dev",
+      "--port",
+      "3100",
+      "--hostname",
+      "0.0.0.0",
+    ]);
+    expect(nextDevArgs(3100, false)).not.toContain("--hostname");
+  });
+
+  it("passes the container's own 127.0.0.1 port through to the same port on the host", () => {
+    expect(socatArgs(55322)).toEqual([
+      "TCP-LISTEN:55322,bind=127.0.0.1,fork,reuseaddr",
+      "TCP:host.docker.internal:55322",
+    ]);
   });
 });

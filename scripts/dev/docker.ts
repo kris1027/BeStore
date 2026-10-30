@@ -7,19 +7,25 @@ import {
   authContainer,
   checkStripeKey,
   devPort,
+  nextDevArgs,
   parseWebhookSecret,
   sendEmailHookUri,
   siteUrl,
+  socatArgs,
   stackNeedsRestart,
   stripeListenArgs,
   stripeListenContainer,
   stripeSecretArgs,
+  supabaseHostPorts,
 } from "./plan";
 
-// `pnpm dev:docker`: the whole store locally, every feature wired. Supabase (database, auth,
-// storage, Mailpit) and the Stripe CLI run in Docker; Next.js runs on the host for fast reloads.
-// Local only: it refuses live Stripe keys and never reads a deployed environment.
+// The whole store locally, every feature wired. `docker compose up` (`pnpm dev:docker`) runs this
+// in the dev container; Supabase (database, auth, storage, Mailpit) and the Stripe CLI run as
+// sibling containers through the mounted Docker socket. Run directly with tsx it works on the host
+// too. Local only: it refuses live Stripe keys and never reads a deployed environment.
 config({ path: [".env.local", ".env"], quiet: true });
+
+const inDocker = process.env.BESTORE_IN_DOCKER === "1";
 
 const stripeKey = checkStripeKey(process.env.STRIPE_SECRET_KEY);
 if (!stripeKey.ok) fail(stripeKey.reason);
@@ -29,6 +35,10 @@ if (run("docker", ["info"], { quiet: true }).status !== 0) {
   fail("Docker is not running. Start Docker Desktop (or your container runtime) and try again.");
 }
 
+// Before the stack starts: the Supabase CLI itself dials 127.0.0.1 to check the database is up.
+const forwards = inDocker
+  ? supabaseHostPorts.map((port) => spawn("socat", socatArgs(port), { stdio: "ignore" }))
+  : [];
 startStack();
 step("Applying migrations");
 must(run("pnpm", ["exec", "prisma", "migrate", "deploy"]));
@@ -46,11 +56,11 @@ console.log(`
   Mailpit      http://127.0.0.1:55324   (every email, auth and order)
   Studio       http://127.0.0.1:55323
   Stripe logs  docker logs --follow ${stripeListenContainer}
-  Crons        pnpm cron:run
-  Stop         Ctrl+C (Supabase keeps running; pnpm db:stop stops it)
+  Crons        ${inDocker ? "docker compose exec dev pnpm cron:run" : "pnpm cron:run"}
+  Stop         Ctrl+C (Supabase keeps running; ${inDocker ? "docker compose run --rm dev pnpm db:stop" : "pnpm db:stop"} stops it)
 `);
 
-const app = spawn("pnpm", ["exec", "next", "dev", "--port", String(devPort)], {
+const app = spawn("pnpm", nextDevArgs(devPort, inDocker), {
   stdio: "inherit",
   env: { ...process.env, ...appEnv(devPort, webhookSecret) },
 });
@@ -59,6 +69,7 @@ process.on("SIGINT", stop);
 process.on("SIGTERM", stop);
 app.on("exit", (code) => {
   run("docker", ["rm", "--force", stripeListenContainer], { quiet: true });
+  for (const forward of forwards) forward.kill();
   process.exit(code ?? 0);
 });
 
