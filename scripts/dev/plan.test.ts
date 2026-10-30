@@ -106,8 +106,13 @@ describe("checkStripeKey", () => {
     expect(checkStripeKey("sk_test_123")).toEqual({ ok: true, key: "sk_test_123" });
   });
 
-  it("refuses a live key", () => {
-    expect(checkStripeKey("sk_live_123").ok).toBe(false);
+  it("refuses a live key, naming both test key kinds it takes", () => {
+    expect(checkStripeKey("sk_live_123")).toEqual({
+      ok: false,
+      reason: "STRIPE_SECRET_KEY must be a test mode key (sk_test_... or rk_test_...).",
+    });
+    expect(checkStripeKey("rk_live_123").ok).toBe(false);
+    expect(checkStripeKey("rk_test_123").ok).toBe(true);
   });
 
   it("refuses a missing key", () => {

@@ -198,7 +198,10 @@ export type KeyCheck =
 export function checkStripeKey(key: string | undefined): KeyCheck {
   if (!key) return { ok: false, reason: "STRIPE_SECRET_KEY is not set in .env.local." };
   if (!key.startsWith("sk_test_") && !key.startsWith("rk_test_")) {
-    return { ok: false, reason: "STRIPE_SECRET_KEY must be a test mode key (sk_test_...)." };
+    return {
+      ok: false,
+      reason: "STRIPE_SECRET_KEY must be a test mode key (sk_test_... or rk_test_...).",
+    };
   }
   return { ok: true, key };
 }
