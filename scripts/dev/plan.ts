@@ -55,12 +55,8 @@ export type StackUrls = z.infer<typeof statusSchema>;
 // `supabase status -o json` for the Docker stack; null when it isn't running or printed no JSON.
 export function parseStackStatus(output: string): StackUrls | null {
   const json = output.slice(output.indexOf("{"), output.lastIndexOf("}") + 1);
-  try {
-    const parsed = statusSchema.safeParse(JSON.parse(json));
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
-  }
+  const parsed = statusSchema.safeParse(parseJson(json));
+  return parsed.success ? parsed.data : null;
 }
 
 // What points the app, migrations and the admin scripts at the Docker stack instead of the one
@@ -115,6 +111,31 @@ export function stackNeedsRestart(containerEnv: readonly string[], port: number)
     .find((line) => line.startsWith("GOTRUE_HOOK_SEND_EMAIL_URI="))
     ?.slice("GOTRUE_HOOK_SEND_EMAIL_URI=".length);
   return current !== sendEmailHookUri(port);
+}
+
+const authInspectSchema = z.object({
+  State: z.object({ Running: z.boolean() }),
+  Config: z.object({ Env: z.array(z.string()) }),
+});
+
+export type StackAction = "start" | "restart" | "keep";
+
+// From `docker inspect <auth container>`, null when it doesn't exist. A container left stopped
+// (after Docker restarts, say) gets the same stop and start as a stale hook; a running one with the
+// right hook is kept as it is.
+export function stackAction(inspectOutput: string | null, port: number): StackAction {
+  if (inspectOutput === null) return "start";
+  const parsed = authInspectSchema.safeParse(parseJson(inspectOutput));
+  if (!parsed.success || !parsed.data.State.Running) return "restart";
+  return stackNeedsRestart(parsed.data.Config.Env, port) ? "restart" : "keep";
+}
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
 }
 
 // The key travels as STRIPE_API_KEY from the caller's env (`--env` with no value), never as an

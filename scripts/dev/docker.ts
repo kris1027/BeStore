@@ -19,8 +19,8 @@ import {
   sendEmailHookUri,
   siteUrl,
   socatArgs,
+  stackAction,
   stackEnv,
-  stackNeedsRestart,
   stripeListenArgs,
   stripeListenContainer,
   stripeSecretArgs,
@@ -106,14 +106,13 @@ app.on("exit", (code) => {
 
 function startStack() {
   const hookEnv = { ...process.env, SEND_EMAIL_HOOK_URI: sendEmailHookUri(devPort) };
-  const inspect = run("docker", ["inspect", authContainer, "--format", "{{json .Config.Env}}"], {
+  const inspect = run("docker", ["inspect", authContainer, "--format", "{{json .}}"], {
     capture: true,
   });
-  if (inspect.status === 0) {
-    const containerEnv: unknown = JSON.parse(inspect.stdout);
-    const lines = Array.isArray(containerEnv) ? containerEnv.map(String) : [];
-    if (!stackNeedsRestart(lines, devPort)) return;
-    step(`Restarting Supabase so auth emails reach port ${devPort} (your data is kept)`);
+  const action = stackAction(inspect.status === 0 ? inspect.stdout : null, devPort);
+  if (action === "keep") return;
+  if (action === "restart") {
+    step("Restarting Supabase, stopped or sending auth emails to another port (your data is kept)");
     must(run("pnpm", ["exec", "supabase", "stop", "--workdir", dockerWorkdir]));
   } else {
     step("Starting Supabase");

@@ -13,6 +13,7 @@ import {
   parseWebhookSecret,
   sendEmailHookUri,
   socatArgs,
+  stackAction,
   stackNeedsRestart,
   stripeListenArgs,
   stripeSecretArgs,
@@ -34,6 +35,34 @@ describe("stackNeedsRestart", () => {
 
   it("restarts a stack with no hook at all", () => {
     expect(stackNeedsRestart(["GOTRUE_SITE_URL=x"], 3100)).toBe(true);
+  });
+});
+
+describe("stackAction", () => {
+  const inspect = (running: boolean, port: number) =>
+    JSON.stringify({
+      State: { Running: running },
+      Config: { Env: [`GOTRUE_HOOK_SEND_EMAIL_URI=${sendEmailHookUri(port)}`] },
+    });
+
+  it("starts a stack that doesn't exist", () => {
+    expect(stackAction(null, 3100)).toBe("start");
+  });
+
+  it("keeps a running stack whose hook points at the port", () => {
+    expect(stackAction(inspect(true, 3100), 3100)).toBe("keep");
+  });
+
+  it("restarts a stack left stopped, even with the right hook", () => {
+    expect(stackAction(inspect(false, 3100), 3100)).toBe("restart");
+  });
+
+  it("restarts a running stack started for another port", () => {
+    expect(stackAction(inspect(true, 3000), 3100)).toBe("restart");
+  });
+
+  it("restarts when docker inspect printed something unreadable", () => {
+    expect(stackAction("not json", 3100)).toBe("restart");
   });
 });
 
