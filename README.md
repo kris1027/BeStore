@@ -47,7 +47,7 @@ Open [localhost:3000](http://localhost:3000). The local seed is demo data; it do
 
 One `dev` container ([compose.yaml](compose.yaml), built from [docker/dev.Dockerfile](docker/dev.Dockerfile)) installs the dependencies into Docker volumes, then runs [scripts/dev/docker.ts](scripts/dev/docker.ts): it starts the Supabase stack (database, auth, storage and Mailpit), applies migrations, runs the Stripe CLI in a container that forwards webhooks to the app, and starts Next.js on [localhost:3100](http://localhost:3100), a port that doesn't clash with other dev servers on 3000. It reads the matching webhook secret from the Stripe CLI itself, so `STRIPE_WEBHOOK_SECRET` can stay as it is, and it refuses a live key.
 
-- It has its own Supabase stack, `BeStore-docker`, separate from the one `pnpm db:start` runs: its own database (empty on the first run, then kept between runs), on ports 56321 to 56329 so both can run at once. Studio is at [127.0.0.1:56323](http://127.0.0.1:56323).
+- It has its own Supabase stack, `BeStore-docker`, separate from the one `pnpm db:start` runs: its own database (empty on the first run, then kept between runs), on the regular ports plus 1000 (56321 to 56329, inspector 9183) so both can run at once. Studio is at [127.0.0.1:56323](http://127.0.0.1:56323).
 - Every email (sign up, password reset, orders) lands in its Mailpit at [127.0.0.1:56324](http://127.0.0.1:56324).
 - A test card checkout reaches paid through the forwarded webhook; `docker logs --follow bestore-stripe-listen` shows each delivery.
 - `docker compose exec dev pnpm cron:run` calls every cron route once, the way Vercel Cron does; add a name (`reconcile-orders`) to call just one.

@@ -10,6 +10,7 @@ import {
   checkStripeKey,
   devPort,
   dockerSupabaseConfig,
+  dockerSupabasePorts,
   dockerWorkdir,
   envFile,
   nextDevArgs,
@@ -23,7 +24,6 @@ import {
   stripeListenArgs,
   stripeListenContainer,
   stripeSecretArgs,
-  supabaseHostPorts,
 } from "./plan";
 
 // The whole store locally, every feature wired. `docker compose up` (`pnpm dev:docker`) runs this
@@ -43,9 +43,15 @@ if (run("docker", ["info"], { quiet: true }).status !== 0) {
   fail("Docker is not running. Start Docker Desktop (or your container runtime) and try again.");
 }
 
+const dockerConfig = dockerSupabaseConfig(readFileSync(join("supabase", "config.toml"), "utf8"));
+mkdirSync(join(dockerWorkdir, "supabase"), { recursive: true });
+writeFileSync(join(dockerWorkdir, "supabase", "config.toml"), dockerConfig);
+
 // Before the stack starts: the Supabase CLI itself dials 127.0.0.1 to check the database is up.
 const forwards = inDocker
-  ? supabaseHostPorts.map((port) => spawn("socat", socatArgs(port), { stdio: "ignore" }))
+  ? dockerSupabasePorts(dockerConfig).map((port) =>
+      spawn("socat", socatArgs(port), { stdio: "ignore" }),
+    )
   : [];
 startStack();
 const status = run(
@@ -99,11 +105,6 @@ app.on("exit", (code) => {
 });
 
 function startStack() {
-  mkdirSync(join(dockerWorkdir, "supabase"), { recursive: true });
-  writeFileSync(
-    join(dockerWorkdir, "supabase", "config.toml"),
-    dockerSupabaseConfig(readFileSync(join("supabase", "config.toml"), "utf8")),
-  );
   const hookEnv = { ...process.env, SEND_EMAIL_HOOK_URI: sendEmailHookUri(devPort) };
   const inspect = run("docker", ["inspect", authContainer, "--format", "{{json .Config.Env}}"], {
     capture: true,

@@ -22,16 +22,23 @@ export const dockerWorkdir = ".dev-docker";
 export const authContainer = `supabase_auth_${dockerProjectId}`;
 const portOffset = 1000;
 
-// Every `port`/`shadow_port` line outside a comment moves up by portOffset (55321 → 56321).
+// Every port key outside a comment (`port`, `shadow_port`, `inspector_port`, ...) moves up by
+// portOffset (55321 → 56321), so no port is shared with the regular stack.
 export function dockerSupabaseConfig(source: string): string {
   const projectLine = /^project_id = ".*"$/m;
   if (!projectLine.test(source)) throw new Error("supabase/config.toml has no project_id line.");
   return source
     .replace(projectLine, `project_id = "${dockerProjectId}"`)
     .replace(
-      /^(\s*(?:port|shadow_port) = )(\d+)$/gm,
+      /^(\s*(?:\w+_)?port = )(\d+)$/gm,
       (_line, key: string, port: string) => `${key}${Number(port) + portOffset}`,
     );
+}
+
+// The ports the stack's services publish on the host (each section's plain `port`), read from the
+// written config so they follow supabase/config.toml and portOffset.
+export function dockerSupabasePorts(config: string): readonly number[] {
+  return [...config.matchAll(/^\s*port = (\d+)$/gm)].map((match) => Number(match[1]));
 }
 
 const statusSchema = z.object({
@@ -80,7 +87,6 @@ export const webhookEvents: readonly string[] = [...handledEventTypes, ...refund
 // Under `docker compose up` (compose.yaml sets BESTORE_IN_DOCKER), the stack's ports on 127.0.0.1
 // belong to the host, not this container. socat answers on the container's own 127.0.0.1 and
 // passes each through, so the same URLs work in the container and in your browser.
-export const supabaseHostPorts: readonly number[] = [56321, 56322, 56323, 56324];
 
 export function socatArgs(port: number): readonly string[] {
   return [`TCP-LISTEN:${port},bind=127.0.0.1,fork,reuseaddr`, `TCP:host.docker.internal:${port}`];

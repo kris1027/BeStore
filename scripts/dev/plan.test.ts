@@ -6,6 +6,7 @@ import {
   appEnv,
   checkStripeKey,
   dockerSupabaseConfig,
+  dockerSupabasePorts,
   envFile,
   nextDevArgs,
   parseStackStatus,
@@ -120,19 +121,28 @@ describe("dockerSupabaseConfig", () => {
     expect(config).not.toMatch(/^project_id = "BeStore"$/m);
   });
 
-  it("moves every port off the 553xx range the regular stack uses", () => {
-    const ports = [...config.matchAll(/^\s*(?:port|shadow_port) = (\d+)$/gm)].map((m) => m[1]);
+  it("moves every port off the ones the regular stack uses", () => {
+    const portKeys = /^\s*(\w+_)?port = (\d+)$/gm;
+    const before = [...source.matchAll(portKeys)].map((m) => Number(m[2]));
+    const after = [...config.matchAll(portKeys)].map((m) => Number(m[2]));
 
-    expect(ports.length).toBeGreaterThan(5);
-    expect(ports.every((port) => port?.startsWith("563"))).toBe(true);
-    expect(ports).toEqual(expect.arrayContaining(["56321", "56322", "56323", "56324"]));
+    expect(after.length).toBeGreaterThan(5);
+    expect(after).toEqual(before.map((port) => port + 1000));
+    expect(config).toMatch(/^inspector_port = 9183$/m);
   });
 
   it("changes nothing else", () => {
     const strip = (text: string) =>
-      text.replace(/^project_id = .*$/m, "").replace(/^(\s*(?:port|shadow_port) = )\d+$/gm, "$1");
+      text.replace(/^project_id = .*$/m, "").replace(/^(\s*(?:\w+_)?port = )\d+$/gm, "$1");
 
     expect(strip(config)).toBe(strip(source));
+  });
+
+  it("lists the ports the stack publishes, for the dev container to forward", () => {
+    expect(dockerSupabasePorts(config)).toEqual(
+      expect.arrayContaining([56321, 56322, 56323, 56324, 56327]),
+    );
+    expect(dockerSupabasePorts(config)).not.toContain(56320); // the shadow database is never published
   });
 
   it("refuses a config without a project id", () => {
