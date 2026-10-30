@@ -1,13 +1,7 @@
 // Pure: what one Stripe Checkout event means for a pending order (spec 0006, Event handling).
 
 import { sessionState } from "@/lib/orders/session-state";
-
-export const handledEventTypes = [
-  "checkout.session.completed",
-  "checkout.session.async_payment_succeeded",
-  "checkout.session.async_payment_failed",
-  "checkout.session.expired",
-] as const;
+import { handledEventTypes, refundEventTypes } from "@/lib/orders/webhook-events";
 
 export type HandledEventType = (typeof handledEventTypes)[number];
 
@@ -44,8 +38,6 @@ export function decideEvent(type: HandledEventType, paymentStatus: string): Even
 }
 
 // ─── Refund events (spec 0010, AC-16) ────────────────────────────────────────
-
-export const refundEventTypes = ["refund.created", "refund.updated", "refund.failed"] as const;
 
 export type RefundEventType = (typeof refundEventTypes)[number];
 

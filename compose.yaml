@@ -1,0 +1,44 @@
+# `docker compose up`: the whole store locally with only Docker on the host (see README,
+# "Everything in Docker"). One container runs scripts/dev/docker.ts, which starts the Supabase
+# stack and the Stripe CLI as sibling containers and then Next.js on localhost:3100.
+name: bestore
+
+services:
+  dev:
+    build:
+      context: docker
+      dockerfile: dev.Dockerfile
+    # The repo is mounted at its host path: the Supabase CLI hands that path to Docker for its own
+    # bind mounts, and the Docker daemon resolves paths on the host, not in this container.
+    working_dir: ${PWD:?run docker compose from the repository root}
+    volumes:
+      - .:${PWD}
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Linux builds of everything installed or generated, kept out of the macOS checkout.
+      - node_modules:${PWD}/node_modules
+      - next:${PWD}/.next
+      - prisma_client:${PWD}/src/generated
+      - pnpm_store:/pnpm-store
+    environment:
+      BESTORE_IN_DOCKER: "1"
+      # Inside the container, never rewrite the host's .git/hooks.
+      SKIP_SIMPLE_GIT_HOOKS: "1"
+      pnpm_config_store_dir: /pnpm-store
+      NEXT_TELEMETRY_DISABLED: "1"
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - "3100:3100"
+    # Every command, `docker compose run` ones too (dev:docker:stop), installs first: the volume
+    # starts empty. `exec` hands the process over, so `docker compose stop` (SIGTERM) reaches the
+    # script, which then stops Next.js and removes the Stripe container.
+    entrypoint: ["sh", "-c", 'pnpm install --frozen-lockfile && exec "$$@"', "--"]
+    command: ["node_modules/.bin/tsx", "scripts/dev/docker.ts"]
+    init: true
+    stop_grace_period: 30s
+
+volumes:
+  node_modules:
+  next:
+  prisma_client:
+  pnpm_store:

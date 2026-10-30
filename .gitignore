@@ -52,3 +52,6 @@ next-env.d.ts
 # tailwind-4-docs snapshot: the Tailwind docs license says keep it local
 /.agents/skills/tailwind-4-docs/references/docs/
 /.agents/skills/tailwind-4-docs/references/docs-index.tsx
+
+# pnpm dev:docker: its own Supabase workdir, written from supabase/config.toml on every start
+/.dev-docker/
