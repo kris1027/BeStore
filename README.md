@@ -47,14 +47,15 @@ Open [localhost:3000](http://localhost:3000). The local seed is demo data; it do
 
 One `dev` container ([compose.yaml](compose.yaml), built from [docker/dev.Dockerfile](docker/dev.Dockerfile)) installs the dependencies into Docker volumes, then runs [scripts/dev/docker.ts](scripts/dev/docker.ts): it starts the Supabase stack (database, auth, storage and Mailpit), applies migrations, runs the Stripe CLI in a container that forwards webhooks to the app, and starts Next.js on [localhost:3100](http://localhost:3100), a port that doesn't clash with other dev servers on 3000. It reads the matching webhook secret from the Stripe CLI itself, so `STRIPE_WEBHOOK_SECRET` can stay as it is, and it refuses a live key.
 
-- Every email (sign up, password reset, orders) lands in Mailpit at [127.0.0.1:55324](http://127.0.0.1:55324).
+- It has its own Supabase stack, `BeStore-docker`, separate from the one `pnpm db:start` runs: its own database (empty on the first run, then kept between runs), on ports 56321 to 56329 so both can run at once. Studio is at [127.0.0.1:56323](http://127.0.0.1:56323).
+- Every email (sign up, password reset, orders) lands in its Mailpit at [127.0.0.1:56324](http://127.0.0.1:56324).
 - A test card checkout reaches paid through the forwarded webhook; `docker logs --follow bestore-stripe-listen` shows each delivery.
 - `docker compose exec dev pnpm cron:run` calls every cron route once, the way Vercel Cron does; add a name (`reconcile-orders`) to call just one.
-- Any other command runs the same way, for example `docker compose exec dev pnpm admin:create --email you@example.com --name You`.
+- The admin scripts take the stack's URLs from a file the script writes: `docker compose exec dev pnpm admin:create --env-file .dev-docker/stack.env --email you@example.com --name You`.
 
-Ctrl+C (or `docker compose stop`) stops Next.js and the Stripe container. Supabase keeps running with your data; `docker compose run --rm dev pnpm db:stop` stops it. `node_modules`, `.next` and the generated Prisma client live in Docker volumes, so the container never writes macOS builds into your checkout, and `docker compose down --volumes` removes them.
+Ctrl+C (or `docker compose stop`) stops Next.js and the Stripe container. Supabase keeps running with your data; `pnpm dev:docker:stop` stops it, and `pnpm dev:docker:reset` stops it and deletes its data, so the next run starts empty again. Each start writes the stack's config to `.dev-docker/` (ignored by git) from `supabase/config.toml`, changing only the project id and ports; after editing `supabase/config.toml`, run `pnpm dev:docker:stop` so the next start picks it up. `node_modules`, `.next` and the generated Prisma client live in Docker volumes, so the container never writes macOS builds into your checkout, and `docker compose down --volumes` removes them.
 
-The dev container drives your Docker through its socket, so the Supabase and Stripe containers run next to it, and the repository is mounted at the same path as on your machine (run `docker compose` from the repository root). The auth server keeps the Send Email Hook port it started with, so the script restarts the stack when it was started for another port. Going back to `pnpm dev` on 3000 afterwards, run `pnpm db:stop && pnpm db:start` once so auth emails reach 3000 again.
+The dev container drives your Docker through its socket, so the Supabase and Stripe containers run next to it, and the repository is mounted at the same path as on your machine (run `docker compose` from the repository root). The auth server keeps the Send Email Hook port it started with, so the script restarts its stack when it was started for another port.
 
 ## Checks
 

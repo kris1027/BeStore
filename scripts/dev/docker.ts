@@ -1,4 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { config } from "dotenv";
 
@@ -7,11 +9,16 @@ import {
   authContainer,
   checkStripeKey,
   devPort,
+  dockerSupabaseConfig,
+  dockerWorkdir,
+  envFile,
   nextDevArgs,
+  parseStackStatus,
   parseWebhookSecret,
   sendEmailHookUri,
   siteUrl,
   socatArgs,
+  stackEnv,
   stackNeedsRestart,
   stripeListenArgs,
   stripeListenContainer,
@@ -22,7 +29,8 @@ import {
 // The whole store locally, every feature wired. `docker compose up` (`pnpm dev:docker`) runs this
 // in the dev container; Supabase (database, auth, storage, Mailpit) and the Stripe CLI run as
 // sibling containers through the mounted Docker socket. Run directly with tsx it works on the host
-// too. Local only: it refuses live Stripe keys and never reads a deployed environment.
+// too. It uses its own empty Supabase stack (see dockerProjectId), never the `pnpm db:start` one.
+// Local only: it refuses live Stripe keys and never reads a deployed environment.
 config({ path: [".env.local", ".env"], quiet: true });
 
 const inDocker = process.env.BESTORE_IN_DOCKER === "1";
@@ -40,8 +48,24 @@ const forwards = inDocker
   ? supabaseHostPorts.map((port) => spawn("socat", socatArgs(port), { stdio: "ignore" }))
   : [];
 startStack();
+const status = run(
+  "pnpm",
+  ["exec", "supabase", "status", "-o", "json", "--workdir", dockerWorkdir],
+  {
+    capture: true,
+  },
+);
+const stack = parseStackStatus(status.stdout);
+if (!stack) fail(`Could not read the Supabase stack's URLs:\n${status.stderr}`);
+// For the scripts you run beside it, e.g. `pnpm admin:create --env-file .dev-docker/stack.env`.
+writeFileSync(join(dockerWorkdir, "stack.env"), envFile(stackEnv(stack)));
+
 step("Applying migrations");
-must(run("pnpm", ["exec", "prisma", "migrate", "deploy"]));
+must(
+  run("pnpm", ["exec", "prisma", "migrate", "deploy"], {
+    env: { ...process.env, ...stackEnv(stack) },
+  }),
+);
 
 step("Starting Stripe webhook forwarding");
 run("docker", ["rm", "--force", stripeListenContainer], { quiet: true });
@@ -53,16 +77,17 @@ must(run("docker", stripeListenArgs(devPort), { quiet: true, env: childEnv }));
 
 console.log(`
   Store        ${siteUrl(devPort)}
-  Mailpit      http://127.0.0.1:55324   (every email, auth and order)
-  Studio       http://127.0.0.1:55323
+  Mailpit      ${stack.MAILPIT_URL}   (every email, auth and order)
+  Studio       ${stack.STUDIO_URL}
+  Admin        ${inDocker ? "docker compose exec dev " : ""}pnpm admin:create --env-file ${dockerWorkdir}/stack.env --email <you> --name <name>
   Stripe logs  docker logs --follow ${stripeListenContainer}
   Crons        ${inDocker ? "docker compose exec dev pnpm cron:run" : "pnpm cron:run"}
-  Stop         Ctrl+C (Supabase keeps running; ${inDocker ? "docker compose run --rm dev pnpm db:stop" : "pnpm db:stop"} stops it)
+  Stop         Ctrl+C (Supabase keeps running; pnpm dev:docker:stop stops it, pnpm dev:docker:reset empties it)
 `);
 
 const app = spawn("pnpm", nextDevArgs(devPort, inDocker), {
   stdio: "inherit",
-  env: { ...process.env, ...appEnv(devPort, webhookSecret) },
+  env: { ...process.env, ...appEnv(devPort, webhookSecret, stack) },
 });
 const stop = () => app.kill("SIGINT");
 process.on("SIGINT", stop);
@@ -74,6 +99,11 @@ app.on("exit", (code) => {
 });
 
 function startStack() {
+  mkdirSync(join(dockerWorkdir, "supabase"), { recursive: true });
+  writeFileSync(
+    join(dockerWorkdir, "supabase", "config.toml"),
+    dockerSupabaseConfig(readFileSync(join("supabase", "config.toml"), "utf8")),
+  );
   const hookEnv = { ...process.env, SEND_EMAIL_HOOK_URI: sendEmailHookUri(devPort) };
   const inspect = run("docker", ["inspect", authContainer, "--format", "{{json .Config.Env}}"], {
     capture: true,
@@ -83,11 +113,11 @@ function startStack() {
     const lines = Array.isArray(containerEnv) ? containerEnv.map(String) : [];
     if (!stackNeedsRestart(lines, devPort)) return;
     step(`Restarting Supabase so auth emails reach port ${devPort} (your data is kept)`);
-    must(run("pnpm", ["exec", "supabase", "stop"]));
+    must(run("pnpm", ["exec", "supabase", "stop", "--workdir", dockerWorkdir]));
   } else {
     step("Starting Supabase");
   }
-  must(run("pnpm", ["exec", "supabase", "start"], { env: hookEnv }));
+  must(run("pnpm", ["exec", "supabase", "start", "--workdir", dockerWorkdir], { env: hookEnv }));
 }
 
 type RunOptions = {

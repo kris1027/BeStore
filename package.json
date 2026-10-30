@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "dev:docker": "docker compose up --build",
+    "dev:docker:stop": "docker compose run --rm dev pnpm exec supabase stop --workdir .dev-docker",
+    "dev:docker:reset": "docker compose run --rm dev pnpm exec supabase stop --no-backup --workdir .dev-docker",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

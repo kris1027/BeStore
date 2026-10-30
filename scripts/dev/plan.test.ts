@@ -1,9 +1,14 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
   appEnv,
   checkStripeKey,
+  dockerSupabaseConfig,
+  envFile,
   nextDevArgs,
+  parseStackStatus,
   parseWebhookSecret,
   sendEmailHookUri,
   socatArgs,
@@ -80,15 +85,76 @@ describe("checkStripeKey", () => {
   });
 });
 
+const stack = {
+  API_URL: "http://127.0.0.1:56321",
+  DB_URL: "postgresql://postgres:postgres@127.0.0.1:56322/postgres",
+  ANON_KEY: "anon",
+  SERVICE_ROLE_KEY: "service",
+  MAILPIT_URL: "http://127.0.0.1:56324",
+  STUDIO_URL: "http://127.0.0.1:56323",
+};
+
 describe("appEnv", () => {
-  it("points every self link and the hook at the dev port, and email at Mailpit", () => {
-    expect(appEnv(3100, "whsec_x")).toEqual({
+  it("points the app at the Docker stack, every self link and the hook at the dev port, and email at its Mailpit", () => {
+    expect(appEnv(3100, "whsec_x", stack)).toEqual({
+      NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:56321",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon",
+      SUPABASE_SERVICE_ROLE_KEY: "service",
+      DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:56322/postgres",
+      DIRECT_URL: "postgresql://postgres:postgres@127.0.0.1:56322/postgres",
+      MAILPIT_URL: "http://127.0.0.1:56324",
       NEXT_PUBLIC_SITE_URL: "http://localhost:3100",
       STRIPE_WEBHOOK_SECRET: "whsec_x",
       SEND_EMAIL_HOOK_URI: "http://host.docker.internal:3100/api/auth/send-email",
       EMAIL_TRANSPORT: "mailpit",
-      MAILPIT_URL: "http://127.0.0.1:55324",
     });
+  });
+});
+
+describe("dockerSupabaseConfig", () => {
+  const source = readFileSync(new URL("../../supabase/config.toml", import.meta.url), "utf8");
+  const config = dockerSupabaseConfig(source);
+
+  it("gives the Docker stack its own project id, so it gets its own containers and data", () => {
+    expect(config).toMatch(/^project_id = "BeStore-docker"$/m);
+    expect(config).not.toMatch(/^project_id = "BeStore"$/m);
+  });
+
+  it("moves every port off the 553xx range the regular stack uses", () => {
+    const ports = [...config.matchAll(/^\s*(?:port|shadow_port) = (\d+)$/gm)].map((m) => m[1]);
+
+    expect(ports.length).toBeGreaterThan(5);
+    expect(ports.every((port) => port?.startsWith("563"))).toBe(true);
+    expect(ports).toEqual(expect.arrayContaining(["56321", "56322", "56323", "56324"]));
+  });
+
+  it("changes nothing else", () => {
+    const strip = (text: string) =>
+      text.replace(/^project_id = .*$/m, "").replace(/^(\s*(?:port|shadow_port) = )\d+$/gm, "$1");
+
+    expect(strip(config)).toBe(strip(source));
+  });
+
+  it("refuses a config without a project id", () => {
+    expect(() => dockerSupabaseConfig("[api]\nport = 1")).toThrow();
+  });
+});
+
+describe("parseStackStatus", () => {
+  it("reads the URLs from the CLI's JSON, ignoring notices around it", () => {
+    const output = `Update available\n${JSON.stringify({ ...stack, JWT_SECRET: "x" })}\n`;
+
+    expect(parseStackStatus(output)).toEqual(stack);
+  });
+
+  it("answers null when the stack isn't running", () => {
+    expect(parseStackStatus("failed to inspect container health")).toBeNull();
+  });
+});
+
+describe("envFile", () => {
+  it("writes one KEY=value line per entry", () => {
+    expect(envFile({ A: "1", B: "two" })).toBe("A=1\nB=two\n");
   });
 });
 

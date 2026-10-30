@@ -1,8 +1,10 @@
+import { z } from "zod";
+
 import { handledEventTypes, refundEventTypes } from "@/features/orders/event-decision";
 
 // Pure planning for `pnpm dev:docker`: every value the run derives, so the I/O in docker.ts
-// only executes it. The app runs on the host; Supabase (with Mailpit) and the Stripe CLI run in
-// Docker, and both reach the app through host.docker.internal.
+// only executes it. Supabase (with Mailpit) and the Stripe CLI run in Docker, and both reach the
+// app through host.docker.internal.
 
 export const devPort = 3100;
 
@@ -10,16 +12,76 @@ export const devPort = 3100;
 export const stripeCliImage = "stripe/stripe-cli:v1.52.0";
 export const stripeListenContainer = "bestore-stripe-listen";
 
-// The Supabase CLI names the auth container after `project_id` in supabase/config.toml.
-export const authContainer = "supabase_auth_BeStore";
+// Its own Supabase stack, never the one `pnpm db:start` runs: the CLI keys containers and data
+// volumes by `project_id`, so a second id gives a second database that starts empty, keeps its
+// data between runs, and can run beside the first on its own ports. The CLI reads
+// `<workdir>/supabase/config.toml`, written fresh from supabase/config.toml on every start, so
+// the two stacks never drift apart in anything but the id and ports.
+export const dockerProjectId = "BeStore-docker";
+export const dockerWorkdir = ".dev-docker";
+export const authContainer = `supabase_auth_${dockerProjectId}`;
+const portOffset = 1000;
+
+// Every `port`/`shadow_port` line outside a comment moves up by portOffset (55321 → 56321).
+export function dockerSupabaseConfig(source: string): string {
+  const projectLine = /^project_id = ".*"$/m;
+  if (!projectLine.test(source)) throw new Error("supabase/config.toml has no project_id line.");
+  return source
+    .replace(projectLine, `project_id = "${dockerProjectId}"`)
+    .replace(
+      /^(\s*(?:port|shadow_port) = )(\d+)$/gm,
+      (_line, key: string, port: string) => `${key}${Number(port) + portOffset}`,
+    );
+}
+
+const statusSchema = z.object({
+  API_URL: z.url(),
+  DB_URL: z.string().startsWith("postgresql://"),
+  ANON_KEY: z.string().min(1),
+  SERVICE_ROLE_KEY: z.string().min(1),
+  MAILPIT_URL: z.url(),
+  STUDIO_URL: z.url(),
+});
+
+export type StackUrls = z.infer<typeof statusSchema>;
+
+// `supabase status -o json` for the Docker stack; null when it isn't running or printed no JSON.
+export function parseStackStatus(output: string): StackUrls | null {
+  const json = output.slice(output.indexOf("{"), output.lastIndexOf("}") + 1);
+  try {
+    const parsed = statusSchema.safeParse(JSON.parse(json));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+// What points the app, migrations and the admin scripts at the Docker stack instead of the one
+// .env.local names. Locally there is no pooler, so both database URLs are the direct one.
+export function stackEnv(stack: StackUrls): Readonly<Record<string, string>> {
+  return {
+    NEXT_PUBLIC_SUPABASE_URL: stack.API_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: stack.ANON_KEY,
+    SUPABASE_SERVICE_ROLE_KEY: stack.SERVICE_ROLE_KEY,
+    DATABASE_URL: stack.DB_URL,
+    DIRECT_URL: stack.DB_URL,
+    MAILPIT_URL: stack.MAILPIT_URL,
+  };
+}
+
+export function envFile(values: Readonly<Record<string, string>>): string {
+  return `${Object.entries(values)
+    .map(([key, value]) => `${key}=${value}`)
+    .join("\n")}\n`;
+}
 
 // Exactly the events the webhook acts on, as the staging and production endpoints subscribe.
 export const webhookEvents: readonly string[] = [...handledEventTypes, ...refundEventTypes];
 
-// Under `docker compose up` (compose.yaml sets BESTORE_IN_DOCKER), the Supabase ports .env.local
-// names on 127.0.0.1 belong to the host, not this container. socat answers on the container's
-// own 127.0.0.1 and passes each through, so .env.local works unchanged in both places.
-export const supabaseHostPorts: readonly number[] = [55321, 55322, 55323, 55324];
+// Under `docker compose up` (compose.yaml sets BESTORE_IN_DOCKER), the stack's ports on 127.0.0.1
+// belong to the host, not this container. socat answers on the container's own 127.0.0.1 and
+// passes each through, so the same URLs work in the container and in your browser.
+export const supabaseHostPorts: readonly number[] = [56321, 56322, 56323, 56324];
 
 export function socatArgs(port: number): readonly string[] {
   return [`TCP-LISTEN:${port},bind=127.0.0.1,fork,reuseaddr`, `TCP:host.docker.internal:${port}`];
@@ -83,13 +145,17 @@ export function parseWebhookSecret(output: string): string | null {
 }
 
 // Next.js never overrides a variable already in process.env with .env.local, so these win.
-export function appEnv(port: number, webhookSecret: string): Readonly<Record<string, string>> {
+export function appEnv(
+  port: number,
+  webhookSecret: string,
+  stack: StackUrls,
+): Readonly<Record<string, string>> {
   return {
+    ...stackEnv(stack),
     NEXT_PUBLIC_SITE_URL: siteUrl(port),
     STRIPE_WEBHOOK_SECRET: webhookSecret,
     SEND_EMAIL_HOOK_URI: sendEmailHookUri(port),
     EMAIL_TRANSPORT: "mailpit",
-    MAILPIT_URL: "http://127.0.0.1:55324",
   };
 }
 
