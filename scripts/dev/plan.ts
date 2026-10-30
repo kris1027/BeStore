@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { handledEventTypes, refundEventTypes } from "@/features/orders/event-decision";
+import { handledEventTypes, refundEventTypes } from "@/lib/orders/webhook-events";
 
 // Pure planning for `pnpm dev:docker`: every value the run derives, so the I/O in docker.ts
 // only executes it. Supabase (with Mailpit) and the Stripe CLI run in Docker, and both reach the
@@ -75,7 +75,6 @@ export function envFile(values: Readonly<Record<string, string>>): string {
     .join("\n")}\n`;
 }
 
-// Exactly the events the webhook acts on, as the staging and production endpoints subscribe.
 export const webhookEvents: readonly string[] = [...handledEventTypes, ...refundEventTypes];
 
 // Under `docker compose up` (compose.yaml sets BESTORE_IN_DOCKER), the stack's ports on 127.0.0.1

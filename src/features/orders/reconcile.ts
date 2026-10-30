@@ -8,9 +8,10 @@ import { sweepEmails } from "@/lib/email/sweep";
 import { logOrderExpired } from "@/lib/orders/log";
 import { sessionState } from "@/lib/orders/session-state";
 import { markExpired } from "@/lib/orders/transitions";
+import { handledEventTypes } from "@/lib/orders/webhook-events";
 import { stripe } from "@/lib/stripe";
 
-import { type HandledEventType, handledEventTypes } from "./event-decision";
+import type { HandledEventType } from "./event-decision";
 import {
   logReconcile,
   logReconcileOrderFailed,
