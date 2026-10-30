@@ -29,9 +29,11 @@ services:
       - host.docker.internal:host-gateway
     ports:
       - "3100:3100"
-    # `exec` hands the process over, so `docker compose stop` (SIGTERM) reaches the script, which
-    # then stops Next.js and removes the Stripe container.
-    command: sh -c "pnpm install --frozen-lockfile && exec node_modules/.bin/tsx scripts/dev/docker.ts"
+    # Every command, `docker compose run` ones too (dev:docker:stop), installs first: the volume
+    # starts empty. `exec` hands the process over, so `docker compose stop` (SIGTERM) reaches the
+    # script, which then stops Next.js and removes the Stripe container.
+    entrypoint: ["sh", "-c", 'pnpm install --frozen-lockfile && exec "$$@"', "--"]
+    command: ["node_modules/.bin/tsx", "scripts/dev/docker.ts"]
     init: true
     stop_grace_period: 30s
 
