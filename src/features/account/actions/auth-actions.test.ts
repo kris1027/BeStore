@@ -225,13 +225,32 @@ describe("confirmEmail (AC-2)", () => {
     expect(mocks.updateUser).not.toHaveBeenCalled();
   });
 
-  it("sends anyone who runs the store to the authenticator step instead", async () => {
+  // spec 0019, AC-9: an old or hand made recovery link for an admin changes no password.
+  it("refuses a recovery for anyone who runs the store and ends the session it opened", async () => {
     mocks.verifyOtp.mockResolvedValue({ data: { user: confirmedUser }, error: null });
     mocks.runsTheStore.mockResolvedValue(true);
 
     const result = await outcome(() => confirmEmail(form({ token_hash: "abc", type: "recovery" })));
 
-    expect(result).toBe("redirect:/admin/mfa?next=%2Fadmin%2Freset-password");
+    expect(result).toBe("redirect:/account/confirm?failed=1&type=recovery");
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+  });
+
+  // covers: AC-9. A failed sign out must not turn the refusal into a way through to set password.
+  it("still refuses a store runner's recovery when ending the session fails, and logs a code", async () => {
+    mocks.verifyOtp.mockResolvedValue({ data: { user: confirmedUser }, error: null });
+    mocks.runsTheStore.mockResolvedValue(true);
+    mocks.signOut.mockResolvedValue({ error: { status: 500, message: "boom" } });
+
+    const result = await outcome(() => confirmEmail(form({ token_hash: "abc", type: "recovery" })));
+
+    expect(result).toBe("redirect:/account/confirm?failed=1&type=recovery");
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+    expect(mocks.error).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: confirmedUser.id }),
+      "account.confirm.sign_out_failed",
+    );
   });
 
   it("shows the expired message for a used token and never verifies another type", async () => {

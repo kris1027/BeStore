@@ -15,6 +15,7 @@ import {
   hookErrorBody,
   hookPayloadSchema,
   hookSecretKey,
+  isStoreRunnerReset,
   usedActionType,
 } from "@/lib/email/auth-hook";
 import { classifySendFailure } from "@/lib/email/classify";
@@ -72,8 +73,17 @@ export async function handleSendEmailHook(request: Request): Promise<Response> {
 
   let kind: AuthEmailKind | null = null;
   try {
-    kind = authEmailKind(type, type === "recovery" ? await runsTheStore(user.id) : false);
-    const link = authEmailLink(env.NEXT_PUBLIC_SITE_URL, kind, emailData.token_hash);
+    if (isStoreRunnerReset(type, type === "recovery" ? await runsTheStore(user.id) : false)) {
+      // A 200 makes Supabase report success, so the customer forgot page answers the same way,
+      // at the same speed, and never reveals that the email runs the store.
+      logger.info(
+        { event: "auth_email.skipped", userId: user.id, reason: "runs_the_store" },
+        "auth_email.skipped",
+      );
+      return json(200, {});
+    }
+    kind = authEmailKind(type);
+    const link = authEmailLink(env.NEXT_PUBLIC_SITE_URL, type, emailData.token_hash);
     const rendered = await renderAuthEmail(
       kind,
       {

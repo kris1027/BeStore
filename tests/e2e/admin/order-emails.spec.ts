@@ -3,7 +3,7 @@ import { expect, type Page, test } from "@playwright/test";
 import { expectNoA11yViolations, tabTo } from "../a11y";
 import { seedProduct } from "../catalog/support";
 import { type SeededOrder, seedPendingOrder } from "../checkout/support";
-import { createTestUser, signInFully, withDb } from "./support";
+import { createTestUser, signInAsAdmin, withDb } from "./support";
 
 // spec 0011, AC-13, AC-14 and AC-18: the order page's Emails section and Send again, by keyboard,
 // with no axe violations, on desktop and phone. The app runs with EMAIL_TRANSPORT=log, so a
@@ -67,8 +67,8 @@ test("an admin sees the order's emails and sends a failed one again by keyboard"
   page,
 }) => {
   const order = await paidOrderWithEmails();
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
   await page.goto(`/admin/orders/${order.number}`);
   await expect(page.getByRole("heading", { level: 2, name: "Emails" })).toBeVisible();
 
@@ -145,8 +145,8 @@ test("an order with no emails says so", async ({ page }) => {
     return cart.rows[0]!.id;
   });
   const order = await seedPendingOrder(cartId, product, { quantity: 1, priceCents: 1500 });
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
   await page.goto(`/admin/orders/${order.number}`);
 
   await expect(page.getByText("No emails sent for this order.")).toBeVisible();

@@ -6,16 +6,10 @@ import { logger } from "@/lib/logger";
 export type AuthEvent =
   | "auth.sign_in.succeeded"
   | "auth.sign_in.failed"
-  | "auth.mfa.enrolled"
-  | "auth.mfa.succeeded"
-  | "auth.mfa.failed"
-  | "auth.mfa.locked"
   | "auth.sign_out"
   | "auth.session.expired"
   | "auth.access.denied"
-  | "auth.proxy.lookup_failed"
-  | "auth.reset.requested"
-  | "auth.password.changed";
+  | "auth.proxy.lookup_failed";
 
 export type AuthEventFields = {
   // The admin or user id when known.
@@ -24,7 +18,6 @@ export type AuthEventFields = {
   readonly email?: string | null;
   readonly ip: string | null;
   readonly reason?: string;
-  readonly sent?: boolean;
 };
 
 // Unsalted on purpose: it only correlates repeated attempts, and emails are guessable anyway.
@@ -39,19 +32,18 @@ export function requestIp(headers: Pick<Headers, "get">): string | null {
 }
 
 export function authEventRecord(event: AuthEvent, fields: AuthEventFields) {
-  const { adminId, email, ip, reason, sent } = fields;
+  const { adminId, email, ip, reason } = fields;
   return {
     event,
     ...(adminId ? { adminId } : email ? { emailHash: hashEmail(email) } : {}),
     ip,
     ...(reason === undefined ? {} : { reason }),
-    ...(sent === undefined ? {} : { sent }),
   };
 }
 
 export function logAuthEvent(event: AuthEvent, fields: AuthEventFields) {
   const record = authEventRecord(event, fields);
-  const failed = event.endsWith("failed") || event.endsWith(".locked") || event.endsWith(".denied");
+  const failed = event.endsWith("failed") || event.endsWith(".denied");
   if (failed) logger.warn(record, event);
   else logger.info(record, event);
 }

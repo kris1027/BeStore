@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
-import { createTestUser, signInFully } from "../admin/support";
+import { createTestUser, signInAsAdmin } from "../admin/support";
 import { adminProductUrl } from "./support";
 
 // Spec 0005, AC-5 and AC-6 (spec 0009 makes it up to 8): images go straight to Storage, each
@@ -16,8 +16,8 @@ test("an admin uploads a product image that the storefront shows with its alt te
   browser,
 }) => {
   const name = `Stoneware mug ${randomUUID().slice(0, 8)}`;
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
   await page.goto("/admin/products/new");
 
   await page.getByLabel("Name", { exact: true }).fill(name);
@@ -54,8 +54,8 @@ test("an admin uploads a product image that the storefront shows with its alt te
 });
 
 test("a file that is not an image is refused before any upload", async ({ page }) => {
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
   await page.goto("/admin/products/new");
 
   await page.getByLabel("Add an image").setInputFiles({

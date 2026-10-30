@@ -3,7 +3,7 @@ import { type Browser, expect, type Page, test } from "@playwright/test";
 import { expectNoA11yViolations, tabTo } from "../a11y";
 import { seedProduct } from "../catalog/support";
 import { addToCart, fillCheckout, hasRealStripeKey } from "../checkout/support";
-import { createTestUser, injectSession, signInFully } from "./support";
+import { createTestUser, injectSession, signInAsAdmin } from "./support";
 
 // spec 0007, AC-4, AC-7, AC-8, AC-10 and AC-16: the admin sets the delivery fee and the free
 // delivery threshold, and the cart and checkout follow on their next load. store_settings is one
@@ -30,9 +30,9 @@ test.afterEach(async ({}, testInfo) => {
 });
 
 async function signedInAdmin(browser: Browser): Promise<Page> {
-  const admin = await createTestUser({ enrolled: true });
+  const admin = await createTestUser();
   const page = await (await browser.newContext()).newPage();
-  await signInFully(page, admin);
+  await signInAsAdmin(page, admin);
   return page;
 }
 

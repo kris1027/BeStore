@@ -3,9 +3,8 @@ export const adminHome = "/admin";
 // A POST route handler (spec 0005, AC-20).
 export const signOutPath = "/admin/sign-out";
 
-// Pages a `next` must never point back at; the reset page is allowed, since the reset link
-// sends the admin through the MFA step on the way there.
-const authPages = ["/admin/sign-in", "/admin/mfa", "/admin/forgot-password"] as const;
+// Pages a `next` must never point back at.
+const authPages = ["/admin/sign-in"] as const;
 
 const base = "http://admin.invalid";
 
@@ -41,10 +40,4 @@ export function signInPath(options: { next?: string; reason?: string } = {}): st
   if (options.reason) params.set("reason", options.reason);
   const query = params.toString();
   return query ? `/admin/sign-in?${query}` : "/admin/sign-in";
-}
-
-export function mfaPath(next?: string): string {
-  return next === undefined
-    ? "/admin/mfa"
-    : `/admin/mfa?next=${encodeURIComponent(safeAdminPath(next))}`;
 }

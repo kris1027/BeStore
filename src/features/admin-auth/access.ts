@@ -1,10 +1,8 @@
 // Pure access rules for /admin (spec 0004). No I/O: requireAdmin() and the proxy gather the
 // inputs and act on the verdict, so every rule lives here and is unit tested.
 
-// The app enforced session cap, from the first factor's sign in (AC-7).
+// The app enforced session cap, from the sign in (AC-7).
 export const ADMIN_SESSION_MAX_AGE_SECONDS = 43_200;
-
-export type AssuranceLevel = "aal1" | "aal2";
 
 export type AdminRow = {
   readonly id: string;
@@ -22,25 +20,20 @@ export type Admin = {
 export type AccessInput = {
   // Confirmed by the Auth server (getUser), null when there is no valid session.
   readonly userId: string | null;
-  readonly aal: AssuranceLevel | null;
   // The `amr` list from the session token.
   readonly amr: unknown;
   // The live admin_users row for userId, if any.
   readonly adminRow: AdminRow | null;
   readonly nowMs: number;
-  // The MFA step and sign out run below aal2.
-  readonly allowAal1?: boolean;
 };
 
 export type AccessVerdict =
   | { readonly kind: "allow"; readonly admin: Admin }
   | { readonly kind: "sign-in"; readonly reason?: "expired" }
-  | { readonly kind: "mfa" }
   | { readonly kind: "not-found" };
 
-// The session start is the earliest `amr` timestamp: the first factor. Token refreshes carry
-// `amr` over and a later TOTP verify only adds or bumps the `totp` entry, so neither can move
-// it forward. Returns null when no timestamp is present.
+// The session start is the earliest `amr` timestamp: the sign in. Token refreshes carry `amr`
+// over, so they cannot move it forward. Returns null when no timestamp is present.
 export function sessionStartedAtSeconds(amr: unknown): number | null {
   if (!Array.isArray(amr)) return null;
   const timestamps = amr.flatMap((entry: unknown) =>
@@ -62,8 +55,10 @@ export function isSessionExpired(amr: unknown, nowMs: number): boolean {
   return nowMs / 1000 - startedAt > ADMIN_SESSION_MAX_AGE_SECONDS;
 }
 
-// A session opened by a password reset or email link can verify a factor, never enroll one.
-export function isResetSession(amr: unknown): boolean {
+// spec 0019, AC-2: only a password opens /admin. A session made by verifying an email link
+// (`recovery`, `otp`, a sign up confirm) has no `password` entry, so an inbox alone never opens
+// the panel. Supabase writes an entry as a plain string or as an object with `method`.
+export function hasPasswordMethod(amr: unknown): boolean {
   if (!Array.isArray(amr)) return false;
   return amr.some((entry: unknown) => {
     const method =
@@ -72,11 +67,11 @@ export function isResetSession(amr: unknown): boolean {
         : typeof entry === "object" && entry !== null && "method" in entry
           ? entry.method
           : null;
-    return method === "recovery" || method === "otp";
+    return method === "password";
   });
 }
 
-// Checked in the spec's order: session, age, admin row, assurance level.
+// Checked in the spec's order: session, age, admin row, sign in method.
 export function decideAdminAccess(input: AccessInput): AccessVerdict {
   if (input.userId === null) return { kind: "sign-in" };
   if (isSessionExpired(input.amr, input.nowMs)) return { kind: "sign-in", reason: "expired" };
@@ -85,8 +80,6 @@ export function decideAdminAccess(input: AccessInput): AccessVerdict {
   if (row === null || row.id !== input.userId || row.disabledAt !== null) {
     return { kind: "not-found" };
   }
-  const admin = { id: row.id, email: row.email, name: row.name };
-
-  if (input.aal !== "aal2" && !input.allowAal1) return { kind: "mfa" };
-  return { kind: "allow", admin };
+  if (!hasPasswordMethod(input.amr)) return { kind: "sign-in" };
+  return { kind: "allow", admin: { id: row.id, email: row.email, name: row.name } };
 }

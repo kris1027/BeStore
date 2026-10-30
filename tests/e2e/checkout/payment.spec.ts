@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { expectNoA11yViolations, tabTo } from "../a11y";
-import { createTestUser, injectSession, signInFully } from "../admin/support";
+import { createTestUser, injectSession, signInAsAdmin } from "../admin/support";
 import { seedProduct } from "../catalog/support";
 import {
   addToCart,
@@ -88,9 +88,9 @@ test("a paid webhook turns the checkout into a paid order the customer and admin
   await expect(page.getByRole("link", { name: "Cart", exact: true })).toBeVisible();
   await expectNoA11yViolations(page);
 
-  const admin = await createTestUser({ enrolled: true });
+  const admin = await createTestUser();
   const adminPage = await (await browser.newContext()).newPage();
-  await signInFully(adminPage, admin);
+  await signInAsAdmin(adminPage, admin);
   await adminPage.goto("/admin/orders");
   await expect(adminPage.getByRole("heading", { level: 1, name: "Orders" })).toBeVisible();
   const row = adminPage.getByRole("row", { name: new RegExp(`#${order.number}`) });
@@ -169,9 +169,9 @@ test("the admin order pages work by keyboard alone", async ({ page, browser, req
   });
   expect((await postPaidEvent(request, order)).status()).toBe(200);
 
-  const admin = await createTestUser({ enrolled: true });
+  const admin = await createTestUser();
   const adminPage = await (await browser.newContext()).newPage();
-  await signInFully(adminPage, admin);
+  await signInAsAdmin(adminPage, admin);
   await adminPage.goto("/admin/orders");
   await expect(adminPage.getByRole("heading", { level: 1, name: "Orders" })).toBeVisible();
 

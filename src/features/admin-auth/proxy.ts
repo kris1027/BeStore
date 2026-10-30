@@ -31,7 +31,7 @@ async function lookupAdminRow(id: string): Promise<AdminRowLookup> {
   }
 }
 
-// Runs on /admin and /auth only (see proxy.ts at the root), never on storefront routes (AC-1).
+// Runs on /admin only (see proxy.ts at the root), never on storefront routes (AC-1).
 export async function adminAuthProxy(request: NextRequest): Promise<NextResponse> {
   const { pathname, search } = request.nextUrl;
   const requestHeaders = new Headers(request.headers);

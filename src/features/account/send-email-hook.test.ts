@@ -109,15 +109,19 @@ describe("handleSendEmailHook", () => {
     expect(email.html).toContain("/account/confirm?token_hash=pkce_token_hash&amp;type=recovery");
   });
 
-  it("sends the admin reset to /auth/confirm for an admin, whatever the redirect says", async () => {
+  // spec 0019, AC-8: a 200 so Supabase reports success and the forgot page answers as usual.
+  it("sends nothing for the reset of someone who runs the store, answering 200", async () => {
     mocks.runsTheStore.mockResolvedValue(true);
 
-    await handleSendEmailHook(signedRequest(payload("recovery")));
+    const response = await handleSendEmailHook(signedRequest(payload("recovery")));
 
-    const [email] = mocks.send.mock.calls[0]!;
-    expect(email.subject).toBe("Reset your admin password");
-    expect(email.html).toContain("/auth/confirm?token_hash=pkce_token_hash&amp;type=recovery");
-    expect(email.html).not.toContain("/account/confirm");
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({});
+    expect(mocks.send).not.toHaveBeenCalled();
+    expect(mocks.info).toHaveBeenCalledWith(
+      { event: "auth_email.skipped", userId, reason: "runs_the_store" },
+      "auth_email.skipped",
+    );
   });
 
   it("refuses a bad signature with 401 and sends nothing", async () => {

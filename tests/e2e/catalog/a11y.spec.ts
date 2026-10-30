@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoA11yViolations } from "../a11y";
-import { createTestUser, signInFully } from "../admin/support";
+import { createTestUser, signInAsAdmin } from "../admin/support";
 import { adminProductUrl, seedProduct, seedProductWithOptions, setStock } from "./support";
 
 // Spec 0005, AC-17: axe on every page of the buy loop, in its states, on desktop and phone
@@ -78,8 +78,8 @@ test("a customer picks, adds and changes the cart by keyboard alone", async ({ p
 });
 
 test("the admin product pages have no axe violations, errors included", async ({ page }) => {
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
 
   await page.goto("/admin/products");
   await expect(page.getByRole("heading", { level: 1, name: "Products" })).toBeVisible();
@@ -95,8 +95,8 @@ test("the admin product pages have no axe violations, errors included", async ({
 });
 
 test("an admin creates a product by keyboard alone", async ({ page }) => {
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
   await page.goto("/admin/products/new");
   const name = `Keyboard tote ${Date.now()}`;
 

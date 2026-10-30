@@ -49,7 +49,7 @@ export type ChangePasswordError = {
 };
 
 // spec 0012, AC-19: the current password, then a new one under the AC-3 rule. Every other session
-// ends and this one stays. Anyone who runs the store changes it behind the authenticator instead.
+// ends and this one stays. Anyone who runs the store changes it from the terminal instead.
 export async function changePassword(
   values: unknown,
 ): Promise<ActionResult<null, ChangePasswordError>> {

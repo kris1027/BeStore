@@ -9,7 +9,8 @@ import { signInPath } from "./safe-admin-path";
 import { endLocalSession } from "@/lib/supabase/session";
 
 // The one admin route without requireAdmin(): it only ends the caller's own session on this
-// device, so it must work from any state (aal1, expired, disabled) and grants nothing.
+// device, so it must work from any state (expired, disabled, an email link session) and grants
+// nothing.
 // A plain form POST and a 303, so the browser does a full page load and Cache Components keeps
 // no admin page alive for Back (spec 0005, AC-20).
 export async function signOutRequest(request: NextRequest): Promise<Response> {

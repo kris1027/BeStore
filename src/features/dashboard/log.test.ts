@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // spec 0015, AC-14: the failure line goes through the real logger, redaction included, so a
-// field name the logger censors (such as `code`, kept for TOTP codes) would hide the SQLSTATE.
+// field name the logger censors (such as `code`, kept for auth codes) would hide the SQLSTATE.
 
 const { lines, sink } = await vi.hoisted(async () => {
   const { Writable } = await import("node:stream");

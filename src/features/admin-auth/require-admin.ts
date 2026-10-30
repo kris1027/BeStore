@@ -8,25 +8,12 @@ import { cache } from "react";
 import { db } from "@/lib/db";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-import {
-  type AccessInput,
-  type Admin,
-  type AssuranceLevel,
-  decideAdminAccess,
-  isResetSession,
-} from "./access";
+import { type AccessInput, type Admin, decideAdminAccess } from "./access";
 import { logAuthEvent, requestIp } from "./log";
 import { adminPathHeader } from "./proxy-decision";
-import { mfaPath, safeAdminPath, signInPath } from "./safe-admin-path";
+import { safeAdminPath, signInPath } from "./safe-admin-path";
 
-export type AdminSession = {
-  readonly admin: Admin;
-  readonly aal: AssuranceLevel;
-  // Opened by a password reset link: may verify a factor, never enroll one (AC-4).
-  readonly fromResetLink: boolean;
-};
-
-type SessionState = Omit<AccessInput, "nowMs" | "allowAal1">;
+type SessionState = Omit<AccessInput, "nowMs">;
 
 // Once per request: the layout, the page and an action in the same request share it.
 const loadSessionState = cache(async (): Promise<SessionState> => {
@@ -35,52 +22,38 @@ const loadSessionState = cache(async (): Promise<SessionState> => {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { userId: null, aal: null, amr: null, adminRow: null };
+  if (!user) return { userId: null, amr: null, adminRow: null };
 
-  // Decodes the token getUser() just confirmed; no second network call.
-  const { data: level } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  // The `amr` of the token getUser() just confirmed, read the way the proxy reads it. A token
+  // that cannot be read counts as no session: a plain sign in, not "your session expired".
+  const { data } = await supabase.auth.getClaims();
+  if (!data) return { userId: null, amr: null, adminRow: null };
   const adminRow = await db.adminUser.findUnique({
     where: { id: user.id },
     select: { id: true, email: true, name: true, disabledAt: true },
   });
-  return {
-    userId: user.id,
-    aal: level?.currentLevel === "aal2" ? "aal2" : "aal1",
-    amr: level?.currentAuthenticationMethods ?? null,
-    adminRow,
-  };
+  return { userId: user.id, amr: data?.claims.amr ?? null, adminRow };
 });
 
 // The one guard for every admin page, layout, action and route handler (spec 0004). It checks
-// the session with the Auth server, the 12 hour cap, the live admin_users row and aal2, then
-// redirects or 404s; it only returns for an active admin.
-export async function requireAdminSession(
-  options: { readonly allowAal1?: boolean } = {},
-): Promise<AdminSession> {
+// the session with the Auth server, the 12 hour cap, the live admin_users row and that a
+// password opened the session (spec 0019), then redirects or 404s; it only returns for an
+// active admin.
+export async function requireAdmin(): Promise<Admin> {
   const state = await loadSessionState();
-  const verdict = decideAdminAccess({
-    ...state,
-    nowMs: Date.now(),
-    allowAal1: options.allowAal1 ?? false,
-  });
+  const verdict = decideAdminAccess({ ...state, nowMs: Date.now() });
   const requestHeaders = await headers();
   const path = requestHeaders.get(adminPathHeader) ?? undefined;
 
   switch (verdict.kind) {
     case "allow":
-      return {
-        admin: verdict.admin,
-        aal: state.aal ?? "aal1",
-        fromResetLink: isResetSession(state.amr),
-      };
+      return verdict.admin;
     case "sign-in":
       redirect(
         verdict.reason === "expired"
           ? signInPath({ reason: "expired" })
           : signInPath(path === undefined ? {} : { next: path }),
       );
-    case "mfa":
-      redirect(mfaPath(path));
     case "not-found":
       logAuthEvent("auth.access.denied", { adminId: state.userId, ip: requestIp(requestHeaders) });
       notFound();
@@ -96,30 +69,20 @@ export async function requireAdminSession(
 // 404 title entirely); the page's own guard does that.
 export async function adminMetadata(
   metadata: Metadata,
-  options: { readonly allowAal1?: boolean; readonly layout?: boolean } = {},
+  options: { readonly layout?: boolean } = {},
 ): Promise<Metadata> {
   const state = await loadSessionState();
-  const verdict = decideAdminAccess({
-    ...state,
-    nowMs: Date.now(),
-    allowAal1: options.allowAal1 ?? false,
-  });
+  const verdict = decideAdminAccess({ ...state, nowMs: Date.now() });
   if (verdict.kind === "allow") return metadata;
   return options.layout ? {} : { title: "Page not found" };
 }
 
-export async function requireAdmin(): Promise<Admin> {
-  const { admin } = await requireAdminSession();
-  return admin;
-}
-
-// AC-17: the sign in and forgot password pages send an admin who is already signed in onward.
-// Anyone else (no session, expired, not an admin) sees the page.
+// spec 0019, AC-6: the sign in page sends an active admin with a password session onward.
+// Anyone else (no session, expired, not an admin, an email link session) sees the page.
 export async function redirectIfSignedIn(next: unknown): Promise<void> {
   const state = await loadSessionState();
   if (state.userId === null) return;
   const verdict = decideAdminAccess({ ...state, nowMs: Date.now() });
-  const target = typeof next === "string" ? next : undefined;
-  if (verdict.kind === "mfa") redirect(mfaPath(target));
-  if (verdict.kind === "allow") redirect(safeAdminPath(target));
+  if (verdict.kind === "allow")
+    redirect(safeAdminPath(typeof next === "string" ? next : undefined));
 }

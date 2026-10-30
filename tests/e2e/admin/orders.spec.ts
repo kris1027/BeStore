@@ -5,7 +5,7 @@ import { expectNoA11yViolations, tabTo } from "../a11y";
 import { seedProduct, type SeededProduct } from "../catalog/support";
 import { hasRealStripeKey, type SeededOrder, seedPendingOrder } from "../checkout/support";
 import { blockAppScripts } from "../no-js";
-import { createTestUser, signInFully, withDb } from "./support";
+import { createTestUser, signInAsAdmin, withDb } from "./support";
 
 // spec 0010: run an order after payment from the admin pages, by keyboard, with no axe
 // violations (AC-4 to AC-7, AC-19, AC-21, AC-24) and the list filters (AC-1 to AC-3). The refund
@@ -90,8 +90,8 @@ test("an admin ships, delivers, undoes, edits tracking and notes an order by key
 }) => {
   const socks = await seedProduct({ stock: 5, priceCents: 1250 });
   const order = await seedPaidOrder(socks, { quantity: 1, priceCents: 1250 });
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
   await openOrder(page, order);
   await expectNoA11yViolations(page);
 
@@ -139,8 +139,8 @@ test("an admin ships, delivers, undoes, edits tracking and notes an order by key
 test("the refund and cancel dialogs work by keyboard alone", async ({ page }) => {
   const socks = await seedProduct({ stock: 5, priceCents: 1000 });
   const order = await seedPaidOrder(socks, { quantity: 2, priceCents: 1000 });
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
   await openOrder(page, order);
 
   // AC-24: focus moves into the refund form; every field is reachable by Tab; an error is
@@ -190,8 +190,8 @@ test("the orders list filters by number, keeps filters in the URL and has an emp
 }) => {
   const socks = await seedProduct({ stock: 5, priceCents: 900 });
   const order = await seedPaidOrder(socks, { quantity: 1, priceCents: 900 });
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
   await page.goto("/admin/orders");
 
   await page.getByLabel("Order number, email or name").fill(String(order.number));
@@ -210,8 +210,8 @@ test("the orders list filters by number, keeps filters in the URL and has an emp
 
 // spec 0016: the filters are a GET form, so they work before the app's JavaScript loads.
 test("without the app's JavaScript the orders filters still filter", async ({ page }) => {
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
   await blockAppScripts(page);
   await page.goto("/admin/orders");
 
@@ -257,8 +257,8 @@ test("@stripe a partial refund with restock goes through Stripe", async ({ page 
     priceCents: 1000,
     paymentIntentId: await realPayment(2000),
   });
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
   await openOrder(page, order);
 
   await openByKeyboard(page, "Refund");
@@ -299,8 +299,8 @@ test("@stripe cancelling a pending order closes its open checkout first", async 
       session.id,
     ]),
   );
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
   await openOrder(page, order);
 
   await openByKeyboard(page, "Cancel order");
@@ -325,8 +325,8 @@ test("@stripe cancelling a paid order refunds it in full", async ({ page }) => {
     priceCents: 1500,
     paymentIntentId: await realPayment(1500),
   });
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
   await openOrder(page, order);
 
   await openByKeyboard(page, "Cancel and refund");

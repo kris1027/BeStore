@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { expect, type Page, test } from "@playwright/test";
 
 import { brand } from "../../../src/lib/brand/brand";
-import { createTestUser, signInFully } from "../admin/support";
+import { createTestUser, signInAsAdmin } from "../admin/support";
 import { adminProductUrl } from "./support";
 
 // Spec 0005, milestone 1: one real product from the admin form to a cart that survives reload.
@@ -15,8 +15,8 @@ async function createProductAsAdmin(
   product: NewProduct,
   button: "Publish" | "Save as draft",
 ) {
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
 
   await page.goto("/admin/products");
   await page.getByRole("link", { name: "New product" }).first().click();

@@ -1,16 +1,12 @@
 import { type AdminRow, decideAdminAccess, isSessionExpired } from "./access";
-import { mfaPath, signInPath, signOutPath } from "./safe-admin-path";
+import { signInPath, signOutPath } from "./safe-admin-path";
 
-// Carries the requested admin path to requireAdmin(), so a page or action it bounces to the MFA
-// step can come back. The proxy sets it on every request, so a client supplied value never survives.
+// Carries the requested admin path to requireAdmin(), so a page or action it bounces to sign in
+// can come back. The proxy sets it on every request, so a client supplied value never survives.
 export const adminPathHeader = "x-bestore-admin-path";
 
 // Pages a visitor with no session may open.
-const publicAdminPages = ["/admin/sign-in", "/admin/forgot-password"] as const;
-
-// Pages that call requireAdminSession({ allowAal1: true }); the two lists must match, or the
-// proxy bounces an aal1 admin away from a page that allows them.
-export const aal1AdminPages = ["/admin/mfa"] as const;
+const publicAdminPages = ["/admin/sign-in"] as const;
 
 export type ProxyInput = {
   readonly pathname: string;
@@ -59,7 +55,6 @@ export type AdminGateInput = {
   readonly isServerAction: boolean;
   readonly claims: {
     readonly sub?: unknown;
-    readonly aal?: unknown;
     readonly amr?: unknown;
   };
   readonly nowMs: number;
@@ -88,22 +83,22 @@ export function needsAdminGate(input: Omit<AdminGateInput, "claims" | "nowMs">):
 export function decideAdminGate(
   input: AdminGateInput & { readonly adminRow: AdminRow | null },
 ): AdminGateDecision {
-  const { sub, aal, amr } = input.claims;
+  const { sub, amr } = input.claims;
   const verdict = decideAdminAccess({
     userId: typeof sub === "string" ? sub : null,
-    aal: aal === "aal2" ? "aal2" : "aal1",
     amr,
     adminRow: input.adminRow,
     nowMs: input.nowMs,
-    allowAal1: aal1AdminPages.some((page) => input.pathname === page),
   });
   switch (verdict.kind) {
     case "not-found":
       return { kind: "not-found" };
-    case "mfa":
-      return { kind: "redirect", to: mfaPath(`${input.pathname}${input.search}`) };
-    case "allow":
+    // spec 0019, AC-2: a session no password opened (an email link) is sent to sign in here, so
+    // the page load gets a real redirect instead of a streamed 200. Expiry was decided earlier,
+    // in decideProxy.
     case "sign-in":
+      return { kind: "redirect", to: signInPath({ next: `${input.pathname}${input.search}` }) };
+    case "allow":
       return { kind: "continue" };
   }
 }

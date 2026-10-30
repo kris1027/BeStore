@@ -3,7 +3,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
 import { z } from "zod";
 
-import { PrismaClient } from "../../src/generated/prisma/client";
+import { PrismaClient } from "@/generated/prisma/client";
 
 // The admin account scripts (spec 0004): no admin UI exists, so these are the whole account
 // lifecycle. They never import server-only app modules; they build their own clients here.
@@ -50,8 +50,10 @@ export async function findAuthUserId(db: PrismaClient, email: string): Promise<s
 export type CreateAdminInput = {
   readonly email: string;
   readonly name: string;
-  // Only used when no auth user has this email yet; an existing user keeps their password.
-  readonly password: string | null;
+  // Set for an existing user too (spec 0019, AC-15): public sign up lets anyone create an
+  // unconfirmed user with a password they know, and confirming it here must not hand them
+  // an admin password.
+  readonly password: string;
 };
 
 export async function createAdmin(
@@ -65,11 +67,13 @@ export async function createAdmin(
   let id: string;
   if (existingId) {
     // One auth user may be both a customer and an admin (spec 0004).
-    const { error } = await supabase.auth.admin.updateUserById(existingId, { email_confirm: true });
-    if (error) throw new Error(`Could not confirm the existing user: ${error.message}`);
+    const { error } = await supabase.auth.admin.updateUserById(existingId, {
+      password: input.password,
+      email_confirm: true,
+    });
+    if (error) throw new Error(`Could not update the existing user: ${error.message}`);
     id = existingId;
   } else {
-    if (input.password === null) throw new Error("A password is needed for a new user.");
     const { data, error } = await supabase.auth.admin.createUser({
       email,
       password: input.password,
@@ -87,34 +91,36 @@ export async function createAdmin(
   return { id, existingUser: existingId !== null };
 }
 
-export async function disableAdmin({ db }: Pick<AdminDeps, "db">, email: string): Promise<string> {
+// Said by every script that takes an admin's email (spec 0019, AC-7).
+export const noAdminMessage = "No admin has that email.";
+
+// Null when no admin row has the email: an expected answer, which each script reports itself.
+export async function findAdminId(db: PrismaClient, email: string): Promise<string | null> {
   const admin = await db.adminUser.findUnique({ where: { email: normalizeEmail(email) } });
-  if (!admin) throw new Error("No admin has that email.");
-  // Takes effect on their next request: requireAdmin() reads this row every time.
-  await db.adminUser.update({ where: { id: admin.id }, data: { disabledAt: new Date() } });
-  return admin.id;
+  return admin?.id ?? null;
 }
 
-export async function resetAdminMfa(
-  { db, supabase }: AdminDeps,
+// Null when no admin has the email. Takes effect on their next request: requireAdmin() reads
+// this row every time.
+export async function disableAdmin(
+  { db }: Pick<AdminDeps, "db">,
   email: string,
-): Promise<{ readonly id: string; readonly factorsRemoved: number }> {
-  const admin = await db.adminUser.findUnique({ where: { email: normalizeEmail(email) } });
-  if (!admin) throw new Error("No admin has that email.");
+): Promise<string | null> {
+  const id = await findAdminId(db, email);
+  if (id === null) return null;
+  await db.adminUser.update({ where: { id }, data: { disabledAt: new Date() } });
+  return id;
+}
 
-  const { data, error } = await supabase.auth.admin.mfa.listFactors({ userId: admin.id });
-  if (error) throw new Error(`Could not list factors: ${error.message}`);
-  for (const factor of data.factors) {
-    const { error: deleteError } = await supabase.auth.admin.mfa.deleteFactor({
-      id: factor.id,
-      userId: admin.id,
-    });
-    if (deleteError) throw new Error(`Could not delete a factor: ${deleteError.message}`);
-  }
-
-  // Deleting the sessions revokes every refresh token (they cascade), and requireAdmin()'s
-  // getUser() finds no session, so every device is out on its next request. The only write to
-  // the auth schema anywhere in the app.
-  await db.$executeRaw`DELETE FROM auth.sessions WHERE user_id = ${admin.id}::uuid`;
-  return { id: admin.id, factorsRemoved: data.factors.length };
+// The only way to change an admin password without knowing it (spec 0019, AC-7). The id comes
+// from findAdminId, the same lookup as disableAdmin, so the two scripts never disagree about who
+// is an admin, enabled or not; the admin API applies Supabase's own password policy and writes
+// its auth audit log.
+export async function setAdminPassword(
+  { supabase }: Pick<AdminDeps, "supabase">,
+  id: string,
+  password: string,
+): Promise<void> {
+  const { error } = await supabase.auth.admin.updateUserById(id, { password });
+  if (error) throw new Error(`Could not set the password: ${error.message}`);
 }

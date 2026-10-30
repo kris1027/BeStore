@@ -8,7 +8,7 @@ import { adminAuthProxy } from "@/features/admin-auth/proxy";
 // action requireCustomer() (spec 0012, AC-13).
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (pathname.startsWith("/admin") || pathname.startsWith("/auth")) {
+  if (pathname.startsWith("/admin")) {
     return adminAuthProxy(request);
   }
   return accountProxy(request);
@@ -16,5 +16,5 @@ export function proxy(request: NextRequest) {
 
 // Catalog pages never reach Supabase and stay cached (spec 0004, AC-1; spec 0012, AC-22).
 export const config = {
-  matcher: ["/admin/:path*", "/auth/:path*", "/account/:path*", "/checkout/:path*"],
+  matcher: ["/admin/:path*", "/account/:path*", "/checkout/:path*"],
 };

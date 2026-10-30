@@ -2,14 +2,14 @@ import { randomUUID } from "node:crypto";
 
 import { expect, type Page, test } from "@playwright/test";
 
-import { createTestUser, signInFully } from "../admin/support";
+import { createTestUser, signInAsAdmin } from "../admin/support";
 import { adminProductUrl } from "./support";
 
 // Spec 0005, milestone 2: options generate the variant grid, and the product page picks one.
 
-async function signInAsAdmin(page: Page) {
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+async function openNewProduct(page: Page) {
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
   await page.goto("/admin/products/new");
 }
 
@@ -26,7 +26,7 @@ test("options build a variant grid that keeps typed rows, and the picker follows
   page,
 }) => {
   const name = `Merino crew ${randomUUID().slice(0, 8)}`;
-  await signInAsAdmin(page);
+  await openNewProduct(page);
   await page.getByLabel("Name", { exact: true }).fill(name);
   await addOption(page, 0, "Size", ["S", "M"]);
   await addOption(page, 1, "Color", ["Navy"]);
@@ -73,7 +73,7 @@ test("options build a variant grid that keeps typed rows, and the picker follows
 });
 
 test("the form shows each refusal on its field", async ({ page }) => {
-  await signInAsAdmin(page);
+  await openNewProduct(page);
   await page.getByLabel("Name", { exact: true }).fill("Bad input");
   await page.getByLabel("URL name").fill("Bad Slug");
   await page.getByLabel("Price for the product", { exact: true }).fill("1.999");
@@ -100,7 +100,7 @@ test("the form shows each refusal on its field", async ({ page }) => {
 });
 
 test("a URL name another product uses is refused by the server", async ({ page }) => {
-  await signInAsAdmin(page);
+  await openNewProduct(page);
   const name = `Twin ${randomUUID().slice(0, 8)}`;
   for (const attempt of [1, 2]) {
     if (attempt === 2) await page.goto("/admin/products/new");

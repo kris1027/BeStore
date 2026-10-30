@@ -1,7 +1,9 @@
 # 0012. Customer accounts
 
 **Date**: 2026-10-14 (amended the same day after a cross check: AC-1 to AC-5, AC-7 to AC-11, AC-13 to AC-15, AC-17, AC-19, AC-20, AC-23, AC-24, AC-26; amended 2026-10-14 again: AC-15 now names where the order's `customer_name` comes from; amended 2026-10-15 after the code review: AC-2, AC-3, AC-5, AC-7, AC-13, AC-24, the template choice, and the leftover account cart cookie)
-**Status**: Accepted
+**Status**: Accepted, partly superseded by [spec 0019](../0019-remove-admin-mfa/index.md) (2026-10-27)
+
+> **Superseded by spec 0019**: the admin branch of AC-8 and AC-19. The Send Email Hook no longer sends an admin reset email (a recovery email for a store runner is skipped), `/auth/confirm` is gone, and a store runner is an `admin_users` row in any state, with no `auth.mfa_factors` check. Everything else still holds.
 
 ## Summary
 
@@ -219,7 +221,7 @@ Reasoning and options: see [rationale.md](rationale.md).
 | checkout page | prefill | pending order for this cart (spec 0007), else default `customer_addresses` row |
 | address book | country | the store's country from `src/lib/shipping` (spec 0007) |
 | `signUpFromOrder` | email, eligibility | the order found by `stripe_checkout_session_id`: `email`, `status`, `customer_id`; the visitor's session |
-| AC-20 | open order count, admin refusal | count of the customer's `orders` with status `paid`; `admin_users` row by id or a verified `auth.mfa_factors` row |
+| AC-20 | open order count, admin refusal | count of the customer's `orders` with status `paid`; `admin_users` row by id (the `auth.mfa_factors` check is gone, spec 0019) |
 | AC-21 | Account or Guest | `orders.customer_id` null or not |
 
 **Key invariants**:

@@ -1,8 +1,8 @@
 import { z } from "zod";
 
-// Pure (no server-only imports): the admin pages, the account pages and the admin scripts all
-// check passwords with this one schema, which mirrors the project wide Supabase policy
-// (spec 0004, AC-10; supabase/config.toml `password_requirements`). Keep the two in step.
+// Pure (no server-only imports): the account pages and the admin scripts check passwords with
+// this schema, which mirrors the project wide Supabase policy (spec 0004, AC-10;
+// supabase/config.toml `password_requirements`). Keep the two in step.
 
 export const passwordRuleMessages = {
   length: "At least 8 characters",
@@ -45,6 +45,19 @@ export const passwordSchema = z.string().superRefine((value, ctx) => {
     ctx.addIssue({ code: "custom", message: passwordRuleMessages[rule] });
   }
   if (isPasswordTooLong(value)) ctx.addIssue({ code: "custom", message: passwordTooLongMessage });
+});
+
+// Admin passwords (spec 0019, AC-16): the password is the only factor in front of `/admin`, so
+// length is the cheapest defense against guessing that slips past rate limits. Only the admin
+// scripts set one; the customer forms refuse store runners.
+export const ADMIN_PASSWORD_MIN_LENGTH = 14;
+
+export const adminPasswordLengthMessage = `At least ${ADMIN_PASSWORD_MIN_LENGTH} characters`;
+
+export const adminPasswordSchema = passwordSchema.superRefine((value, ctx) => {
+  if (value.length < ADMIN_PASSWORD_MIN_LENGTH) {
+    ctx.addIssue({ code: "custom", message: adminPasswordLengthMessage });
+  }
 });
 
 // The rule list a form prints under a new password field.

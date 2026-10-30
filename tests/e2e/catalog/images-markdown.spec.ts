@@ -3,7 +3,7 @@ import path from "node:path";
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoA11yViolations } from "../a11y";
-import { createTestUser, signInFully } from "../admin/support";
+import { createTestUser, signInAsAdmin } from "../admin/support";
 import { seedProduct, seedProductWithOptions, type SeededProduct, waitForEditor } from "./support";
 
 // spec 0009, milestone 3: several images per product, ordered by keyboard, tied to an option
@@ -12,8 +12,8 @@ import { seedProduct, seedProductWithOptions, type SeededProduct, waitForEditor 
 const fixture = path.resolve("tests/e2e/fixtures/product.png");
 
 async function openEditor(page: Page, product: SeededProduct) {
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
   await page.goto(`/admin/products/${product.id}`);
   await waitForEditor(page, product.name);
 }

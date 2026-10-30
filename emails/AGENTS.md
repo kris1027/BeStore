@@ -10,7 +10,7 @@ React Email templates for the customer emails (order confirmation, shipped, refu
 - Sending happens after the work it reports is committed, and must be safe to retry: an email for one event goes out once.
   - Build the Resend idempotency key from the email type plus the order or event id (e.g. `order_confirmation:<orderId>`, spec 0011 AC-2), so different emails for one order never share a key.
   - Resend keeps idempotency keys for only 24 hours. Retries later than that must also check a durable record of sent emails in our DB.
-- Auth emails (`confirm-signup.tsx`, `reset-password.tsx`, `admin-reset-password.tsx`) are not sent by Supabase templates: Supabase calls the Send Email Hook at `POST /api/auth/send-email` (`src/features/account/send-email-hook.ts`, signed with `SEND_EMAIL_HOOK_SECRET`), which picks the template, admin reset first, and sends it through the app's transport within 4 seconds (spec 0012, AC-8).
+- Auth emails (`confirm-signup.tsx`, `reset-password.tsx`) are not sent by Supabase templates: Supabase calls the Send Email Hook at `POST /api/auth/send-email` (`src/features/account/send-email-hook.ts`, signed with `SEND_EMAIL_HOOK_SECRET`), which picks the template and sends it through the app's transport within 4 seconds (spec 0012, AC-8). A store runner gets no reset email at all; their password changes only from the terminal (spec 0019, AC-8).
 - `EMAIL_TRANSPORT` is `log` (unit tests), `mailpit` (local dev, e2e, CI; read the mail at `MAILPIT_URL`) or `resend`, the only one allowed when `VERCEL_ENV` is production.
 - `RESEND_API_KEY` and `EMAIL_FROM` join the Zod schema in `src/lib/env.ts` when this area is built.
 

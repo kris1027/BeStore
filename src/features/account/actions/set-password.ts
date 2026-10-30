@@ -37,7 +37,7 @@ export async function setPassword(
   const parsed = newPasswordSchema.safeParse(values);
   if (!parsed.success) return { ok: false, error: { fields: fieldErrors(parsed.error) } };
 
-  // A password that guards /admin is only ever changed behind the authenticator (spec 0004).
+  // A password that guards /admin changes only from the terminal (spec 0019, AC-10).
   if (await runsTheStore(user.id)) return { ok: false, error: { form: "runs_the_store" } };
 
   const { data, error } = await supabase.auth.updateUser({ password: parsed.data.password });

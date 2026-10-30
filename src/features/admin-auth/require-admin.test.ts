@@ -2,12 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AdminRow } from "./access";
 import { adminPathHeader } from "./proxy-decision";
-import {
-  adminMetadata,
-  redirectIfSignedIn,
-  requireAdmin,
-  requireAdminSession,
-} from "./require-admin";
+import { adminMetadata, redirectIfSignedIn, requireAdmin } from "./require-admin";
 
 const mocks = vi.hoisted(() => {
   class NavigationSignal extends Error {}
@@ -21,7 +16,7 @@ const mocks = vi.hoisted(() => {
     }),
     requestHeaders: new Headers(),
     getUser: vi.fn(),
-    getAal: vi.fn(),
+    getClaims: vi.fn(),
     findAdmin: vi.fn(),
     warn: vi.fn(),
   };
@@ -39,7 +34,7 @@ vi.mock("next/navigation", () => ({ redirect: mocks.redirect, notFound: mocks.no
 vi.mock("@/lib/db", () => ({ db: { adminUser: { findUnique: mocks.findAdmin } } }));
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: async () => ({
-    auth: { getUser: mocks.getUser, mfa: { getAuthenticatorAssuranceLevel: mocks.getAal } },
+    auth: { getUser: mocks.getUser, getClaims: mocks.getClaims },
   }),
 }));
 vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), warn: mocks.warn } }));
@@ -56,18 +51,16 @@ const activeRow: AdminRow = {
 };
 
 type SessionSetup = {
-  readonly aal?: "aal1" | "aal2";
   readonly amr?: unknown;
   readonly row?: AdminRow | null;
 };
 
-function signedIn({ aal = "aal2", amr, row = activeRow }: SessionSetup = {}) {
+const recoveryAmr = [{ method: "recovery", timestamp: nowSeconds - 30 }];
+
+function signedIn({ amr, row = activeRow }: SessionSetup = {}) {
   mocks.getUser.mockResolvedValue({ data: { user: { id: ADMIN_ID } } });
-  mocks.getAal.mockResolvedValue({
-    data: {
-      currentLevel: aal,
-      currentAuthenticationMethods: amr ?? [{ method: "password", timestamp: nowSeconds - 60 }],
-    },
+  mocks.getClaims.mockResolvedValue({
+    data: { claims: { amr: amr ?? [{ method: "password", timestamp: nowSeconds - 60 }] } },
   });
   mocks.findAdmin.mockResolvedValue(row);
 }
@@ -97,21 +90,21 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("requireAdminSession", () => {
-  it("returns the admin without the row's disabled flag for a full aal2 session", async () => {
+describe("requireAdmin", () => {
+  it("returns the admin without the row's disabled flag for a password session", async () => {
     signedIn();
 
-    await expect(requireAdminSession()).resolves.toEqual({
-      admin: { id: ADMIN_ID, email: "admin@example.com", name: "Ada" },
-      aal: "aal2",
-      fromResetLink: false,
+    await expect(requireAdmin()).resolves.toEqual({
+      id: ADMIN_ID,
+      email: "admin@example.com",
+      name: "Ada",
     });
   });
 
   it("looks up the admin row by the id the Auth server confirmed", async () => {
     signedIn();
 
-    await requireAdminSession();
+    await requireAdmin();
 
     expect(mocks.findAdmin).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: ADMIN_ID } }),
@@ -122,7 +115,7 @@ describe("requireAdminSession", () => {
   it("sends a visitor with no session to sign in, keeping the page they asked for", async () => {
     signedOut();
 
-    await expect(outcome(requireAdminSession)).resolves.toBe(
+    await expect(outcome(requireAdmin)).resolves.toBe(
       "redirect:/admin/sign-in?next=%2Fadmin%2Forders%3Fstatus%3Dpaid",
     );
     expect(mocks.findAdmin).not.toHaveBeenCalled();
@@ -132,32 +125,28 @@ describe("requireAdminSession", () => {
     mocks.requestHeaders = new Headers();
     signedOut();
 
-    await expect(outcome(requireAdminSession)).resolves.toBe("redirect:/admin/sign-in");
+    await expect(outcome(requireAdmin)).resolves.toBe("redirect:/admin/sign-in");
   });
 
   it("never carries an unsafe path from the header into next", async () => {
     mocks.requestHeaders = new Headers({ [adminPathHeader]: "//evil.example/admin" });
     signedOut();
 
-    await expect(outcome(requireAdminSession)).resolves.toBe(
-      "redirect:/admin/sign-in?next=%2Fadmin",
-    );
+    await expect(outcome(requireAdmin)).resolves.toBe("redirect:/admin/sign-in?next=%2Fadmin");
   });
 
   // covers: AC-7
   it("sends a session older than 12 hours to sign in with the expired reason and no next", async () => {
     signedIn({ amr: [{ method: "password", timestamp: nowSeconds - 12 * 3600 - 1 }] });
 
-    await expect(outcome(requireAdminSession)).resolves.toBe(
-      "redirect:/admin/sign-in?reason=expired",
-    );
+    await expect(outcome(requireAdmin)).resolves.toBe("redirect:/admin/sign-in?reason=expired");
   });
 
   // covers: AC-6
   it("answers 404 for a signed in user who is not an admin, and logs the denial", async () => {
     signedIn({ row: null });
 
-    await expect(outcome(requireAdminSession)).resolves.toBe("not-found");
+    await expect(outcome(requireAdmin)).resolves.toBe("not-found");
     expect(mocks.warn).toHaveBeenCalledWith(
       expect.objectContaining({ event: "auth.access.denied", adminId: ADMIN_ID }),
       "auth.access.denied",
@@ -165,56 +154,37 @@ describe("requireAdminSession", () => {
   });
 
   // covers: AC-6
-  it("answers 404 for a disabled admin, even with a full aal2 session", async () => {
+  it("answers 404 for a disabled admin, even with a password session", async () => {
     signedIn({ row: { ...activeRow, disabledAt: new Date(NOW_MS - 1000) } });
 
-    await expect(outcome(requireAdminSession)).resolves.toBe("not-found");
+    await expect(outcome(requireAdmin)).resolves.toBe("not-found");
   });
 
-  // covers: AC-5
-  it("sends a password only (aal1) session to the MFA step, keeping the page", async () => {
-    signedIn({ aal: "aal1" });
+  // spec 0019, AC-2: an inbox alone never opens the panel.
+  it("sends an admin whose session an email link opened to sign in, keeping the page", async () => {
+    signedIn({ amr: recoveryAmr });
 
-    await expect(outcome(requireAdminSession)).resolves.toBe(
-      "redirect:/admin/mfa?next=%2Fadmin%2Forders%3Fstatus%3Dpaid",
+    await expect(outcome(requireAdmin)).resolves.toBe(
+      "redirect:/admin/sign-in?next=%2Fadmin%2Forders%3Fstatus%3Dpaid",
     );
   });
 
-  it("lets an aal1 session through only where the caller allows it", async () => {
-    signedIn({ aal: "aal1" });
-
-    await expect(requireAdminSession({ allowAal1: true })).resolves.toMatchObject({ aal: "aal1" });
-  });
-
-  // covers: AC-4 (a reset link session may verify a factor, never enroll one)
-  it("marks a session opened by a password reset link", async () => {
-    signedIn({
-      aal: "aal1",
-      amr: [{ method: "recovery", timestamp: nowSeconds - 30 }],
-    });
-
-    await expect(requireAdminSession({ allowAal1: true })).resolves.toMatchObject({
-      fromResetLink: true,
-    });
-  });
-});
-
-describe("requireAdmin", () => {
-  it("returns just the admin for an allowed session", async () => {
+  it("reads amr from the claims of the confirmed session", async () => {
     signedIn();
 
-    await expect(requireAdmin()).resolves.toEqual({
-      id: ADMIN_ID,
-      email: "admin@example.com",
-      name: "Ada",
-    });
+    await requireAdmin();
+
+    expect(mocks.getClaims).toHaveBeenCalled();
   });
 
-  // covers: AC-5 (every admin action calls this guard, so aal1 never runs one)
-  it("refuses an aal1 session", async () => {
-    signedIn({ aal: "aal1" });
+  it("sends a session whose token cannot be read to a plain sign in, not the expired one", async () => {
+    signedIn();
+    mocks.getClaims.mockResolvedValue({ data: null, error: new Error("invalid JWT") });
 
-    await expect(outcome(requireAdmin)).resolves.toMatch(/^redirect:\/admin\/mfa/);
+    await expect(outcome(requireAdmin)).resolves.toBe(
+      "redirect:/admin/sign-in?next=%2Fadmin%2Forders%3Fstatus%3Dpaid",
+    );
+    expect(mocks.findAdmin).not.toHaveBeenCalled();
   });
 });
 
@@ -246,11 +216,10 @@ describe("adminMetadata", () => {
     await expect(adminMetadata(metadata, { layout: true })).resolves.toEqual({});
   });
 
-  it("gives an aal1 session the metadata only where aal1 is allowed", async () => {
-    signedIn({ aal: "aal1" });
+  it("returns the not found title to an email link session", async () => {
+    signedIn({ amr: recoveryAmr });
 
     await expect(adminMetadata(metadata)).resolves.toEqual({ title: "Page not found" });
-    await expect(adminMetadata(metadata, { allowAal1: true })).resolves.toBe(metadata);
   });
 
   it("never redirects or 404s itself", async () => {
@@ -263,7 +232,7 @@ describe("adminMetadata", () => {
   });
 });
 
-// covers: AC-17
+// covers: spec 0004 AC-17, spec 0019 AC-6
 describe("redirectIfSignedIn", () => {
   it("leaves a signed out visitor on the page", async () => {
     signedOut();
@@ -271,15 +240,14 @@ describe("redirectIfSignedIn", () => {
     await expect(redirectIfSignedIn(undefined)).resolves.toBeUndefined();
   });
 
-  it("sends an aal1 admin to the MFA step, keeping next", async () => {
-    signedIn({ aal: "aal1" });
+  // spec 0019, AC-6
+  it("leaves an admin whose session an email link opened on the page", async () => {
+    signedIn({ amr: recoveryAmr });
 
-    await expect(outcome(() => redirectIfSignedIn("/admin/orders"))).resolves.toBe(
-      "redirect:/admin/mfa?next=%2Fadmin%2Forders",
-    );
+    await expect(redirectIfSignedIn("/admin/orders")).resolves.toBeUndefined();
   });
 
-  it("sends an aal2 admin to next", async () => {
+  it("sends an admin with a password session to next", async () => {
     signedIn();
 
     await expect(outcome(() => redirectIfSignedIn("/admin/orders"))).resolves.toBe(
@@ -288,7 +256,7 @@ describe("redirectIfSignedIn", () => {
   });
 
   // covers: AC-12
-  it("sends an aal2 admin to /admin when next points off site", async () => {
+  it("sends an admin to /admin when next points off site", async () => {
     signedIn();
 
     await expect(outcome(() => redirectIfSignedIn("//evil.example/admin"))).resolves.toBe(

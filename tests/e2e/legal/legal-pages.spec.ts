@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { expect, type Page, type Request, test } from "@playwright/test";
 
 import { expectNoA11yViolations } from "../a11y";
-import { createTestUser, signInFully, withDb } from "../admin/support";
+import { createTestUser, signInAsAdmin, withDb } from "../admin/support";
 import { seedProduct } from "../catalog/support";
 import {
   addToCart,
@@ -90,8 +90,8 @@ test("printing a legal page prints only its text", async ({ page }) => {
 });
 
 test("the admin panel shows no legal footer and no consent banner", async ({ page }) => {
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
 
   await page.goto("/admin");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -231,9 +231,9 @@ test("a ticked Pay records the terms version on the order, shown to the admin", 
     accepted: true,
   });
 
-  const admin = await createTestUser({ enrolled: true });
+  const admin = await createTestUser();
   const adminPage = await (await browser.newContext()).newPage();
-  await signInFully(adminPage, admin);
+  await signInAsAdmin(adminPage, admin);
   await adminPage.goto(`/admin/orders/${row.rows[0]!.number}`);
   await expect(adminPage.getByText(/^version \w+ \d{1,2}, \d{4}, on /)).toBeVisible();
 });
@@ -249,9 +249,9 @@ test("an order from before the feature reads 'not recorded' on the admin page", 
     priceCents: 1250,
   });
 
-  const admin = await createTestUser({ enrolled: true });
+  const admin = await createTestUser();
   const adminPage = await (await browser.newContext()).newPage();
-  await signInFully(adminPage, admin);
+  await signInAsAdmin(adminPage, admin);
   await adminPage.goto(`/admin/orders/${order.number}`);
   const details = adminPage.locator("dl").filter({ hasText: "Terms accepted" });
   await expect(details.getByText("not recorded")).toBeVisible();

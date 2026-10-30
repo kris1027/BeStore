@@ -23,33 +23,24 @@ export function usedActionType(type: string): AuthActionType | null {
   return type === "signup" || type === "recovery" ? type : null;
 }
 
-export type AuthEmailKind = "confirm_signup" | "customer_reset" | "admin_reset";
+export type AuthEmailKind = "confirm_signup" | "customer_reset";
 
-// Admin first: whether the user runs the store cannot be steered by the caller, unlike
-// redirect_to, which anyone with the anon key can set. So an inbox alone never resets a password
-// that guards /admin.
-export function authEmailKind(type: AuthActionType, runsTheStore: boolean): AuthEmailKind {
-  if (type === "signup") return "confirm_signup";
-  return runsTheStore ? "admin_reset" : "customer_reset";
+// spec 0019, AC-8: a store runner gets no reset email from any flow, since an admin password
+// changes only from the terminal. Decided from the user id, which the caller cannot steer, unlike
+// redirect_to, which anyone with the anon key can set.
+export function isStoreRunnerReset(type: AuthActionType, runsTheStore: boolean): boolean {
+  return type === "recovery" && runsTheStore;
 }
 
-const linkPaths: Record<AuthEmailKind, string> = {
-  confirm_signup: "/account/confirm",
-  customer_reset: "/account/confirm",
-  admin_reset: "/auth/confirm",
-};
-
-const linkTypes: Record<AuthEmailKind, AuthActionType> = {
-  confirm_signup: "signup",
-  customer_reset: "recovery",
-  admin_reset: "recovery",
-};
+export function authEmailKind(type: AuthActionType): AuthEmailKind {
+  return type === "signup" ? "confirm_signup" : "customer_reset";
+}
 
 // The token hash link pattern: the page shows Continue first, and only that POST spends it.
-export function authEmailLink(siteUrl: string, kind: AuthEmailKind, tokenHash: string): string {
-  const url = new URL(linkPaths[kind], siteUrl);
+export function authEmailLink(siteUrl: string, type: AuthActionType, tokenHash: string): string {
+  const url = new URL("/account/confirm", siteUrl);
   url.searchParams.set("token_hash", tokenHash);
-  url.searchParams.set("type", linkTypes[kind]);
+  url.searchParams.set("type", type);
   return url.toString();
 }
 

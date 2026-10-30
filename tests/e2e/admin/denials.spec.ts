@@ -1,6 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 
-import { createTestUser, disableAdmin, injectSession, signInFully } from "./support";
+import { seedProduct, waitForEditor } from "../catalog/support";
+import { createTestUser, disableAdmin, injectSession, signInAsAdmin } from "./support";
 
 // Spec 0004, AC-6: anyone who is not an active admin gets the store's plain 404.
 async function expectNotFound(page: Page) {
@@ -31,24 +32,20 @@ test("a signed in non admin gets a 404 on admin pages", async ({ page }) => {
   expect(mfa?.status()).toBe(404);
   await expectNotFound(page);
   await expectNotFoundTitle(page);
-
-  const reset = await page.goto("/admin/reset-password");
-  expect(reset?.status()).toBe(404);
-  await expectNotFoundTitle(page);
 });
 
 test("a disabled admin gets a 404 on their next page and their next action", async ({ page }) => {
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
-  await page.goto("/admin/reset-password");
-  await expect(page.getByRole("heading", { name: "Choose a new password" })).toBeVisible();
+  const product = await seedProduct({ stock: 1, label: "Disabled action" });
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
+  await page.goto(`/admin/products/${product.id}`);
+  await waitForEditor(page, product.name);
 
   await disableAdmin(admin.id);
 
   // The action runs requireAdmin() itself, even though the page was rendered while active.
-  await page.getByLabel("New password").fill("Another-pass-9!");
-  await page.getByLabel("Type it again").fill("Another-pass-9!");
-  await page.getByRole("button", { name: "Save new password" }).click();
+  await page.getByLabel("Name", { exact: true }).fill("Changed by a disabled admin");
+  await page.getByRole("button", { name: "Save details" }).click();
   await expectNotFound(page);
 
   const response = await page.goto("/admin");

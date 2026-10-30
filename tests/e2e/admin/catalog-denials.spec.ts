@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { seedProduct, waitForEditor } from "../catalog/support";
-import { createTestUser, disableAdmin, injectSession, signInFully } from "./support";
+import { createTestUser, disableAdmin, injectSession, signInAsAdmin } from "./support";
 
 // spec 0009, AC-22: every new admin page answers a non admin with the store's 404, and every
 // action checks the admin again, whatever the page showed.
@@ -31,8 +31,8 @@ test("a signed out visitor is sent to sign in", async ({ page }) => {
 
 test("a disabled admin's catalog save changes nothing", async ({ page }) => {
   const product = await seedProduct({ stock: 1, label: "Disabled save" });
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
   await page.goto(`/admin/products/${product.id}`);
   await waitForEditor(page, product.name);
 

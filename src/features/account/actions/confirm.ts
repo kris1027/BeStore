@@ -10,11 +10,13 @@ import { logger } from "@/lib/logger";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { accountPaths } from "../paths";
-import { confirmLinkSchema } from "../schemas";
+import { type ConfirmLinkType, confirmLinkSchema } from "../schemas";
 import { throwawayPassword } from "../throwaway-password";
 
-// The admin reset waits behind the authenticator (spec 0004): the same place /auth/confirm sends.
-const adminResetPath = "/admin/mfa?next=%2Fadmin%2Freset-password";
+// The confirm page's failure view; a known type lets it offer a new link of that kind.
+function failedPath(type?: ConfirmLinkType): string {
+  return `${accountPaths.confirm}?failed=1${type ? `&type=${type}` : ""}`;
+}
 
 // spec 0012, AC-2: the POST half of /account/confirm. Only a person pressing Continue spends the
 // one time token, never a mail scanner that opens the link.
@@ -23,18 +25,27 @@ export async function confirmEmail(formData: FormData): Promise<void> {
     tokenHash: formData.get("token_hash"),
     type: formData.get("type"),
   });
-  if (!parsed.success) redirect(`${accountPaths.confirm}?failed=1`);
+  if (!parsed.success) redirect(failedPath());
   const { tokenHash, type } = parsed.data;
 
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
-  if (error || !data.user) redirect(`${accountPaths.confirm}?failed=1&type=${type}`);
+  if (error || !data.user) redirect(failedPath(type));
 
-  // A password that guards /admin is never changed from an inbox alone (Key invariants), even with
-  // an admin's link pasted here: a reset goes to the authenticator step like /auth/confirm, and a
-  // sign up keeps the admin's password as it is.
+  // A password that guards /admin is never changed from an inbox alone (spec 0019, AC-9), even
+  // with an old or hand made link: a store runner's reset is refused, and the session verifyOtp
+  // just opened is ended on this device. A sign up keeps the admin's password as it is.
   const storeAdmin = await runsTheStore(data.user.id);
-  if (type === "recovery" && storeAdmin) redirect(adminResetPath);
+  if (type === "recovery" && storeAdmin) {
+    const { error: signOutError } = await supabase.auth.signOut({ scope: "local" });
+    if (signOutError) {
+      logger.error(
+        { userId: data.user.id, reason: classifyAuthError(signOutError) },
+        "account.confirm.sign_out_failed",
+      );
+    }
+    redirect(failedPath("recovery"));
+  }
 
   if (type === "signup") {
     if (!storeAdmin) await dropPlantedPassword(supabase, data.user.id);

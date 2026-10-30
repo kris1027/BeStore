@@ -32,14 +32,14 @@ function request(path: string, init: { method?: string; headers?: Record<string,
   });
 }
 
-function signedIn(aal: "aal1" | "aal2") {
-  mocks.getClaims.mockResolvedValue({ data: { claims: { sub: "admin-1", aal, amr } } });
+function signedIn(methods: unknown = amr) {
+  mocks.getClaims.mockResolvedValue({ data: { claims: { sub: "admin-1", amr: methods } } });
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.findUnique.mockResolvedValue(adminRow);
-  signedIn("aal2");
+  signedIn();
 });
 
 // covers: spec 0005 AC-19
@@ -74,21 +74,21 @@ describe("adminAuthProxy admin gate", () => {
     expect(response.headers.get("x-middleware-rewrite")).toMatch(/\/admin\/__denied$/);
   });
 
-  it("redirects an aal1 session to the MFA step with the requested path", async () => {
-    signedIn("aal1");
+  // spec 0019, AC-2: a real 3xx, not the 200 a page's own redirect() streams.
+  it("redirects a session an email link opened to sign in with the requested path", async () => {
+    signedIn([{ method: "recovery", timestamp: now - 60 }]);
 
     const response = await adminAuthProxy(request("/admin/orders?page=2"));
 
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe(
-      "https://shop.example/admin/mfa?next=%2Fadmin%2Forders%3Fpage%3D2",
+      "https://shop.example/admin/sign-in?next=%2Fadmin%2Forders%3Fpage%3D2",
     );
+    expect(response.headers.get("cache-control")).toBe("no-store");
   });
 
-  it("lets an aal1 session open the MFA page", async () => {
-    signedIn("aal1");
-
-    const response = await adminAuthProxy(request("/admin/mfa"));
+  it("lets a password session through to the page", async () => {
+    const response = await adminAuthProxy(request("/admin/orders"));
 
     expect(response.headers.get("x-middleware-next")).toBe("1");
   });

@@ -12,10 +12,10 @@ Optional customer accounts under `/account`: sign up, confirm, choose a password
 - `proxy.ts`, `proxy-decision.ts`: the first gate, called from the root `proxy.ts` for `/account` and `/checkout`. Refreshes the session, redirects signed out visitors to sign in, sets `Cache-Control: no-store` on account pages.
 - `guards.ts`: `redirectIfSignedIn` for the sign in and sign up pages.
 - `queries.ts`, `order-view.ts`: order history and detail; `order-sign-up.ts`: when the confirmation page may offer sign up.
-- `send-email-hook.ts`: `handleSendEmailHook`, behind `POST /api/auth/send-email` (AC-8). Checks the Standard Webhooks signature, picks the template (admin reset first) and sends it within 4 seconds; the pure parts live in `src/lib/email/auth-hook.ts`.
+- `send-email-hook.ts`: `handleSendEmailHook`, behind `POST /api/auth/send-email` (AC-8). Checks the Standard Webhooks signature, skips a recovery email for a user who runs the store (answering 200 so the forgot page reveals nothing), picks the template and sends it within 4 seconds; the pure parts live in `src/lib/email/auth-hook.ts`.
 - `sign-up-email.ts`, `throwaway-password.ts`, `settle.ts`: the sign up call made in `after()` with a password nobody knows, and its failure as a reason code.
 - `src/lib/customer/session.ts`: `getCustomer`, `getCustomerId`, `requireCustomer`. `setup.ts`: `accountSetup` (customer row, guest order links, cart merge). `lock.ts`: `lockCustomer`. `addresses.ts`, `address-rules.ts`: the address book. `store-admin.ts`: `runsTheStore`. `log.ts`: `account.*` events.
-- `src/lib/auth/password.ts`: the one password schema for admin pages, account pages and scripts, mirroring `password_requirements` in `supabase/config.toml`. Keep the two in step.
+- `src/lib/auth/password.ts`: `passwordSchema` for the account pages, mirroring `password_requirements` in `supabase/config.toml` (keep the two in step), and `adminPasswordSchema`, the same rule plus at least 14 characters, which only the admin scripts use (spec 0019, AC-16). Supabase does not enforce the 14 characters; the scripts are the only way an admin password is set.
 
 ## Conventions
 
@@ -25,7 +25,7 @@ Optional customer accounts under `/account`: sign up, confirm, choose a password
 - One advisory lock per customer (`lockCustomer`) guards every write to their cart, addresses or order links. Take it before any cart or order row lock.
 - Sign up never sets the real password: Supabase gets a throwaway one and the customer chooses theirs after confirming. Sign up and forgot password answer the same whatever the email, and the Supabase call runs in `after()`.
 - Email links use the token hash pattern: the GET shows Continue, only the POST calls `verifyOtp`. `/account/confirm` sends `no-referrer` (set in `next.config.ts`).
-- A user who runs the store (an `admin_users` row in any state, or a verified TOTP factor) always gets the admin reset email, keeps their password when a sign up link is confirmed, and cannot delete their account here. `auth.users` and `auth.mfa_factors` are read only, through `$queryRaw`.
+- A user who runs the store (`runsTheStore`: an `admin_users` row in any state) changes their password only from the terminal (`pnpm admin:reset-password`, spec 0019): they get no reset email, a recovery link they confirm is refused and signed out, a sign up link they confirm keeps their password, and set password, change password and delete account all refuse with `runs_the_store`. `auth.users` is read only, through `$queryRaw`.
 - Signed in checkout uses the account email, whatever was typed. An order number that is missing, someone else's or hidden renders the same not found content.
 - Logs carry the customer id, order ids and numbers, counts and reason codes only, never an email, name, address, password or token.
 

@@ -32,7 +32,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 23 | Native controls in GET forms | Slice 9 follow up | done |
 | 16 | Legal pages & cookie consent | Launch | done |
 | 17 | SEO for storefront pages | Launch | done |
-| 18 | Analytics & error tracking | Launch | planned |
+| 24 | Remove admin 2FA | Launch | in-progress |
 | 19 | Production deploy | Launch | planned |
 
 ## Foundations
@@ -101,6 +101,7 @@ spec [0004](../specs/0004-admin-sign-in/index.md) · code in [src/features/admin
 - [x] Test it: `/test admin sign in`
 - [x] Review it (fresh model): `/check review admin sign in`
 - [x] Document it: `/document admin sign in`
+_Note: the TOTP step, the admin email reset and `admin:reset-mfa` were removed by feature 24 (spec [0019](../specs/0019-remove-admin-mfa/index.md)); admins sign in with a password only._
 
 ### 6. Core buy loop · done
 The narrow end to end path: an admin creates a product with variants, price, stock, and one image; the storefront shows a product list and a product page; a customer picks a variant, adds it to a cart, and reaches checkout as a guest.
@@ -337,17 +338,27 @@ spec [0018](../specs/0018-storefront-seo/index.md) · code in [src/lib/seo/](../
 - [x] Verify it: `/check verify SEO for storefront pages` (the Rich Results Test waits for the first preview deploy, a spec 0018 follow-up)
 - [x] Test it: `/test SEO for storefront pages`
 
-### 18. Analytics & error tracking · needs a decision
-See how customers move through the store and know when something breaks.
-**Done when:** the funnel (view product, add to cart, start checkout, pay) is tracked with consent respected; front end and server errors, including failed payments, raise alerts.
-- [ ] Design it (spec): `/architect analytics & error tracking`
+### 24. Remove admin 2FA · in-progress · GA
+Admins sign in with email and password only; the TOTP step goes. An admin password changes only from the terminal, so an inbox alone never opens `/admin`.
+**Done when:** an admin reaches `/admin` with just a password; no MFA or admin email reset surface remains; `pnpm admin:reset-password` works; every existing denial still holds.
+spec [0019](../specs/0019-remove-admin-mfa/index.md) · supersedes parts of spec [0004](../specs/0004-admin-sign-in/index.md) and [0012](../specs/0012-customer-accounts/index.md) · code in [src/features/admin-auth/](../../src/features/admin-auth/), [scripts/admin/](../../scripts/admin/), [docs/runbooks/admin-accounts.md](../runbooks/admin-accounts.md)
+- [x] Design it (spec): `/architect remove admin 2FA`
+- [x] Build it: `/develop remove admin 2FA`
+  - [x] Terminal reset replaces the email reset: `admin:reset-password`, 14 character admin passwords, `admin:create` sets the password, hook skips store runners, `/auth/confirm` and admin reset pages gone (AC-4, AC-7 to AC-10, AC-15, AC-16)
+  - [x] Password only guard: `password` amr rule, proxy redirect, MFA page, actions, lockout, `admin:reset-mfa` and `otpauth` gone (AC-1 to AC-6, AC-11, AC-12, AC-13)
+  - [x] Config and records: TOTP off, runbook, spec 0004 and 0012 notes, README, Firewall item (AC-11, AC-14)
+- [x] Verify it: `/check verify remove admin 2FA`
+- [x] Test it: `/test remove admin 2FA`
+- [x] Review it (fresh model): `/check review remove admin 2FA`
+- [ ] Document it: `/document remove admin 2FA`
 
 ### 19. Production deploy
 The last step: ship to Vercel and the production Supabase project, and turn on the production only settings every earlier slice left for deploy time.
 **Done when:** the production app runs on Vercel against production Supabase, and each production only item below is applied and checked there.
 - [ ] Build it: `/develop production deploy`
-  - [ ] Admin sign in, from the runbook [docs/runbooks/admin-accounts.md](../runbooks/admin-accounts.md): production Supabase auth settings, Resend SMTP, recovery template, redirect URLs, asymmetric JWT keys, the first real admin (spec 0004 AC-10, AC-11)
-  - [ ] Vercel Firewall rate limit on `POST` to `/admin/sign-in`, `/admin/mfa`, `/admin/forgot-password`: 10 per minute per IP, deny 10 minutes (spec 0004 AC-15)
+  - [ ] Admin sign in, from the runbook [docs/runbooks/admin-accounts.md](../runbooks/admin-accounts.md): production Supabase auth settings, Resend SMTP, redirect URLs, asymmetric JWT keys, the first real admin (spec 0004 AC-10, AC-11)
+  - [ ] **Required before the first production admin exists**: Vercel Firewall rate limit on `POST` to `/admin/sign-in` and `/account/sign-in`: 10 per minute per IP, deny 10 minutes (spec 0019 AC-14, replacing spec 0004 AC-15)
+  - [ ] Admin TOTP off in production: delete any existing factors, then turn TOTP enroll and verify off; check the Send Email Hook is on (a reset request for an admin email sends nothing) (spec 0019 AC-8, AC-11)
   - [ ] Vercel Firewall rate limit on `POST /checkout` (promo code Apply and Pay), generous enough for real Pay clicks (spec 0014 Follow-up)
 - [ ] Verify it: `/check verify production deploy`
 
@@ -370,6 +381,7 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Customer email change**: Supabase secure email change, keeping `customers.email` and order linking in step · needs a decision · from spec 0012
 - **Order data retention and export**: set the accounting retention period, extend the spec 0008 purge to settled orders past it, and offer account holders a data export · needs a decision · GA · from spec 0012
 - **Admin customers page**: search customers and see their orders, if support needs it · needs a decision · from spec 0012
+- **Analytics & error tracking (feature 18)**: the consent respected funnel (view product, add to cart, start checkout, pay) and alerts on front end, server and payment errors · needs a decision
 
 ## Legend
 

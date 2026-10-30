@@ -9,7 +9,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { classifyAuthError } from "@/lib/auth/errors";
 import { logAuthEvent, requestIp } from "../log";
-import { mfaPath } from "../safe-admin-path";
+import { safeAdminPath } from "../safe-admin-path";
 import { signInSchema } from "../schemas";
 import { fieldErrors } from "@/lib/form-errors";
 import { endLocalSession } from "@/lib/supabase/session";
@@ -52,5 +52,5 @@ export async function signIn(
   }
 
   logAuthEvent("auth.sign_in.succeeded", { adminId: admin.id, ip });
-  redirect(mfaPath(typeof next === "string" ? next : undefined));
+  redirect(safeAdminPath(next));
 }

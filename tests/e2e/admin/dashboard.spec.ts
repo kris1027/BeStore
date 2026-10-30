@@ -2,7 +2,7 @@ import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoA11yViolations, tabTo } from "../a11y";
 import { blockAppScripts } from "../no-js";
-import { createTestUser, signInFully, withDb } from "./support";
+import { createTestUser, signInAsAdmin, withDb } from "./support";
 
 // spec 0015: the sales dashboard on /admin. The exact sums are proven in tests/db; here, the
 // page, its links, its states and its access. Other tests write orders at the same time, so the
@@ -42,8 +42,8 @@ async function removeOrders(ids: readonly string[]) {
 }
 
 async function signedInAdmin(page: Page) {
-  const admin = await createTestUser({ enrolled: true });
-  await signInFully(page, admin);
+  const admin = await createTestUser();
+  await signInAsAdmin(page, admin);
   return admin;
 }
 
