@@ -75,10 +75,10 @@ must(
 
 step("Starting Stripe webhook forwarding");
 run("docker", ["rm", "--force", stripeListenContainer], { quiet: true });
-const secret = run("docker", stripeSecretArgs(), { capture: true, env: childEnv });
-const webhookSecret = parseWebhookSecret(secret.stdout);
+const printSecret = run("docker", stripeSecretArgs(), { capture: true, env: childEnv });
+const webhookSecret = parseWebhookSecret(printSecret.stdout);
 if (!webhookSecret)
-  fail(`Could not read the webhook secret from the Stripe CLI:\n${secret.stderr}`);
+  fail(`Could not read the webhook secret from the Stripe CLI:\n${printSecret.stderr}`);
 must(run("docker", stripeListenArgs(devPort), { quiet: true, env: childEnv }));
 // It runs detached, so nothing else stops it: every way this script ends (Next.js exiting, a
 // failed step, a crash) removes it. Only a SIGKILL skips this; the next start removes it then.

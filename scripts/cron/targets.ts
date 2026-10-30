@@ -3,8 +3,10 @@ import { z } from "zod";
 // Pure: which cron routes `pnpm cron:run` calls. vercel.json is the one list of crons, so a new
 // cron is runnable locally the moment it is scheduled.
 
+const cronPrefix = "/api/cron/";
+
 const vercelConfigSchema = z.object({
-  crons: z.array(z.object({ path: z.string().startsWith("/api/cron/") })).default([]),
+  crons: z.array(z.object({ path: z.string().startsWith(cronPrefix) })).default([]),
 });
 
 export type CronTargets =
@@ -17,7 +19,7 @@ export function cronTargets(vercelConfig: unknown, names: readonly string[]): Cr
   const all = parsed.data.crons.map((cron) => cron.path);
   if (names.length === 0) return { ok: true, paths: all };
 
-  const known = new Map(all.map((path) => [path.slice("/api/cron/".length), path]));
+  const known = new Map(all.map((path) => [path.slice(cronPrefix.length), path]));
   const unknown = names.filter((name) => !known.has(name));
   if (unknown.length > 0) {
     return {

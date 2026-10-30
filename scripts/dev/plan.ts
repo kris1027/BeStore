@@ -101,17 +101,21 @@ export function siteUrl(port: number): string {
   return `http://localhost:${port}`;
 }
 
+// How Supabase's and the Stripe CLI's containers reach the app.
+function appFromContainers(port: number, path: string): string {
+  return `http://host.docker.internal:${port}${path}`;
+}
+
 // Read by the Supabase CLI through env() in config.toml, only when the stack starts.
 export function sendEmailHookUri(port: number): string {
-  return `http://host.docker.internal:${port}/api/auth/send-email`;
+  return appFromContainers(port, "/api/auth/send-email");
 }
 
 // The auth container keeps the hook URI it started with, so a stack started for another port
 // (plain `pnpm dev` on 3000) sends every auth email to the wrong place until it restarts.
 export function stackNeedsRestart(containerEnv: readonly string[], port: number): boolean {
-  const current = containerEnv
-    .find((line) => line.startsWith("GOTRUE_HOOK_SEND_EMAIL_URI="))
-    ?.slice("GOTRUE_HOOK_SEND_EMAIL_URI=".length);
+  const prefix = "GOTRUE_HOOK_SEND_EMAIL_URI=";
+  const current = containerEnv.find((line) => line.startsWith(prefix))?.slice(prefix.length);
   return current !== sendEmailHookUri(port);
 }
 
@@ -156,7 +160,7 @@ export function stripeListenArgs(port: number): readonly string[] {
     stripeCliImage,
     "listen",
     "--forward-to",
-    `http://host.docker.internal:${port}/api/stripe/webhook`,
+    appFromContainers(port, "/api/stripe/webhook"),
     "--events",
     webhookEvents.join(","),
   ];
