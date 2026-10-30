@@ -80,6 +80,9 @@ const webhookSecret = parseWebhookSecret(secret.stdout);
 if (!webhookSecret)
   fail(`Could not read the webhook secret from the Stripe CLI:\n${secret.stderr}`);
 must(run("docker", stripeListenArgs(devPort), { quiet: true, env: childEnv }));
+// It runs detached, so nothing else stops it: every way this script ends (Next.js exiting, a
+// failed step, a crash) removes it. Only a SIGKILL skips this; the next start removes it then.
+process.on("exit", () => run("docker", ["rm", "--force", stripeListenContainer], { quiet: true }));
 
 console.log(`
   Store        ${siteUrl(devPort)}
@@ -99,7 +102,6 @@ const stop = () => app.kill("SIGINT");
 process.on("SIGINT", stop);
 process.on("SIGTERM", stop);
 app.on("exit", (code) => {
-  run("docker", ["rm", "--force", stripeListenContainer], { quiet: true });
   for (const forward of forwards) forward.kill();
   process.exit(code ?? 0);
 });
