@@ -23,12 +23,14 @@ export const authContainer = `supabase_auth_${dockerProjectId}`;
 const portOffset = 1000;
 
 // Every port key outside a comment (`port`, `shadow_port`, `inspector_port`, ...) moves up by
-// portOffset (55321 → 56321), so no port is shared with the regular stack.
+// portOffset (55321 → 56321), so no port is shared with the regular stack. Auth's site_url, its
+// fallback redirect, follows the app to devPort.
 export function dockerSupabaseConfig(source: string): string {
   const projectLine = /^project_id = ".*"$/m;
   if (!projectLine.test(source)) throw new Error("supabase/config.toml has no project_id line.");
   return source
     .replace(projectLine, `project_id = "${dockerProjectId}"`)
+    .replace(/^site_url = ".*"$/m, `site_url = "${siteUrl(devPort)}"`)
     .replace(
       /^(\s*(?:\w+_)?port = )(\d+)$/gm,
       (_line, key: string, port: string) => `${key}${Number(port) + portOffset}`,

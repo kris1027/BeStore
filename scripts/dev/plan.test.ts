@@ -162,9 +162,16 @@ describe("dockerSupabaseConfig", () => {
 
   it("changes nothing else", () => {
     const strip = (text: string) =>
-      text.replace(/^project_id = .*$/m, "").replace(/^(\s*(?:\w+_)?port = )\d+$/gm, "$1");
+      text
+        .replace(/^project_id = .*$/m, "")
+        .replace(/^site_url = .*$/m, "")
+        .replace(/^(\s*(?:\w+_)?port = )\d+$/gm, "$1");
 
     expect(strip(config)).toBe(strip(source));
+  });
+
+  it("sends auth's fallback redirect to the dev:docker app", () => {
+    expect(config).toMatch(/^site_url = "http:\/\/localhost:3100"$/m);
   });
 
   it("lists the ports the stack publishes, for the dev container to forward", () => {
