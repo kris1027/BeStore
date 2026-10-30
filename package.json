@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:docker": "tsx scripts/dev/docker.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -21,6 +22,7 @@
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:seed": "prisma db seed",
+    "cron:run": "tsx scripts/cron/run.ts",
     "email:dev": "email dev --dir emails --port 3001",
     "admin:create": "tsx scripts/admin/create.ts",
     "admin:disable": "tsx scripts/admin/disable.ts",

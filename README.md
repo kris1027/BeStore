@@ -41,6 +41,16 @@ pnpm dev
 
 Open [localhost:3000](http://localhost:3000). The local seed is demo data; it does not create a live catalog. See the [admin account runbook](docs/runbooks/admin-accounts.md) to create an admin and test sign-in. Do not point seed or database-test commands at a production database.
 
+### Everything wired, with Docker
+
+`pnpm dev:docker` runs the whole store locally with every feature working, in one command. It starts the Supabase stack (database, auth, storage and Mailpit), applies migrations, runs the Stripe CLI in a container that forwards webhooks to the app, and starts Next.js on [localhost:3100](http://localhost:3100), a port that doesn't clash with other dev servers on 3000. You only need `.env.local` filled in as above, with a Stripe **test** key in `STRIPE_SECRET_KEY`. The script reads the matching webhook secret from the Stripe CLI itself, so `STRIPE_WEBHOOK_SECRET` can stay as it is, and it refuses a live key.
+
+- Every email (sign up, password reset, orders) lands in Mailpit at [127.0.0.1:55324](http://127.0.0.1:55324).
+- A test card checkout reaches paid through the forwarded webhook; `docker logs --follow bestore-stripe-listen` shows each delivery.
+- `pnpm cron:run` calls every cron route once, the way Vercel Cron does; `pnpm cron:run reconcile-orders` calls just one. Add `--url http://localhost:3000` when the app runs under `pnpm dev`.
+
+Ctrl+C stops Next.js and the Stripe container; Supabase keeps running with your data (`pnpm db:stop` stops it). The auth server keeps the Send Email Hook port it started with, so `pnpm dev:docker` restarts the stack when it was started for another port. Going back to `pnpm dev` on 3000 afterwards, run `pnpm db:stop && pnpm db:start` once so auth emails reach 3000 again.
+
 ## Checks
 
 | Command | Purpose |
